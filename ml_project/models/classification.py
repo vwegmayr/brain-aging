@@ -23,20 +23,21 @@ class MeanPredictor(BaseEstimator, TransformerMixin):
 class BaseTF(ABC, BaseEstimator):
     """docstring for BaseTF"""
 
-    def __init__(self):
+    def __init__(self, config=None):
         super(BaseTF, self).__init__()
         self._graph_built = False
         self._saver = None
+        self._sess = tf.Session(config=config)
 
-    def _init_session(self, tf_config=None):
+    def _init_session(self):
         if self.optimizer is None:
             raise RuntimeError(
                 "Optimizer not set for {}".format(self.__name__))
 
         if not self._graph_built:
-            self._sess = tf.Session(config=tf_config)
             # Init the network parameters and build the computational graph
             self._build_graph()
+            self._graph_built = True
 
             # Merge all the summaries and dump them to the disk
             # self._summary_merged = tf.summary.merge_all()
@@ -46,9 +47,8 @@ class BaseTF(ABC, BaseEstimator):
             init = tf.global_variables_initializer()
             self._sess.run(init)
 
-            # Tensorflow Saver object
             self._saver = tf.train.Saver()
-            self._graph_built = True
+
 
     def restore_checkpoint(self, checkpoint_path=None):
         """
@@ -96,13 +96,14 @@ class NeuralNetwork(BaseTF):
     """docstring for NeuralNetwork"""
 
     def __init__(self, layers=None, batch_size=None, num_epochs=None,
-                 optimizer=None, learning_rate=1, gradient_max_norm=100,
+                 optimizer_conf=None, gradient_max_norm=100,
                  loss_function=None, random_seed=42, save_path=None):
         super(NeuralNetwork, self).__init__()
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.gradient_max_norm = gradient_max_norm
-        self.optimizer = optimizer["class"](learning_rate=learning_rate)
+        self.optimizer_conf = optimizer_conf
+        self.optimizer = utils.get_object(optimizer_conf["module"], optimizer_conf["class"])(**optimizer_conf["params"])
         self.loss_function = loss_function["class"]
         self.layers = layers
         self.train_op = None
@@ -125,6 +126,8 @@ class NeuralNetwork(BaseTF):
                 self.partial_fit(X_batch, y_batch)
             loss = self.score(X_eval_batch, y_eval_batch)
             print(loss)
+        if self.save_path is not None:
+            self._saver.save(self._sess, self.save_path + "NeuralNetwork.ckpt")
         return self
 
     def partial_fit(self, X, y):
@@ -134,9 +137,12 @@ class NeuralNetwork(BaseTF):
         return loss
 
     def predict(self, X):
+        data = utils.get_object("ml_project.data", "MNIST")()
+        X, _ = data.get_eval_batch(4)
         X = check_array(X, force_all_finite=True, allow_nd=True)
         prediction = self._sess.run([self.prediction],
                                  feed_dict={self._X: X, self._training: False})
+        print(np.array(prediction).shape)
         return prediction
 
     def predict_proba(self, X):
@@ -149,7 +155,7 @@ class NeuralNetwork(BaseTF):
         return loss
 
     def _build_graph(self):
-        self.global_step = tf.Variable(0, trainable=False)
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
         self._X = tf.placeholder(
             tf.float32, [None] + utils.make_list(self.input_shape), name="X")
         self._y = tf.placeholder(
@@ -171,6 +177,31 @@ class NeuralNetwork(BaseTF):
 
         self.train_op = self.optimizer.apply_gradients(
             zip(gradients, variables), global_step=self.global_step, name="train_op")
+
+
+    def set_save_path(self, save_path):
+        self.save_path = save_path
+
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        for key, val in list(state.items()):
+            if "tensorflow" in getattr(val, "__module__", "None"):
+                del state[key]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._sess = tf.Session()
+        self.optimizer = utils.get_object(self.optimizer_conf["module"], self.optimizer_conf["class"])(**self.optimizer_conf["params"])
+        self._build_graph()
+        self._graph_built = True
+        self._saver = tf.train.Saver()
+        self._saver.restore(self._sess, self.save_path + "NeuralNetwork.ckpt")
+
+# How to pass checkpoint_path to set_state?
+# How to re-init optimizer during unpickling?
+
 
 def mean_cross_entropy(logits, labels):
     return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=labels))

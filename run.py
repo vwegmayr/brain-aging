@@ -24,7 +24,7 @@ class Action(ABC):
     def __init__(self, args):
         self.args = args
         self._check_action(args.action)
-        if self.args.X is not None and self.args.y is not None:
+        if self.args.X is not None:
             self.X, self.y = self._load_data()
         self.save_path = self._mk_save_folder()
         self.X_new, self.y_new = None, None
@@ -102,6 +102,7 @@ class ConfigAction(Action):
             self.model.fit(self.config["data"]["class"]())
         elif self.args.X is not None and self.args.y is None:
             self.model.fit(self.X, self.y)
+        joblib.dump(self.model, normpath("test.pkl"))
 
     def fit_transform(self):
         self.fit()

@@ -60,7 +60,7 @@ class ConfigParser:
                     obj['function'] = getattr(obj['class'], obj['function'])
             # Do the same thing for all other keys
             for key, value in obj.items():
-                if key != 'module' and key != 'class':
+                if key != 'module' and key != 'class' and "_conf" not in key:
                     ConfigParser.import_python_classes(value)
 
         # If the object is a list, continue the search for each item
