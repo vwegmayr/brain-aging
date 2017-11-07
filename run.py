@@ -24,7 +24,8 @@ class Action(ABC):
     def __init__(self, args):
         self.args = args
         self._check_action(args.action)
-        self.X, self.y = self._load_data()
+        if self.args.X is not None and self.args.y is not None:
+            self.X, self.y = self._load_data()
         self.save_path = self._mk_save_folder()
         self.X_new, self.y_new = None, None
         self._X_new_set, self._y_new_set = False, False
@@ -97,7 +98,10 @@ class ConfigAction(Action):
         self.act()
 
     def fit(self):
-        self.model.fit(self.X, self.y)
+        if "data" in self.config and self.args.X is None and self.args.y is None:
+            self.model.fit(self.config["data"]["class"]())
+        elif self.args.X is not None and self.args.y is None:
+            self.model.fit(self.X, self.y)
 
     def fit_transform(self):
         self.fit()
@@ -105,8 +109,7 @@ class ConfigAction(Action):
 
     def _save(self):
         class_name = self.config["class"].__name__
-        joblib.dump(self.model,
-                    normpath(self.save_path+class_name+".pkl"))
+        joblib.dump(self.model, normpath(self.save_path+class_name+".pkl"))
 
         if self._X_new_set:
             path = self.save_path+"X_new.npy"
@@ -196,7 +199,7 @@ if __name__ == '__main__':
     arg_parser.add_argument("-C", "--config", help="config file")
     arg_parser.add_argument("-M", "--model", help="model file")
 
-    arg_parser.add_argument("-X", help="Input data", required=True)
+    arg_parser.add_argument("-X", help="Input data")
     arg_parser.add_argument("-y", help="Input labels")
 
     arg_parser.add_argument("-a", "--action", choices=["transform", "predict",
