@@ -21,7 +21,7 @@ class Pipeline(Pipeline):
             else:
                 name = dict_["class"].__name__
             if "params" in dict_:
-                params = dict_["params"]
+                params = dict_["params"]                
                 steps.append((name, dict_["class"](**params)))
             else:
                 steps.append((name, dict_["class"]()))
@@ -29,7 +29,7 @@ class Pipeline(Pipeline):
 
     def set_save_path(self, save_path):
         self.save_path = save_path
-        for dict_ in self.class_list:
-            if hasattr(dict_["class"], "set_save_path"):
-                param = {dict_["class"].__name__+"__save_path": save_path}
-                self.set_params(**param)
+        for idx, step in enumerate(self.steps):
+            estimator = step[1]
+            if hasattr(estimator, "set_save_path"):
+                self.steps[idx][1].set_save_path(save_path)

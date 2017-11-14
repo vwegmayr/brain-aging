@@ -13,6 +13,7 @@ from ml_project import configparse
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
+from ml_project.models.utils import get_object
 
 
 class Action(ABC):
@@ -100,9 +101,8 @@ class ConfigAction(Action):
     def fit(self):
         if "data" in self.config and self.args.X is None and self.args.y is None:
             self.model.fit(self.config["data"]["class"]())
-        elif self.args.X is not None and self.args.y is None:
+        elif self.args.X is not None and self.args.y is not None:
             self.model.fit(self.X, self.y)
-        joblib.dump(self.model, normpath("test.pkl"))
 
     def fit_transform(self):
         self.fit()

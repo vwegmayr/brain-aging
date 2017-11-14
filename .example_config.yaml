@@ -33,7 +33,7 @@ params:
 
 #Example 4
 #smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#module: ml_project.model_selection
+#module: ml_project.gridsearch
 #class: GridSearchCV
 #params:
 #  est_module: ml_project.pipeline

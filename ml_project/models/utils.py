@@ -9,6 +9,7 @@ import re
 
 import nibabel as nib
 import numpy as np
+import scipy as sp
 import sklearn.metrics as metrics
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -16,6 +17,41 @@ import yaml
 import importlib
 
 from . import config_wrapper
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import check_is_fitted, check_X_y
+from ml_project.data import DataLoader
+
+class Connector(BaseEstimator, TransformerMixin):
+    """docstring for Connector"""
+    def __init__(self):
+        super(Connector, self).__init__()
+
+    def fit(self, X, y):
+        check_X_y(X, y, force_all_finite=True,
+                        allow_nd=True,
+                        multi_output=True)
+        return self
+
+    def transform(self, X, y=None):
+        return DataLoader(X, y)
+
+    def fit_transform(self, X, y=None):
+        self.fit(X, y)
+        return self.transform(X, y)
+        
+
+def logits2labels(logits):
+    logits = np.squeeze(logits)
+    labels = np.argmax(logits, axis=-1)
+    return labels
+
+def logits2proba(logits):
+    logits = np.squeeze(logits)
+    num_classes = logits.shape[-1]
+    sig = sp.special.expit(logits)
+    Z = np.sum(sig, axis=-1, keepdims=True)
+    proba = sig / np.tile(Z, (1, num_classes))
+    return proba
 
 def get_object(module_string, class_string):
     module = importlib.import_module(module_string)
