@@ -64,6 +64,10 @@ class BaseTF(ABC, BaseEstimator):
                                "got {}, expected {}.".format(list(y.shape[1:]), self.output_shape))
 
     @abstractmethod
+    def parser(self, record):
+        pass
+
+    @abstractmethod
     def _partial_fit(self, X, y):
         pass
 
@@ -73,12 +77,13 @@ class BaseTF(ABC, BaseEstimator):
 
     def _set_model(self):
         if not self._model_set:
-            self._set_sess()
             self._set_optimizer()
             self._set_graph()
+            self._set_sess()
 
-            init = tf.global_variables_initializer()
-            self._sess.run(init)
+            init_op = tf.group(tf.global_variables_initializer(),
+                               tf.local_variables_initializer())
+            self._sess.run(init_op)
             self._saver = tf.train.Saver()
 
             self._model_set = True
@@ -140,19 +145,31 @@ class NeuralNetwork(BaseTF):
                                             random_seed)
 
     def fit(self, data, y=None):
+        
+        self._set_model()
+        #self._sess.run(self.train_op)
+
+        self._sess.run(self.iterator.initializer, feed_dict={self.filenames: ["data/tf.test"]})
+        
+        while True:
+            try:
+                self._sess.run(self.train_op)
+            except tf.errors.OutOfRangeError:
+                break
+        
+        """
         batches_per_epoch = int(data.num_samples("train") / self.batch_size)
         self.input_shape = data.input_shape()
         self.output_shape = data.output_shape()
         self._set_model()
-
         for epoch in range(self.num_epochs):
             for batch in range(batches_per_epoch):
                 X_batch, y_batch = data.get_batch(self.batch_size, "train")
                 self._partial_fit(X_batch, y_batch)
-
+        """
         if self.save_path is not None:
             self._saver.save(self._sess, self.save_path + self.__class__.__name__ + ".ckpt")
-
+        
         return self
 
     def _partial_fit(self, X, y):
@@ -191,15 +208,44 @@ class NeuralNetwork(BaseTF):
                                  feed_dict={self._X: X, self._y: y, self._training: False})
         return loss
 
+    def parser(self, record):
+       keys_to_features = {
+           "X": tf.FixedLenFeature(shape=[], dtype=tf.string),
+           "y": tf.FixedLenFeature(shape=[], dtype=tf.int64),
+       }
+       parsed = tf.parse_single_example(record, features=keys_to_features)
+
+       image = tf.decode_raw(parsed["X"], tf.float64)
+       #image.set_shape([20])
+       image = tf.reshape(image, [20])
+       label = tf.cast(parsed["y"], tf.float64)
+       #label.set_shape([])
+       label = tf.reshape(label, [1])
+
+       return image, label
+
     def _set_graph(self):
         if not self._graph_set:
             self.global_step = tf.Variable(0, trainable=False, name="global_step")
+            self._training = tf.placeholder_with_default(True, shape=[], name="training")
+
+            self.filenames = tf.placeholder(tf.string, shape=[None])
+            
+            self.dataset = tf.data.TFRecordDataset(self.filenames)
+            self.dataset = self.dataset.map(self.parser)
+            self.dataset = self.dataset.shuffle(buffer_size=10000)
+            self.dataset = self.dataset.batch(self.batch_size)
+            self.dataset = self.dataset.repeat(self.num_epochs)
+            self.iterator = self.dataset.make_initializable_iterator()
+        
+            self._X, self._y = self.iterator.get_next()
+            """
             self._X = tf.placeholder(
                 tf.float32, [None] + utils.make_list(self.input_shape), name="X")
             self._y = tf.placeholder(
                 tf.float32, [None] + utils.make_list(self.output_shape), name="y")
-            self._training = tf.placeholder_with_default(True, shape=[], name="training")
-         
+            """
+            
             self.logits = tf.contrib.layers.flatten(
             layers.build_architecture(x=self._X, architecture=self.layers, scope="layers",
                 training=self._training))
@@ -214,7 +260,7 @@ class NeuralNetwork(BaseTF):
 
             self.train_op = self.optimizer.apply_gradients(
                 zip(gradients, variables), global_step=self.global_step, name="train_op")
-
+            
             self._graph_set = True
 
 
