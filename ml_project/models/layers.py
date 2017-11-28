@@ -182,9 +182,9 @@ def dense_layer(x, layer, name, reuse=None, weight_decay=None):
         Returns a new dense layer.
     """
     with tf.name_scope('dense'):
-        return tf.layers.dense(inputs=tf.contrib.layers.flatten(x), units=layer['units'],
-                               activation=eval(layer['activation']),
-                               kernel_regularizer=weight_decay, reuse=reuse, name=name)
+      return tf.layers.dense(inputs=tf.contrib.layers.flatten(x), units=layer['units'],
+                             activation=eval(layer['activation']),
+                             kernel_regularizer=weight_decay, reuse=reuse, name=name)
 
 
 def build_architecture(x, architecture, training, scope, reuse=None, weight_decay=None):

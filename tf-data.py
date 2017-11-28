@@ -3,39 +3,59 @@ import tensorflow as tf
 import glob
 import os
 import numpy as np
+import pandas as pd
+import argparse
 
-def _int64_feature(value):
-  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+def tf_feature(value, list_type):
+  if not isinstance(value, list):
+    value = [value]
 
-def _bytes_feature(value):
-  return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+  if list_type not in ["Int64", "Float", "Bytes"]:
+    raise RuntimeError("Unsupported list_type: {}".format(list_type))
 
-image_folder = "/local/OASIS/OASIS_normalized/CV1/*.nii.gz"
+  tf_list = getattr(tf.train, list_type + "List")(value=value)
+  tf_dict = {list_type.lower() + "_list": tf_list}
 
-writer = tf.python_io.TFRecordWriter("data/tf.test")
-
-num_samples = len(glob.glob(image_folder))
-print("num samples = {}".format(num_samples))
-
-np.random.seed(42)
-
-labels = np.random.randint(2, size=num_samples)
-
-i=0
-for file in glob.glob(image_folder):
-    img = nib.load(file)
-    shape = img.shape
-    #data = img.get_data()
-    data = np.random.rand(20)
-
-    feature = {
-               "y": _int64_feature(labels[i]),
-               "X": _bytes_feature(data.tostring())
-              }
+  return tf.train.Feature(**tf_dict)
 
 
-    example = tf.train.Example(features=tf.train.Features(feature=feature))
-    writer.write(example.SerializeToString())
-    i += 1
+def transform_files_to_tfrecord(args):
+  writer = tf.python_io.TFRecordWriter(args.output)
 
-writer.close()
+  if args.type == "nii":
+
+    labels = pd.read_csv(args.labels)
+    labels = labels.set_index("file").to_dict(orient="index")
+
+
+    for file in glob.glob(os.path.join(args.input, "*.nii*")):
+      image = nib.load(file).get_data()
+      feature = {"image": tf_feature(image.tostring(), "Bytes"),
+                 "shape": tf_feature(list(image.shape), "Int64"),
+                 "label": tf_feature(labels[file]["label"], "Int64")}
+      example = tf.train.Example(features=tf.train.Features(feature=feature))
+      writer.write(example.SerializeToString())
+    
+  else:
+    np.random.seed(42)
+    labels = np.random.randint(2, size=100)
+    data = np.random.rand(100,20)
+    for i in range(len(labels)):
+      feature = {"X": tf_feature(data[i, :].tostring(), "Bytes"),
+                 "y": tf_feature(labels[i], "Int64"),
+                 "X_shape": tf_feature([20], "Int64"),
+                 "X_dtype": tf_feature([b for b in "float64".encode("ascii")], "Int64")}
+      example = tf.train.Example(features=tf.train.Features(feature=feature))
+      writer.write(example.SerializeToString())
+
+  writer.close()
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser(description="Transform set of files to TFRecord binary file.")
+  parser.add_argument("-i", "--input", help="Path to directory containing the files.")
+  parser.add_argument("-L", "--labels", help="Path to labels.")
+  parser.add_argument("-o", "--output", help="Name of output TFRecord file.")
+  parser.add_argument("-t", "--type", help="File format of input", choices=["nii"])
+  args = parser.parse_args()
+
+  transform_files_to_tfrecord(args)
