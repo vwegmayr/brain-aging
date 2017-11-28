@@ -41,10 +41,10 @@ def transform_files_to_tfrecord(args):
     labels = np.random.randint(2, size=100)
     data = np.random.rand(100,20)
     for i in range(len(labels)):
-      feature = {"X": tf_feature(data[i, :].tostring(), "Bytes"),
-                 "y": tf_feature(labels[i], "Int64"),
-                 "X_shape": tf_feature([20], "Int64"),
-                 "X_dtype": tf_feature([b for b in "float64".encode("ascii")], "Int64")}
+      feature = {"X_input": tf_feature(data[i, :].tostring(), "Bytes"),
+                 "y_label": tf_feature(labels[i], "Int64"),
+                 "X_input_shape": tf_feature([20], "Int64"),
+                 "X_input_dtype": tf_feature([b for b in "float64".encode("ascii")], "Int64")}
       example = tf.train.Example(features=tf.train.Features(feature=feature))
       writer.write(example.SerializeToString())
 

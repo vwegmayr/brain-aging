@@ -30,31 +30,33 @@ def get_example_structure(tf_record_file):
 
   features = json.loads(features)["features"]["feature"]
 
-  feature_structure = {}
+  example_structure = {}
 
   for feature_name, body in features.items():
     for list_type in ["int64List", "bytesList", "floatList"]:
       try:
         feature_value = body[list_type]
-        feature_structure[feature_name] = {"type": list_type}
+        example_structure[feature_name] = {"type": list_type}
         if "shape" in feature_name:
           if list_type != "int64List":
             message = "Expected int64List for shape feature of {}, got {}"
             warnings.warn(message.format(feature_name.split("_")[0], list_type))
-          feature_structure[feature_name]["value"] = [int(dim) for dim in feature_value["value"]]
+          example_structure[feature_name]["value"] = [int(dim) for dim in feature_value["value"]]
         if "dtype" in feature_name:          
-          feature_structure[feature_name]["value"] = "".join(map(lambda x: chr(int(x)), feature_value["value"]))
+          example_structure[feature_name]["value"] = "".join(map(lambda x: chr(int(x)), feature_value["value"]))
       except KeyError:
         pass
 
-  for key, val in list(feature_structure.items()):
-    var_key = key.split("_")[0]
+  for key, val in list(example_structure.items()):
+    var_key = "_".join(key.split("_")[:-1])
     if "shape" in key:
-      feature_structure[var_key]["shape"] = val["value"]
+      example_structure[var_key]["shape"] = val["value"]
+      example_structure.pop(key)
     if "dtype" in key:
-      feature_structure[var_key]["dtype"] = val["value"]
+      example_structure[var_key]["dtype"] = val["value"]
+      example_structure.pop(key)
 
-  return feature_structure
+  return example_structure
 
 
 def basic_parser(record, example_structure):
@@ -68,7 +70,10 @@ def basic_parser(record, example_structure):
     elif va["type"] == "floatList":
       dytpe = tf.float32
 
-    if "dtype" in key:
+    #if "dtype" in key:
+    #  keys_to_features[key] = tf.VarLenFeature(dtype=dtype)
+    #else:
+    if "input" in key:
       keys_to_features[key] = tf.VarLenFeature(dtype=dtype)
     else:
       keys_to_features[key] = tf.FixedLenFeature(shape=[], dtype=dtype)
@@ -79,6 +84,8 @@ def basic_parser(record, example_structure):
     if val["type"] == "int64List":
       parsed[key] = tf.cast(parsed[key], tf.int64)
     elif val["type"] == "bytesList":
+      if "input" in key:
+        parsed[key] = tf.sparse_tensor_to_dense(parsed[key], default_value="0")
       parsed[key] = tf.decode_raw(parsed[key], getattr(tf, val["dtype"]))
     elif val["type"] == "floatList":
       parsed[key] = tf.cast(parsed[key], tf.float32)
@@ -97,7 +104,7 @@ class Parser(ABC):
     self.example_structure = example_structure
 
   @abstractmethod
-  def parse(self, record):
+  def parse_fn(self, record):
     pass
     
 
@@ -106,7 +113,7 @@ class MyParser(Parser):
   def __init__(self, example_structure):
     super(MyParser, self).__init__(example_structure)
 
-  def parse(self, record):
+  def parse_fn(self, record):
     basic_parsed = basic_parser(record, self.example_structure)
 
-    return {"X": basic_parsed["X"]}, basic_parsed["y"]
+    return {"X_input": basic_parsed["X_input"]}, basic_parsed["y_label"]
