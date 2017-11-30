@@ -8,13 +8,11 @@ import csv
 import time
 
 from sklearn.externals import joblib
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from ml_project.configparse import ConfigParser
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
-from ml_project.models.utils import get_object
 
 
 class Action(ABC):
@@ -165,7 +163,7 @@ class ModelAction(Action):
     def _save(self):
         y_path = normpath(os.path.join(self.save_path, "y_" + self.time_stamp + ".csv"))
         X_path = normpath(os.path.join(self.save_path, "X_" + self.time_stamp + ".npy"))
-        
+
         if self.X_new is not None:
             np.save(X_path, self.X_new)
 
