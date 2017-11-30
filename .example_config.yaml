@@ -51,18 +51,18 @@ params:
 #class: ml_project.models.regression.ExampleTF
 #params:
 #  input_fn_config:
-#    batch_size: 1
-#    num_epochs: 1
+#    batch_size: 64
+#    num_epochs: 5
 #    shuffle: True
 #    queue_capacity: 1000
 #    num_threads: 1
 #  config:
-#    save_summary_steps: 100
+#    save_summary_steps: 10
 #    tf_random_seed: 42
 #    save_checkpoints_steps: 100
 #    #save_checkpoints_secs:
 #    keep_checkpoint_max: 5
-#    log_step_count_steps: 100
+#    log_step_count_steps: 10
 #  params:
 #    learning_rate: 0.005
 #    hooks:
