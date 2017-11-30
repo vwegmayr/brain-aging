@@ -6,54 +6,65 @@
 
 #Example 1
 #smt run --config .config.yaml -X data/X_train.npy -a fit_transform
-module: ml_project.models.feature_selection
-class: RandomSelection
+class: ml_project.models.feature_selection.RandomSelection
 params:
   n_components: 1000
   random_state: 37
 
 #Example 2 (Warning: might exceed your memory)
 #smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#module: ml_project.models.regression
-#class: KernelEstimator
+#class: ml_project.models.regression.KernelEstimator
 
 #Example 3
 #smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#module: ml_project.pipeline
-#class: Pipeline
+#class: ml_project.pipeline.Pipeline
 #params:
 #  class_list:
-#    - module: ml_project.models.feature_selection
-#      class: RandomSelection
+#    - class: ml_project.models.feature_selection.RandomSelection
 #      params:
 #        random_state: 37
 #        n_components: 1000
-#    - module: sklearn.linear_model
-#      class: LinearRegression
+#    - class: sklearn.linear_model.LinearRegression
 
 #Example 4
 #smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#module: ml_project.gridsearch
-#class: GridSearchCV
+#class: ml_project.gridsearch.GridSearchCV
 #params:
-#  est_module: ml_project.pipeline
-#  est_class: Pipeline
+#  est_class: ml_project.pipeline.Pipeline
 #  est_params:
-#    - module: ml_project.models.feature_selection
-#      class: RandomSelection
+#    - class: ml_project.models.feature_selection.RandomSelection
 #      params:
 #        random_state: 37
-#    - module: sklearn.linear_model
-#      class: LinearRegression
+#    - class: sklearn.linear_model.LinearRegression
 #  param_grid:
 #    RandomSelection__n_components:
 #      - 100
 #      - 1000
 #      - 10000
 #  cv:
-#    module: sklearn.model_selection
-#    class: KFold
+#    class: sklearn.model_selection.KFold
 #    params:
 #      n_splits: 3
 #      shuffle: True
 #      random_state: 37
+
+#class: ml_project.models.regression.ExampleTF
+#params:
+#  input_fn_config:
+#    batch_size: 1
+#    num_epochs: 1
+#    shuffle: True
+#    queue_capacity: 1000
+#    num_threads: 1
+#  config:
+#    save_summary_steps: 100
+#    tf_random_seed: 42
+#    save_checkpoints_steps: 100
+#    #save_checkpoints_secs:
+#    keep_checkpoint_max: 5
+#    log_step_count_steps: 100
+#  params:
+#    learning_rate: 0.005
+#    hooks:
+#      - type: SummarySaverHook
+#        params: {name: mean_output, op: scalar, save_steps: 10}
