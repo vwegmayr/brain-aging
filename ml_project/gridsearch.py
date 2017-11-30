@@ -1,5 +1,7 @@
 from sklearn.model_selection import GridSearchCV
 import pandas as pd
+import os
+import shutil
 from os.path import normpath
 
 
@@ -25,27 +27,31 @@ class GridSearchCV(GridSearchCV):
                                            n_jobs=n_jobs,
                                            refit=True,
                                            error_score=error_score,
+                                           return_train_score=False,
                                            **kwargs)
 
     def fit(self, X, y=None, groups=None, **fit_params):
         super(GridSearchCV, self).fit(X, y, groups, **fit_params)
 
         if self.save_path is not None:
+            print("Best params: {}".format(self.best_params_))
+            print(self.save_path)
             data = {
                 "best_params_": self.best_params_,
                 "mean_test_score": self.cv_results_["mean_test_score"],
                 "std_test_score": self.cv_results_["std_test_score"],
             }
             df = pd.DataFrame.from_dict(pd.io.json.json_normalize(data))
-            df.to_csv(normpath(self.save_path+"GridSearchCV.csv"))
-
-            if hasattr(self.best_estimator_, "save_path"):
-                self.best_estimator_.set_save_path(self.save_path)
+            df.to_csv(normpath(os.path.join(self.save_path, "GridSearchCV.csv")))
 
         return self
 
     def set_save_path(self, save_path):
         self.save_path = save_path
+
+        if hasattr(self.estimator, "set_save_path"):
+            self.estimator.set_save_path(save_path)
+
         if (hasattr(self, "best_estimator_") and
-           hasattr(self.best_estimator_, "save_path")):
+            hasattr(self.best_estimator_, "set_save_path")):
             self.best_estimator_.set_save_path(save_path)

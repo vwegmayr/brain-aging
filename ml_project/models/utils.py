@@ -15,11 +15,16 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import yaml
 import importlib
+import builtins
 
 from . import config_wrapper
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted, check_X_y
 from ml_project.data import DataLoader
+
+
+def print(string):
+    builtins.print(string, flush=True)
 
 class Connector(BaseEstimator, TransformerMixin):
     """docstring for Connector"""

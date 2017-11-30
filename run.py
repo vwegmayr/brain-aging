@@ -5,11 +5,12 @@ import os
 import sys
 import pandas as pd
 import csv
+import time
 
 from sklearn.externals import joblib
 from abc import ABC
 from abc import abstractmethod
-from ml_project import configparse
+from ml_project.configparse import ConfigParser
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
@@ -27,9 +28,8 @@ class Action(ABC):
         self._check_action(args.action)
         if self.args.X is not None:
             self.X, self.y = self._load_data()
-        self.save_path = self._mk_save_folder()
+        self._mk_save_folder()
         self.X_new, self.y_new = None, None
-        self._X_new_set, self._y_new_set = False, False
 
     @abstractmethod
     def _save(self):
@@ -46,8 +46,7 @@ class Action(ABC):
     def act(self):
         self.model = self._load_model()
         getattr(self, self.args.action)()
-        if self.args.smt_label != "debug":
-            self._save()
+        self._save()
 
     def _load_data(self):
         try:
@@ -63,25 +62,28 @@ class Action(ABC):
                 print("{} not found. "
                       "Please download data first.".format(self.args.y))
                 exit()
+            except UnicodeDecodeError:
+                y = np.load(self.args.y)
         else:
             y = None
         return X, y
 
     def _mk_save_folder(self):
         if self.args.smt_label != "debug":
-            basename = self.args.smt_label
-            path = "data/"+basename+"/"
-            os.mkdir(normpath(path))
-            return path
+          self.time_stamp = self.args.smt_label
         else:
-            return None
+          self.time_stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime()) + "-debug"
+
+        path = os.path.join("data", self.time_stamp)
+        os.mkdir(os.path.normpath(path))
+
+        self.save_path = path
 
     def transform(self):
         if "y" in getfullargspec(self.model.transform).args:
             self.X_new = self.model.transform(self.X, self.y)
         else:
             self.X_new = self.model.transform(self.X)
-        self._X_new_set = True
 
 
 class ConfigAction(Action):
@@ -110,11 +112,13 @@ class ConfigAction(Action):
 
     def _save(self):
         class_name = self.config["class"].__name__
-        joblib.dump(self.model, normpath(self.save_path+class_name+".pkl"))
+        model_path = normpath(os.path.join(self.save_path, class_name+".pkl"))
+        print("saving model to {}".format(model_path))
+        joblib.dump(self.model, model_path)
 
-        if self._X_new_set:
-            path = self.save_path+"X_new.npy"
-            np.save(normpath(path), self.X_new)
+        if self.X_new is not None:
+            X_path = normpath(os.path.join(self.save_path, "X_" + self.time_stamp + ".npy"))
+            np.save(X_path, self.X_new)
 
     def _load_model(self):
         if "params" in self.config:
@@ -151,35 +155,35 @@ class ModelAction(Action):
 
     def predict(self):
         self.y_new = self.model.predict(self.X)
-        self._y_new_set = True
 
     def predict_proba(self):
         self.y_new = self.model.predict_proba(self.X)
-        self._y_new_set = True
 
     def score(self):
         self.model.score(self.X, self.y)
 
     def _save(self):
-        y_path = normpath(self.save_path+"y_"+self.args.smt_label+".csv")
-        X_path = normpath(self.save_path+"X_new.npy")
-        if self._X_new_set:
+        y_path = normpath(os.path.join(self.save_path, "y_" + self.time_stamp + ".csv"))
+        X_path = normpath(os.path.join(self.save_path, "X_" + self.time_stamp + ".npy"))
+        
+        if self.X_new is not None:
             np.save(X_path, self.X_new)
-        if self._y_new_set and self.args.action == "predict":
-            df = pd.DataFrame({"Prediction": self.y_new})
-            df.index += 1
-            df.index.name = "ID"
-            df.to_csv(y_path)
-        elif self._y_new_set and self.args.action == "predict_proba":
-            with open(y_path, "w") as csvfile:
-                writer = csv.writer(csvfile, delimiter=',')
-                writer.writerow(["ID", "Prediction"])
-                n = 1
-                for prediction in self.y_new:
-                    prediction = np.round(prediction, decimals=4)
-                    prediction = " ".join(prediction.astype("str"))
-                    writer.writerow([n, prediction])
-                    n += 1
+
+        if self.y_new is not None:
+            if isinstance(self.y_new, (np.ndarray, list)):
+                with open(y_path, "w") as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',')
+                    writer.writerow(["ID", "Prediction"])
+                    for id, prediction in enumerate(self.y_new):
+                        prediction = np.round(prediction, decimals=6)
+                        if len(prediction.shape) > 1:
+                            prediction = " ".join(prediction.astype("str"))
+                        writer.writerow([id, prediction])
+            elif isinstance(self.y_new, dict):
+                df = pd.DataFrame(self.y_new)
+                df.index += 1
+                df.index.name = "ID"
+                df.to_csv(y_path)
 
     def _load_model(self):
         model = joblib.load(self.args.model)
@@ -215,6 +219,5 @@ if __name__ == '__main__':
     if args.config is None:
         ModelAction(args)
     else:
-        config_parser = configparse.ConfigParser()
-        config = config_parser.parse_config(args.config)
+        config = ConfigParser().parse(args.config)
         ConfigAction(args, config)

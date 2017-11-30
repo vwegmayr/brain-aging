@@ -36,7 +36,7 @@ class ConfigParser:
       if isinstance(yaml_dict, dict):
 
           # Add custom replacements here
-          replace_obj_from_module("_fn", yaml_dict)
+          replace_obj_from_module(["_fn", "_func", "class"], yaml_dict)
 
           for key, value in yaml_dict.items():
             self.parse_python_objects(value)
@@ -46,7 +46,7 @@ class ConfigParser:
           self.parse_python_objects(item)
 
 
-def replace_obj_from_module(string, dict):
+def replace_obj_from_module(strings, dict):
     """Replace string values with objects, in place.
 
     If a key in dict contains string, the value is replaced with
@@ -57,13 +57,15 @@ def replace_obj_from_module(string, dict):
       string (str): String to look for.
       dict (dict): Dictionary being parsed.
     """
-    if any_key_contains(string, dict):
-      full_keys = get_full_keys_containing(string, dict)
-      for full_key in full_keys:
-        module_string = ".".join(dict[full_key].split(".")[:-1])
-        module = importlib.import_module(module_string)
-        obj_key = dict[full_key].split(".")[-1]
-        dict[full_key] = getattr(module, obj_key)
+    for string in strings:
+      if any_key_contains(string, dict):
+        full_keys = get_full_keys_containing(string, dict)
+        for full_key in full_keys:
+          if isinstance(dict[full_key], str):
+            module_string = ".".join(dict[full_key].split(".")[:-1])
+            module = importlib.import_module(module_string)
+            obj_key = dict[full_key].split(".")[-1]
+            dict[full_key] = getattr(module, obj_key)
 
 
 def any_key_contains(string, dict):

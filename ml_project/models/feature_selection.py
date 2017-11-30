@@ -20,7 +20,7 @@ class NonZeroSelection(BaseEstimator, TransformerMixin):
 
 class RandomSelection(BaseEstimator, TransformerMixin):
     """Random Selection of features"""
-    def __init__(self, n_components=1000, random_state=None):
+    def __init__(self, n_components=1000, random_state=42):
         self.n_components = n_components
         self.random_state = random_state
         self.components = None
