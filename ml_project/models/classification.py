@@ -58,7 +58,7 @@ class ExampleTF(BaseTF):
             activation=None)
 
         probabs = tf.nn.softmax(logits)
-        predictions = tf.nn.argmax(probabs)
+        predictions = tf.argmax(probabs)
 
         loss = tf.nn.softmax_cross_entropy_with_logits(
             labels=tf.one_hot(labels, depth=4),
