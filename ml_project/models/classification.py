@@ -31,7 +31,8 @@ class ExampleTF(BaseTF):
 
     def model_fn(self, features, labels, mode, params, config):
 
-        input_tensor = tf.expand_dims(features["X"], axis=-1)
+        input_tensor = tf.cast(features["X"], tf.float32)
+        input_tensor = tf.expand_dims(input_tensor, axis=-1)
 
         conv_layer = tf.layers.conv1d(
             input_tensor,
@@ -51,6 +52,8 @@ class ExampleTF(BaseTF):
             flat,
             units=512,
             activation=tf.nn.relu)
+
+        dense_layer_1_norm = tf.norm(dense_layer_1)
 
         logits = tf.layers.dense(
             dense_layer_1,
@@ -72,6 +75,7 @@ class ExampleTF(BaseTF):
                 "probabs": tf.estimator.export.PredictOutput({"probabs": probabs})
                 })
         #================================================================
+        labels = tf.cast(labels, tf.int32)
         labels = tf.one_hot(labels, depth=4)
 
         loss = tf.nn.softmax_cross_entropy_with_logits(
