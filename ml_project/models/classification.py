@@ -33,7 +33,7 @@ class ExampleTF(BaseTF):
         #================================================================
 
         input_tensor = tf.cast(features["X"], tf.float32)
-        input_tensor = tf.expand_dims(input_tensor, 1)
+        input_tensor = tf.expand_dims(input_tensor, axis=-1)
 
         conv_layer = tf.layers.conv1d(
             input_tensor,
