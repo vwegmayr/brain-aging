@@ -31,6 +31,37 @@ class ExampleTF(BaseTF):
 
     def model_fn(self, features, labels, mode, params, config):
         #================================================================
+
+        conv_layer = tf.layers.conv1d(
+            features["X"],
+            filters=16,
+            kernel_size=256,
+            strides=64,
+            activation=tf.nn.relu)
+
+        max_pooled = tf.layers.max_pooling1d(
+            conv_layer,
+            pool_size=64,
+            strides=1)
+
+        dense_layer_1 = tf.layers.dense(
+            max_pooled,
+            units=512,
+            activation=tf.nn.relu)
+
+        logits = tf.layers.dense(
+            dense_layer_1,
+            units=4,
+            activation=None)
+
+        probabs = tf.nn.softmax(logits)
+        predictions = tf.nn.argmax(probabs)
+
+        loss = tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.one_hot(labels, depth=4),
+            logits=logits)
+
+        """
         first_hidden_layer = tf.layers.dense(features["X"], 10, activation=tf.nn.relu, name="layer0")
 
         second_hidden_layer = tf.layers.dense(first_hidden_layer, 10, activation=tf.nn.relu)
@@ -40,14 +71,20 @@ class ExampleTF(BaseTF):
         mean_output = tf.reduce_mean(output_layer)
 
         predictions = tf.reshape(output_layer, [-1])
+        """
 
         if mode == tf.estimator.ModeKeys.PREDICT:
-          return tf.estimator.EstimatorSpec(
-              mode=mode,
-              predictions={"predictions": predictions},
-              export_outputs={"predictions": tf.estimator.export.PredictOutput({"predictions": predictions})})
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions={
+                    "predictions": predictions,
+                    "probabs": probabs},
+                export_outputs={
+                "predictions": tf.estimator.export.PredictOutput({"predictions": predictions}),
+                "probabs": tf.estimator.export.PredictOutput({"probabs": probabs})
+                })
 
-        loss = tf.losses.mean_squared_error(labels, predictions)
+        #loss = tf.losses.mean_squared_error(labels, predictions)
 
         optimizer = tf.train.GradientDescentOptimizer(
             learning_rate=params["learning_rate"])
@@ -56,10 +93,10 @@ class ExampleTF(BaseTF):
             loss=loss, global_step=tf.train.get_global_step())
 
         #================================================================
-        eval_metric_ops = {
-            "score": tf.metrics.root_mean_squared_error(
-                tf.cast(labels, tf.float64), predictions)
-        }
+        #eval_metric_ops = {
+        #    "score": tf.metrics.root_mean_squared_error(
+        #        tf.cast(labels, tf.float64), predictions)
+        #}
 
         #================================================================
         if "hooks" in params:
@@ -77,4 +114,4 @@ class ExampleTF(BaseTF):
 
     def score(self, X, y):
         y_pred = self.predict(X)
-        return skl.metrics.mean_squared_error(y, y_pred)
+        return skl.metrics.f1_score(y, y_pred, average="micro")
