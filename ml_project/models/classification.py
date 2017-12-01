@@ -30,10 +30,8 @@ class ExampleTF(BaseTF):
         super(ExampleTF, self).__init__(input_fn_config, config, params)
 
     def model_fn(self, features, labels, mode, params, config):
-        input_tensor = tf.cast(features["X"], tf.float32)
-        input_tensor = tf.expand_dims(input_tensor, axis=-1)
 
-        labels = tf.cast(labels, tf.int32)
+        input_tensor = tf.expand_dims(features["X"], axis=-1)
 
         conv_layer = tf.layers.conv1d(
             input_tensor,
@@ -47,8 +45,10 @@ class ExampleTF(BaseTF):
             pool_size=64,
             strides=1)
 
+        flat = tf.layers.flatten(max_pooled)
+
         dense_layer_1 = tf.layers.dense(
-            max_pooled,
+            flat,
             units=512,
             activation=tf.nn.relu)
 
@@ -59,11 +59,25 @@ class ExampleTF(BaseTF):
 
         probabs = tf.nn.softmax(logits)
 
-        predictions = tf.argmax(probabs)
+        predictions = tf.argmax(probabs, axis=1)
+        #================================================================
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions={
+                    "predictions": predictions,
+                    "probabs": probabs},
+                export_outputs={
+                tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput({"predictions": predictions}),
+                "probabs": tf.estimator.export.PredictOutput({"probabs": probabs})
+                })
+        #================================================================
+        labels = tf.one_hot(labels, depth=4)
 
         loss = tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(labels, depth=4),
+            labels=labels,
             logits=logits)
+        loss = tf.reduce_mean(loss)
 
         optimizer = tf.train.GradientDescentOptimizer(
             learning_rate=params["learning_rate"])
@@ -82,17 +96,7 @@ class ExampleTF(BaseTF):
               loss=loss,
               train_op=train_op,
               training_hooks=training_hooks)
-          
-        elif mode == tf.estimator.ModeKeys.PREDICT:
-            return tf.estimator.EstimatorSpec(
-                mode=mode,
-                predictions={
-                    "predictions": predictions,
-                    "probabs": probabs},
-                export_outputs={
-                "predictions": tf.estimator.export.PredictOutput({"predictions": predictions}),
-                "probabs": tf.estimator.export.PredictOutput({"probabs": probabs})
-                })
+
 
     def score(self, X, y):
         y_pred = self.predict(X)
