@@ -1,6 +1,6 @@
 import tensorflow as tf
 from importlib import import_module
-
+import builtins
 
 def parse_hooks(hooks, locals, outdir):
   training_hooks = []
