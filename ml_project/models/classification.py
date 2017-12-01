@@ -32,7 +32,8 @@ class ExampleTF(BaseTF):
     def model_fn(self, features, labels, mode, params, config):
         #================================================================
 
-        input_tensor = tf.expand_dims(features["X"], 1)
+        input_tensor = tf.cast(features["X"], tf.float32)
+        input_tensor = tf.expand_dims(input_tensor, 1)
 
         conv_layer = tf.layers.conv1d(
             input_tensor,
