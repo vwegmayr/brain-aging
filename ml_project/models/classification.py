@@ -114,7 +114,7 @@ class ExampleTF(BaseTF):
               mode=mode,
               loss=loss,
               train_op=train_op,
-              eval_metric_ops=eval_metric_ops,
+              #eval_metric_ops=eval_metric_ops,
               training_hooks=training_hooks)
 
     def score(self, X, y):
