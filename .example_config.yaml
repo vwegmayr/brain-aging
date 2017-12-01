@@ -6,10 +6,10 @@
 
 #Example 1
 #smt run --config .config.yaml -X data/X_train.npy -a fit_transform
-class: ml_project.models.feature_selection.RandomSelection
-params:
-  n_components: 1000
-  random_state: 37
+#class: ml_project.models.feature_selection.RandomSelection
+#params:
+#  n_components: 1000
+#  random_state: 37
 
 #Example 2 (Warning: might exceed your memory)
 #smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
@@ -48,23 +48,23 @@ params:
 #      shuffle: True
 #      random_state: 37
 
-#class: ml_project.models.regression.ExampleTF
-#params:
-#  input_fn_config:
-#    batch_size: 64
-#    num_epochs: 5
-#    shuffle: True
-#    queue_capacity: 1000
-#    num_threads: 1
-#  config:
-#    save_summary_steps: 10
-#    tf_random_seed: 42
-#    save_checkpoints_steps: 100
-#    #save_checkpoints_secs:
-#    keep_checkpoint_max: 5
-#    log_step_count_steps: 10
-#  params:
-#    learning_rate: 0.005
-#    hooks:
-#      - type: SummarySaverHook
-#        params: {name: mean_output, op: scalar, save_steps: 10}
+class: ml_project.models.regression.ExampleTF
+params:
+  input_fn_config:
+    batch_size: 64
+    num_epochs: 15
+    shuffle: True
+    queue_capacity: 1000
+    num_threads: 1
+  config:
+    save_summary_steps: 1
+    tf_random_seed: 42
+    save_checkpoints_steps: 100
+    #save_checkpoints_secs:
+    keep_checkpoint_max: 5
+    log_step_count_steps: 100
+  params:
+    learning_rate: 0.0001
+    hooks:
+      - type: SummarySaverHook
+        params: {name: dense_layer_1_norm, op: scalar, save_steps: 10}
