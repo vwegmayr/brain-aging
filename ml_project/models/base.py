@@ -39,11 +39,17 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
             config=tf.estimator.RunConfig(**config))
 
         tf.logging.set_verbosity(tf.logging.INFO)
-        self.estimator.train(input_fn=self.input_fn(X, y))
-
-        self.export_estimator(
-            input_shape=list(X.shape[1:]),
-            input_dtype=X.dtype.name)
+        try:
+            self.estimator.train(input_fn=self.input_fn(X, y))
+        except KeyboardInterrupt: 
+            print("\nEarly stop of training, saving model...")
+            self.export_estimator(
+                input_shape=list(X.shape[1:]),
+                input_dtype=X.dtype.name)
+        else:   
+            self.export_estimator(
+                input_shape=list(X.shape[1:]),
+                input_dtype=X.dtype.name)
 
         return self
 
