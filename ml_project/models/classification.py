@@ -32,8 +32,10 @@ class ExampleTF(BaseTF):
     def model_fn(self, features, labels, mode, params, config):
         #================================================================
 
+        input = tf.expand_dims(features["X"], 1)
+
         conv_layer = tf.layers.conv1d(
-            features["X"],
+            input,
             filters=16,
             kernel_size=256,
             strides=64,
