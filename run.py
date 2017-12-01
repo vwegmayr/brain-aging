@@ -99,10 +99,10 @@ class ConfigAction(Action):
         self.act()
 
     def fit(self):
-        if "data" in self.config and self.args.X is None and self.args.y is None:
-            self.model.fit(self.config["data"]["class"]())
-        elif self.args.X is not None and self.args.y is not None:
+        if self.args.X is not None and self.args.y is not None:
             self.model.fit(self.X, self.y)
+        else:
+            print("Expected X and y for fit.")
 
     def fit_transform(self):
         self.fit()
@@ -111,7 +111,6 @@ class ConfigAction(Action):
     def _save(self):
         class_name = self.config["class"].__name__
         model_path = normpath(os.path.join(self.save_path, class_name+".pkl"))
-        print("saving model to {}".format(model_path))
         joblib.dump(self.model, model_path)
 
         if self.X_new is not None:
@@ -176,7 +175,7 @@ class ModelAction(Action):
                         prediction = np.round(prediction, decimals=6)
                         if len(prediction.shape) > 1:
                             prediction = " ".join(prediction.astype("str"))
-                        writer.writerow([id, prediction])
+                        writer.writerow([id+1, prediction])
             elif isinstance(self.y_new, dict):
                 df = pd.DataFrame(self.y_new)
                 df.index += 1
