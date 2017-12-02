@@ -8,9 +8,9 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from ml_project.models.utils import parse_hooks
 from ml_project.models.base import BaseTF
 
-from tensorflow.saved_model.signature_constants import (
+from tensorflow.python.saved_model.signature_constants import (
     DEFAULT_SERVING_SIGNATURE_DEF_KEY)
-from tensorflow.estimator.export import PredictOutput
+from tensorflow.python.estimator.export.export_output import PredictOutput
 
 
 class MeanPredictor(BaseEstimator, TransformerMixin):

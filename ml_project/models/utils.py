@@ -14,11 +14,11 @@ def parse_hooks(hooks, locals, outdir):
                 summary_op=summary_op,
                 output_dir=outdir,
                 save_steps=hook["params"]["save_steps"])
-    else:
-        hook_class = getattr(tf.train, hook["type"])
-        hook_instance = hook_class(**hook["params"])
+        else:
+            hook_class = getattr(tf.train, hook["type"])
+            hook_instance = hook_class(**hook["params"])
 
-    training_hooks.append(hook_instance)
+        training_hooks.append(hook_instance)
 
     return training_hooks
 
