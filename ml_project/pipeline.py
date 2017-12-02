@@ -21,7 +21,7 @@ class Pipeline(Pipeline):
             else:
                 name = dict_["class"].__name__
             if "params" in dict_:
-                params = dict_["params"]                
+                params = dict_["params"]
                 steps.append((name, dict_["class"](**params)))
             else:
                 steps.append((name, dict_["class"]()))

@@ -1,7 +1,6 @@
 from sklearn.model_selection import GridSearchCV
 import pandas as pd
 import os
-import shutil
 from os.path import normpath
 
 
@@ -42,7 +41,8 @@ class GridSearchCV(GridSearchCV):
                 "std_test_score": self.cv_results_["std_test_score"],
             }
             df = pd.DataFrame.from_dict(pd.io.json.json_normalize(data))
-            df.to_csv(normpath(os.path.join(self.save_path, "GridSearchCV.csv")))
+            df.to_csv(normpath(os.path.join(
+                self.save_path, "GridSearchCV.csv")))
 
         return self
 
@@ -53,5 +53,5 @@ class GridSearchCV(GridSearchCV):
             self.estimator.set_save_path(save_path)
 
         if (hasattr(self, "best_estimator_") and
-            hasattr(self.best_estimator_, "set_save_path")):
+            hasattr(self.best_estimator_, "set_save_path")):  # noqa: E129
             self.best_estimator_.set_save_path(save_path)

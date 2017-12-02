@@ -1,12 +1,8 @@
 import sklearn as skl
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from matplotlib import pyplot as plt
-from sklearn.base import BaseEstimator
-
-from .utils import print
 
 
 class KernelEstimator(skl.base.BaseEstimator, skl.base.TransformerMixin):

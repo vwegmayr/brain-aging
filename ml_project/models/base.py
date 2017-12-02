@@ -5,6 +5,8 @@ import os
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
 from ml_project.models.utils import print
+from tensorflow.estimator.export import (
+    build_raw_serving_input_receiver_fn as input_receiver_fn)
 
 
 class BaseTF(ABC, BaseEstimator, TransformerMixin):
@@ -41,12 +43,12 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
             self.estimator.train(input_fn=self.input_fn(X, y))
-        except KeyboardInterrupt: 
+        except KeyboardInterrupt:
             print("\nEarly stop of training, saving model...")
             self.export_estimator(
                 input_shape=list(X.shape[1:]),
                 input_dtype=X.dtype.name)
-        else:   
+        else:
             self.export_estimator(
                 input_shape=list(X.shape[1:]),
                 input_dtype=X.dtype.name)
@@ -72,9 +74,13 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
             self.config["model_dir"] = save_path
 
     def export_estimator(self, input_shape, input_dtype):
-        feature_spec = {"X": tf.placeholder(shape=[None] + input_shape, dtype=input_dtype)}
-        receiver_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(feature_spec)
-        self._restore_path = self.estimator.export_savedmodel(self.save_path, receiver_fn)
+        feature_spec = {"X": tf.placeholder(
+            shape=[None] + input_shape,
+            dtype=input_dtype)}
+        receiver_fn = input_receiver_fn(feature_spec)
+        self._restore_path = self.estimator.export_savedmodel(
+            self.save_path,
+            receiver_fn)
         print("Model saved to {}".format(self._restore_path))
 
     @abstractmethod
@@ -91,7 +97,7 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         for key, val in list(state.items()):
             if "tensorflow" in getattr(val, "__module__", "None"):
                 del state[key]
-        
+
         return state
 
     def __setstate__(self, state):

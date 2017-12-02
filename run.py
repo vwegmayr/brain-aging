@@ -68,9 +68,11 @@ class Action(ABC):
 
     def _mk_save_folder(self):
         if self.args.smt_label != "debug":
-          self.time_stamp = self.args.smt_label
+            self.time_stamp = self.args.smt_label
         else:
-          self.time_stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime()) + "-debug"
+            self.time_stamp = (time.strftime(
+                "%Y%m%d-%H%M%S",
+                time.gmtime()) + "-debug")
 
         path = os.path.join("data", self.time_stamp)
         os.mkdir(os.path.normpath(path))
@@ -114,7 +116,9 @@ class ConfigAction(Action):
         joblib.dump(self.model, model_path)
 
         if self.X_new is not None:
-            X_path = normpath(os.path.join(self.save_path, "X_" + self.time_stamp + ".npy"))
+            X_path = normpath(os.path.join(
+                self.save_path,
+                "X_" + self.time_stamp + ".npy"))
             np.save(X_path, self.X_new)
 
     def _load_model(self):
@@ -160,8 +164,10 @@ class ModelAction(Action):
         self.model.score(self.X, self.y)
 
     def _save(self):
-        y_path = normpath(os.path.join(self.save_path, "y_" + self.time_stamp + ".csv"))
-        X_path = normpath(os.path.join(self.save_path, "X_" + self.time_stamp + ".npy"))
+        y_path = normpath(os.path.join(
+            self.save_path, "y_" + self.time_stamp + ".csv"))
+        X_path = normpath(os.path.join(
+            self.save_path, "X_" + self.time_stamp + ".npy"))
 
         if self.X_new is not None:
             np.save(X_path, self.X_new)

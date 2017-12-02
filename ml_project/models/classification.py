@@ -1,14 +1,17 @@
 import numpy as np
 import tensorflow as tf
 import sklearn as skl
-import scipy as sp
-import os
 
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
+from sklearn.utils.validation import check_array, check_is_fitted
 
 from ml_project.models.utils import parse_hooks
 from ml_project.models.base import BaseTF
+
+from tensorflow.saved_model.signature_constants import (
+    DEFAULT_SERVING_SIGNATURE_DEF_KEY)
+from tensorflow.estimator.export import PredictOutput
+
 
 class MeanPredictor(BaseEstimator, TransformerMixin):
     """docstring for MeanPredictor"""
@@ -26,7 +29,12 @@ class MeanPredictor(BaseEstimator, TransformerMixin):
 
 class ExampleTF(BaseTF):
     """docstring for ExampleTF"""
-    def __init__(self, input_fn_config={"shuffle": True}, config={}, params={}):
+    def __init__(
+        self,
+        input_fn_config={"shuffle": True},
+        config={},
+        params={}):  # noqa: E129
+
         super(ExampleTF, self).__init__(input_fn_config, config, params)
 
     def model_fn(self, features, labels, mode, params, config):
@@ -63,7 +71,7 @@ class ExampleTF(BaseTF):
         probabs = tf.nn.softmax(logits)
 
         predictions = tf.argmax(probabs, axis=1)
-        #================================================================
+        # ================================================================
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
@@ -71,10 +79,11 @@ class ExampleTF(BaseTF):
                     "predictions": predictions,
                     "probabs": probabs},
                 export_outputs={
-                tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput({"predictions": predictions}),
-                "probabs": tf.estimator.export.PredictOutput({"probabs": probabs})
-                })
-        #================================================================
+                    DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                    PredictOutput({"predictions": predictions}),
+                    "probabs":
+                    PredictOutput({"probabs": probabs})})
+        # ================================================================
         labels = tf.cast(labels, tf.int32)
         labels = tf.one_hot(labels, depth=4)
 
@@ -88,19 +97,22 @@ class ExampleTF(BaseTF):
 
         train_op = optimizer.minimize(
             loss=loss, global_step=tf.train.get_global_step())
-        #================================================================
+        # ================================================================
         if "hooks" in params:
-            training_hooks = parse_hooks(params["hooks"], locals(), self.save_path)
+            training_hooks = parse_hooks(
+                params["hooks"],
+                locals(),
+                self.save_path)
         else:
             training_hooks = []
-        #================================================================
-        if mode == tf.estimator.ModeKeys.TRAIN or mode == tf.estimator.ModeKeys.EVAL:
-          return tf.estimator.EstimatorSpec(
-              mode=mode,
-              loss=loss,
-              train_op=train_op,
-              training_hooks=training_hooks)
-
+        # ================================================================
+        if (mode == tf.estimator.ModeKeys.TRAIN or
+            mode == tf.estimator.ModeKeys.EVAL):  # noqa: E129
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op,
+                training_hooks=training_hooks)
 
     def score(self, X, y):
         y_pred = self.predict(X)
