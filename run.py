@@ -54,7 +54,8 @@ class Action(ABC):
         elif extension == "pkl":
             loader = joblib.load
         else:
-            raise ValueError("Extension of data file X has to be npy or pkl.")
+            raise ValueError("Expected extension to be in {npy, pkl}, "
+                "got {}".format(extension))
 
         return loader
 
