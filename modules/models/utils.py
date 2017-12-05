@@ -27,7 +27,8 @@ def convert_nii_and_trk_to_npy(
     }
     y = []
 
-    for label in example_loader.train_labels:
+    for idx, label in enumerate(example_loader.train_labels):
+        print("{:3.2f} % Loaded").format(idx / len(example_loader.train_labels * 100), end='\r')
         block = PointExamples.build_datablock(
             example_loader.brain_data,
             example_loader.block_size,
