@@ -1,0 +1,10 @@
+# This config is only provisional
+# It is used to design the BaseTracker class
+
+streamline:
+    nii_file:
+    seeds:
+    n_fibers:
+    block_size: ?
+    last_incoming:
+    wm_mask:
