@@ -8,7 +8,11 @@ class TestUtil(unittest.TestCase):
         trk_file = "data/iFOD2.trk"
         nii_file = "data/FODl4.nii.gz"
         path = "test"
-        utils.convert_nii_and_trk_to_npy(nii_file, trk_file, block_size=3, path=path, n_samples=100)
+        utils.convert_nii_and_trk_to_npy(
+        	nii_file, trk_file,
+        	block_size=3,
+        	path=path,
+        	n_samples=100)
         self.assertTrue(os.path.exists("test/X.npy"))
         self.assertTrue(os.path.exists("test/y.npy"))
         os.remove("test/X.npy")
