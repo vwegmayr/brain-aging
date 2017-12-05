@@ -19,7 +19,6 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         self.input_fn_config = input_fn_config
         self.config = config
         self.params = params
-        self.id = id
 
         self._restore_path = None
 
