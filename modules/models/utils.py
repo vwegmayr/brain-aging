@@ -32,7 +32,7 @@ def convert_nii_and_trk_to_npy(
         n_samples = len(example_loader.train_labels)
 
     for idx, label in enumerate(example_loader.train_labels):
-        if idx > n_samples:
+        if idx >= n_samples:
             break
         block = PointExamples.build_datablock(
             example_loader.brain_data,
@@ -50,8 +50,8 @@ def convert_nii_and_trk_to_npy(
         X[key] = np.array(X[key])
     y = np.array(y)
 
-    joblib.dump(X, os.path.join(path, "X100.npy"))
-    joblib.dump(y, os.path.join(path, "y100.npy"))
+    joblib.dump(X, os.path.join(path, "X.pkl"))
+    joblib.dump(y, os.path.join(path, "y.pkl"))
 
 def parse_hooks(hooks, locals, outdir):
     training_hooks = []
