@@ -10,7 +10,9 @@ def convert_nii_and_trk_to_npy(
         trk_file,
         block_size,
         path,
-        n_samples=None):
+        n_samples=None,
+        min_fiber_length=0,
+        last_incoming=1):
     """Save the samples to numpy binary format."""
     # The labels are the real vectors.
     label_type = "point"
@@ -19,7 +21,9 @@ def convert_nii_and_trk_to_npy(
         nii_file=nii_file,
         trk_file=trk_file,
         block_size=block_size,
-        num_eval_examples=0)
+        num_eval_examples=0,
+        min_fiber_length=min_fiber_length,
+        last_incoming=last_incoming)
 
     X = {
         'blocks': [],
