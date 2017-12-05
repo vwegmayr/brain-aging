@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import builtins
 from modules.models.example_loader import PointExamples
-from sklearn.external import joblib
+from sklearn.externals import joblib
 
 def convert_nii_and_trk_to_npy(
         nii_file,
