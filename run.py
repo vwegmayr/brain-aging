@@ -46,24 +46,35 @@ class Action(ABC):
         getattr(self, self.args.action)()
         self._save()
 
-    def _load_data(self):
+    def _get_loader_from_extension(file_path):
+        extension = file_path.split(".")[-1]
+
+        if extension == "npy":
+            loader = np.load
+        elif extension == "pkl":
+            loader = joblib.load
+        else:
+            raise ValueError("Extension of data file X has to be npy or pkl.")
+
+        return loader
+
+    def _load(file_path, loader):
         try:
-            X = np.load(self.args.X)
+            data = loader(file_path)
         except FileNotFoundError:
             print("{} not found. "
-                  "Please download data first.".format(self.args.X))
+                  "Please download data first.".format(file_path))
             exit()
-        if self.args.y is not None:
-            try:
-                y = np.loadtxt(self.args.y)
-            except FileNotFoundError:
-                print("{} not found. "
-                      "Please download data first.".format(self.args.y))
-                exit()
-            except UnicodeDecodeError:
-                y = np.load(self.args.y)
-        else:
-            y = None
+        return data
+
+    def _load_data(self):
+
+        X_loader = self._get_loader_from_extension(self.args.X)
+        X = self._load(self.args.X, X_loader)
+
+        y_loader = self._get_loader_from_extension(self.args.y)
+        y = self._load(self.args.y, y_loader)
+
         return X, y
 
     def _mk_save_folder(self):
