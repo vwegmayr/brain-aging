@@ -222,12 +222,12 @@ class Examples(object):
             # example["incoming"] = Examples.points_to_relative(incoming_point[0], center_point)  # HACK TRAINING
             example["incoming"] = Examples.points_to_relative(incoming_point[0], center_point) * np.array([1, -1, 1])  # HACK PREDICTION
             for i in range(len(incoming_point) - 1):
-                # example["incoming"] = np.append(example["incoming"],  # HACK TRAINING
-                #                                 Examples.points_to_relative(incoming_point[i + 1],    #HACK TRAINING
-                #                                 incoming_point[i]))  # HACK TRAINING
-                example["incoming"] = np.append(example["incoming"],    #HACK PREDICTION
-                                                Examples.points_to_relative(incoming_point[i + 1],  #HACK PREDICTION
-                                                incoming_point[i]) * np.array([1, -1, 1]))  # HACK PREDICTION
+                example["incoming"] = np.append(example["incoming"],  # HACK TRAINING
+                                                Examples.points_to_relative(incoming_point[i + 1],    #HACK TRAINING
+                                                incoming_point[i]))  # HACK TRAINING
+                # example["incoming"] = np.append(example["incoming"],    #HACK PREDICTION
+                #                                 Examples.points_to_relative(incoming_point[i + 1],  #HACK PREDICTION
+                #                                 incoming_point[i]) * np.array([1, -1, 1]))  # HACK PREDICTION
             example["outgoing"] = Examples.points_to_relative(center_point, outgoing_point)
 
         data_shape = np.shape(data)

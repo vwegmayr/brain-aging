@@ -28,7 +28,12 @@ def convert_nii_and_trk_to_npy(
     }
     y = []
 
+    if n_samples is None:
+        n_samples = len(example_loader.train_labels)
+
     for idx, label in enumerate(example_loader.train_labels):
+        if idx > n_samples:
+            break
         block = PointExamples.build_datablock(
             example_loader.brain_data,
             example_loader.block_size,
@@ -39,8 +44,6 @@ def convert_nii_and_trk_to_npy(
         X['incoming'].append(block['incoming'])
         X['centers'].append(block['center'])
         y.append(block['outgoing'])
-        if n_samples is not None and idx > n_samples:
-            break
 
 
     for key in X.keys():
@@ -71,5 +74,5 @@ def parse_hooks(hooks, locals, outdir):
     return training_hooks
 
 
-def print(string):
-    builtins.print(string, flush=True)
+def print(string, **kwargs):
+    builtins.print(string, flush=True, **kwargs)
