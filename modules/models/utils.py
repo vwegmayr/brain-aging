@@ -1,6 +1,46 @@
+import os
+import numpy as np
 import tensorflow as tf
 import builtins
+from example_loader import PointExamples
 
+
+def convert_nii_and_trk_to_npy(
+        nii_file,
+        trk_file,
+        block_size,
+        path):
+    """Save the samples to numpy binary format."""
+    # The labels are the real vectors.
+    label_type = "point"
+
+    example_loader = PointExamples(
+        nii_file=nii_file,
+        trk_file=trk_file,
+        block_size=block_size,
+        num_eval_examples=0)
+
+    X = {
+        'blocks': [],
+        'incoming': [],
+        'centers': [],
+    }
+    y = []
+
+    for label in example_loader.train_labels:
+        block = PointExamples.build_datablock(
+            example_loader.brain_data,
+            example_loader.block_size,
+            label['center'],
+            label['incoming'], label['outgoing'],
+            label_type)
+        X['blocks'].append(block['data_block'])
+        X['incoming'].append(block['incoming'])
+        X['centers'].append(block['center'])
+        y.append(block['outgoing'])
+
+    np.save(os.path.join(path, "X.npy"), X)
+    np.save(os.path.join(path, "y.npy"), y)
 
 def parse_hooks(hooks, locals, outdir):
     training_hooks = []
