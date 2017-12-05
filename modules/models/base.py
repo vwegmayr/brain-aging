@@ -4,7 +4,7 @@ import os
 
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
-from ml_project.models.utils import print
+from modules.models.utils import print
 from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
 
