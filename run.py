@@ -9,7 +9,7 @@ import time
 
 from sklearn.externals import joblib
 from abc import ABC, abstractmethod
-from ml_project.configparse import ConfigParser
+from modules.configparse import ConfigParser
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
