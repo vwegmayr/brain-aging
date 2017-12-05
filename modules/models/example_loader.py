@@ -10,7 +10,7 @@ import os
 
 import numpy as np
 import nibabel as nib
-from .utils import extract_direction
+# from .utils import extract_direction
 import functools
 
 

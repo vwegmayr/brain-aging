@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import builtins
-from example_loader import PointExamples
+from modules.models.example_loader import PointExamples
 
 
 def convert_nii_and_trk_to_npy(
