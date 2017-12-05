@@ -131,8 +131,8 @@ class BaseTracker(BaseTF):
         if self.track_config['seeds']:
             seeds = self._seeds_from_wm_mask()
 
-        self.tractography = []      # The final result will be here
-        self.ongoing_fibers = []    # Fibers that are still under construction
+        self.tractography = []         # The final result will be here
+        self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
 
     def _build_next_X(self, last_incoming):
         """Builds the next X-batch to be fed to the model.
@@ -162,8 +162,9 @@ class BaseTracker(BaseTF):
         print("Number of seeds on the white matter mask:", len(seeds))
         print("Number of requested seeds:", self.track_config['n_fibers'])
         new_idxs = np.random.choice(len(seeds), self.track_config['n_fibers'], replace=True)
-        self.ongoing_fibers = [[seeds[i] + np.clip(np.random.normal(0, 0.25, 3), -0.5, 0.5)]
-                               for i in new_idxs]
+        new_seeds = [[seeds[i] + np.clip(np.random.normal(0, 0.25, 3), -0.5, 0.5)]
+                     for i in new_idxs]
+        return new_seeds
 
     def _find_borders(self, order=1):
         """Find the wm-gm interface points.
@@ -174,7 +175,7 @@ class BaseTracker(BaseTF):
             seeds: The seeds generated from the white matter mask
         """
         dim = self.mask.shape
-        seeds = []
+        borders = []
         for x in range(order, dim[0] - order):
             for y in range(order, dim[1] - order):
                 for z in range(order, dim[2] - order):
@@ -183,8 +184,8 @@ class BaseTracker(BaseTF):
                                            y - order:y + 1 + order,
                                            z - order:z + 1 + order]
                         if not np.all(window):
-                            seeds.append(np.array([x, y, z]))
-        return seeds
+                            borders.append(np.array([x, y, z]))
+        return borders
 
     def _is_border(self, coord):
         """Check if the voxel is on the white matter border.
