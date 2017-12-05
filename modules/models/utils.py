@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import builtins
 from modules.models.example_loader import PointExamples
-
+from sklearn.external import joblib
 
 def convert_nii_and_trk_to_npy(
         nii_file,
@@ -29,8 +29,6 @@ def convert_nii_and_trk_to_npy(
     y = []
 
     for idx, label in enumerate(example_loader.train_labels):
-        print("{:3.3f} % Labels loaded").format(idx / len(example_loader.train_labels * 100),
-                                                end='\r')
         block = PointExamples.build_datablock(
             example_loader.brain_data,
             example_loader.block_size,
@@ -44,8 +42,13 @@ def convert_nii_and_trk_to_npy(
         if n_samples is not None and idx > n_samples:
             break
 
-    np.save(os.path.join(path, "X.npy"), X)
-    np.save(os.path.join(path, "y.npy"), y)
+
+    for key in X.keys():
+        X[key] = np.array(X[key])
+    y = np.array(y)
+
+    joblib.dump(X, os.path.join(path, "X100.npy"))
+    joblib.dump(y, os.path.join(path, "y100.npy"))
 
 def parse_hooks(hooks, locals, outdir):
     training_hooks = []
