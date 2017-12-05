@@ -9,7 +9,8 @@ def convert_nii_and_trk_to_npy(
         nii_file,
         trk_file,
         block_size,
-        path):
+        path,
+        n_samples=None):
     """Save the samples to numpy binary format."""
     # The labels are the real vectors.
     label_type = "point"
@@ -28,7 +29,8 @@ def convert_nii_and_trk_to_npy(
     y = []
 
     for idx, label in enumerate(example_loader.train_labels):
-        print("{:3.2f} % Loaded").format(idx / len(example_loader.train_labels * 100), end='\r')
+        print("{:3.3f} % Labels loaded").format(idx / len(example_loader.train_labels * 100),
+                                                end='\r')
         block = PointExamples.build_datablock(
             example_loader.brain_data,
             example_loader.block_size,
@@ -39,6 +41,8 @@ def convert_nii_and_trk_to_npy(
         X['incoming'].append(block['incoming'])
         X['centers'].append(block['center'])
         y.append(block['outgoing'])
+        if n_samples is not None and idx > n_samples:
+            break
 
     np.save(os.path.join(path, "X.npy"), X)
     np.save(os.path.join(path, "y.npy"), y)
