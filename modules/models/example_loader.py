@@ -273,9 +273,19 @@ class PointExamples(Examples):
       Update doc
     """
 
-    def __init__(self, nii_file, trk_file, block_size, num_eval_examples, data_corrupt_percent=0.0,
-                 min_fiber_length=0, ignore_start_point=False, ignore_stop_point=True,
-                 cache_examples=False, last_incoming=1, V1=None):
+    def __init__(self,
+                 nii_file,
+                 trk_file,
+                 block_size,
+                 num_eval_examples,
+                 data_corrupt_percent=0.0,
+                 example_percent=1.0,
+                 min_fiber_length=0,
+                 ignore_start_point=False,
+                 ignore_stop_point=True,
+                 cache_examples=False,
+                 last_incoming=1,
+                 V1=None):
         """Load the input files and initialize fields."""
 
         self.min_length = min_fiber_length
@@ -287,6 +297,7 @@ class PointExamples(Examples):
         self.eval_generator = None
         self.cache_examples = cache_examples
         self.data_corrupt_percent = data_corrupt_percent
+        self.example_percent = example_percent
         self.V1 = V1
 
         Examples.__init__(self, nii_file, trk_file, block_size,
@@ -309,9 +320,6 @@ class PointExamples(Examples):
         print("Found {}/{} fibers longer than {}mm".format(len(fibers_filtered), len(self.fibers),
                                                            self.min_length))
 
-        # Subsampling to reduce data
-        fibers_filtered = fibers_filtered[::4]
-
         label_list = []
         eval_labels = []
         for fiber in fibers_filtered:
@@ -321,8 +329,11 @@ class PointExamples(Examples):
                 start = max(j - self.last_incoming, 0)
                 end = max(j, 0)
                 label["incoming"] = fiber[start:end][::-1]
-                label["incoming"] = np.append(label["incoming"],
-                    np.zeros((self.last_incoming - len(label["incoming"]), 3)), 0)
+                label["incoming"] = np.append(
+                    label["incoming"],
+                    np.zeros((self.last_incoming - len(label["incoming"]), 3)),
+                    0)
+
                 if j == len(fiber) - 1:
                     label["outgoing"] = np.zeros(3)
                 else:
@@ -339,23 +350,30 @@ class PointExamples(Examples):
                     reverse_label = {"center": label["center"], "incoming": incoming,
                                      "outgoing": label["incoming"][0]}
                     label_list.append(reverse_label)
-            if len(eval_labels) == 0 and num_eval_examples > 0:
+            if not eval_labels and num_eval_examples > 0:
                 self.eval_fibers.append(fiber)
-            if len(label_list) >= num_eval_examples and len(eval_labels) == 0 \
+            if len(label_list) >= num_eval_examples and not eval_labels \
                     and num_eval_examples > 0:
                 eval_labels = label_list
                 label_list = []
 
         if len(eval_labels) < num_eval_examples:
-            print("ERROR: PointExamples: Requested more evaluation examples than available")
-            eval_labels = label_list
-            label_list = []
+            raise ValueError("PointExamples: Requested more evaluation examples than available")
         print("finished loading, now shuffle")
         train_labels = label_list
         np.random.shuffle(eval_labels)
         np.random.shuffle(train_labels)
-        print("Used {} fibers for training and {} for evaluation".format(
-            len(fibers_filtered) - len(self.eval_fibers), len(self.eval_fibers)))
+
+        if self.example_percent < 1.0:
+            # Subsample the labels
+            n_old = len(train_labels)
+            one_every = np.round(1 / self.example_percent).astype(int)
+            train_labels = train_labels[::one_every]    # Subsample
+            n_new = len(train_labels)
+            print("Training labels are {} / {}, correspoiding to {} %".format(n_old,
+                                                                              n_new,
+                                                                              n_new / n_old))
+
         print("Generated {} train and {} eval fiber labels\n".format(len(train_labels),
                                                                      len(eval_labels)))
         # NOTE: Here is the corruption of the training labels.
@@ -365,7 +383,10 @@ class PointExamples(Examples):
         # NOTE: Labels have already been shuffled, so this can be carried on in sequential order.
         if self.data_corrupt_percent > 0.0:
             n_to_corrupt = int(np.floor(len(train_labels) * self.data_corrupt_percent))
-            print("DEBUG: Corrupting data. Corruption number is ", n_to_corrupt, "on a total of", len(train_labels))
+            print("DEBUG: Corrupting data. Corruption number is ",
+                  n_to_corrupt,
+                  "on a total of",
+                  len(train_labels))
             for idx in range(n_to_corrupt):
                 cur_label = train_labels[idx]
                 cur_center = cur_label['center']

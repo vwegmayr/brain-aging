@@ -19,6 +19,7 @@ def convert_nii_and_trk_to_npy(
         trk_file,
         block_size,
         path,
+        samples_percent=1.0,
         n_samples=None,
         min_fiber_length=0,
         last_incoming=1):
@@ -30,6 +31,7 @@ def convert_nii_and_trk_to_npy(
         nii_file=nii_file,
         trk_file=trk_file,
         block_size=block_size,
+        example_percent=samples_percent,
         num_eval_examples=0,
         min_fiber_length=min_fiber_length,
         last_incoming=last_incoming)
