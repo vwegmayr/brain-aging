@@ -58,7 +58,11 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
 
     def predict(self, X, head="predictions"):
         predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
-        return predictor({"X": X})[head]
+
+        if isinstance(X, np.ndarray):
+            return predictor({"X": X})[head]
+        elif isinstance(X, dict):
+            return predictor(X)[head]
 
     def predict_proba(self, X):
         return self.predict(X, head="probabs")
