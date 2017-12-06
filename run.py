@@ -166,6 +166,10 @@ class ModelAction(Action):
         super(ModelAction, self).__init__(args)
         self.act()
 
+    def track(self):
+        track_config = ConfigParser().parse(self.args.predict_params)
+        self.model.track(track_config)
+
     def predict(self):
         self.y_new = self.model.predict(self.X)
 
@@ -204,10 +208,11 @@ class ModelAction(Action):
         model = joblib.load(self.args.model)
         if hasattr(model, "set_save_path"):
             model.set_save_path(self.save_path)
+
         return model
 
     def _check_action(self, action):
-        if action not in ["transform", "predict", "score", "predict_proba"]:
+        if action not in ["transform", "predict", "score", "predict_proba", "track"]:
             raise RuntimeError("Can only run transform, predict, predict_proba"
                                " or score from model, got {}.".format(action))
 
@@ -223,9 +228,13 @@ if __name__ == '__main__':
     arg_parser.add_argument("-y", help="Input labels")
 
     arg_parser.add_argument("-a", "--action", choices=["transform", "predict",
-                            "fit", "fit_transform", "score", "predict_proba"],
+                            "fit", "fit_transform", "score", "predict_proba", "track"],
                             help="Action to perform.",
                             required=True)
+
+    arg_parser.add_argument(
+        "-pp", "--predict_params",
+        help="Parameters for prediction")
 
     arg_parser.add_argument("smt_label", nargs="?", default="debug")
 
