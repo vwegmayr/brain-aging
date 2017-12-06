@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.utils.validation import check_is_fitted
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
-from modules.models.utils import print
+from modules.models.utils import print, save_fibers
 from modules.models.example_loader import PointExamples
 from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
@@ -116,6 +116,10 @@ class BaseTracker(BaseTF):
         self.track_config = track_config
         self.wm_mask = nib.load(track_config['wm_mask']).get_data()
         self.nii = nib.load(track_config['nii_file']).get_data()
+        if track_config['max_fiber_length']:
+            self.max_fiber_length = track_config['max_fiber_length']
+        else:
+            self.max_fiber_length = 400
 
     def track(self):
         """Generate the tracktography with the current model on the given brain."""
@@ -126,8 +130,6 @@ class BaseTracker(BaseTF):
         brain_file = nib.load(self.track_config['nii_file'])
         brain_data = brain_file.get_data()
         brain_header = brain_file.header.structarr
-        brain_size = brain_data.shape
-        voxel_size = brain_header["pixdim"][1:4]
 
         # If no seeds are specified, build them from the wm mask
         if not self.track_config['seeds']:
@@ -135,6 +137,68 @@ class BaseTracker(BaseTF):
 
         self.tractography = []         # The final result will be here
         self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
+
+        # Start tractography generation
+        if self.track_config['reseed_endpoints']:
+            self._generate_masked_tractography(self.track_config['reseed_endpoints'])
+        else:
+            self._generate_masked_tractography()
+
+        # Now in self.tractography there are all the finished fibers
+        # Build the header for the new fibers
+        new_header = nib.trackvis.empty_header()
+        affine = brain_file.affine
+        nib.trackvis.aff_to_hdr(affine, new_header, True, True)
+        new_header["dim"] = brain_file.header.structarr["dim"][1:4]
+        # Save the Fibers
+        if self.track_config['out_name']:
+            save_fibers(self.tractography, new_header, self.track_config['out_name'])
+        else:
+            save_fibers(self.tractography, new_header)
+
+
+    def _generate_masked_tractography(self, reseed_endpoints=False):
+        """Generate the tractography using the white matter mask.
+
+        Args:
+            reseed_endpoints: Boolean. If True, use the end points of the fibers produced to
+                generate another tractography. This is to symmetrize the process.
+        """
+        i = 0
+        while not self.ongoing_fibers:
+            i += 1
+            # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
+            # the tracto alignment.
+            predictions = self.predict(self._build_next_X())
+
+            # Update the positions of the fibers and check if they are still ongoing
+            cur_ongoing = []
+            for j, fiber in enumerate(self.ongoing_fibers):
+                new_position = fiber[-1] + predictions[j] * self.track_config['step_size']
+
+                if i == 1 and self.is_border(fiber[-1] + predictions[j]):
+                    # First step is ambiguous and leads into boarder -> flip it.
+                    new_position = fiber[-1] - predictions[j] * self.track_config['step_size']
+
+                # Only continue fibers inside the boundaries and short enough
+                if self.is_border(new_position) or \
+                        i * self.track_config['step_size'] > self.max_fiber_length:
+                    self.tractography.append(fiber)
+                else:
+                    fiber.append(new_position)
+                    cur_ongoing.append(fiber)
+            self.ongoing_fibers = cur_ongoing
+
+            end = "\r"
+            if i % 25 == 0:
+                end = "\n"
+            print("Round num:", '%4d' % i, "; ongoing:", '%7d' % len(self.ongoing_fibers),
+                  "; completed:", '%7d' % len(self.tractography), end=end)
+
+        if reseed_endpoints:
+            ending_seeds = [[fiber[-1]] for fiber in self.tractography]
+            self.ongoing_fibers = ending_seeds
+            self._generate_masked_tractography(reseed_endpoints=False)
 
     def _build_next_X(self):
         """Builds the next X-batch to be fed to the model.
@@ -198,15 +262,15 @@ class BaseTracker(BaseTF):
         Return:
             seeds: The seeds generated from the white matter mask
         """
-        dim = self.mask.shape
+        dim = self.wm_mask.shape
         borders = []
         for x in range(order, dim[0] - order):
             for y in range(order, dim[1] - order):
                 for z in range(order, dim[2] - order):
-                    if self.mask[x, y, z] == 1:
-                        window = self.mask[x - order:x + 1 + order,
-                                           y - order:y + 1 + order,
-                                           z - order:z + 1 + order]
+                    if self.wm_mask[x, y, z] == 1:
+                        window = self.wm_mask[x - order:x + 1 + order,
+                                              y - order:y + 1 + order,
+                                              z - order:z + 1 + order]
                         if not np.all(window):
                             borders.append(np.array([x, y, z]))
         return borders
@@ -220,4 +284,15 @@ class BaseTracker(BaseTF):
         Returns:
             True if the [x, y, z] point is on the border.
         """
-        pass
+        coord = np.round(coord).astype(int)
+
+        lowerbound_condition = coord[0] < 0 or coord[1] < 0 or coord[2] < 0
+        upperbound_condition = coord[0] >= self.wm_mask.shape[0] or \
+                               coord[1] >= self.wm_mask.shape[1] or \
+                               coord[2] >= self.wm_mask.shape[2]
+
+        # Check if out of image dimensions
+        if lowerbound_condition or upperbound_condition:
+            return True
+        # Check if out of white matter area
+        return np.isclose(self.wm_mask[coord[0], coord[1], coord[2]], 0.0)

@@ -2,9 +2,14 @@
 # It is used to design the BaseTracker class
 
 streamline:
+    # Mandatory
     nii_file:
-    seeds:
     n_fibers:
-    block_size: ?
-    last_incoming:
+    block_size:
+    n_last_incoming:
     wm_mask:
+    step_size:
+    # Optional
+    seeds:
+    reseed_endpoints:
+    out_name:
