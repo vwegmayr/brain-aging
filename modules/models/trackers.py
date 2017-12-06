@@ -87,3 +87,6 @@ class SimpleTracker(BaseTracker):
                 loss=loss,
                 train_op=train_op,
                 training_hooks=training_hooks)
+
+    def score(self, X):
+        pass
