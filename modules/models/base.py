@@ -112,8 +112,11 @@ class BaseTracker(BaseTF):
     def __init__(self, input_fn_config, config, params, track_config):
         super(BaseTracker, self).__init__(input_fn_config, config, params)
         self.track_config = track_config
-        self.wm_mask = nib.load(track_config['wm_mask']).get_data()
-        self.nii = nib.load(track_config['nii_file']).get_data()
+        try:
+            self.wm_mask = nib.load(track_config['wm_mask']).get_data()
+            self.nii = nib.load(track_config['nii_file']).get_data()
+        except KeyError as err:
+            print(err)
 
     def track(self):
         """Generate the tracktography with the current model on the given brain."""
