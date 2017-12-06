@@ -16,12 +16,14 @@ class SimpleTracker(BaseTracker):
         self,
         input_fn_config={"shuffle": True},
         config={},
-        params={}):  # noqa: E129
+        params={},
+        track_config={}):  # noqa: E129
 
-        super(SimpleTracker, self).__init__(
+        super(ExampleTF, self).__init__(
             input_fn_config,
-            config,
-            params)
+            config, 
+            params,
+            track_config)
 
     def model_fn(self, features, labels, mode, params, config):
 

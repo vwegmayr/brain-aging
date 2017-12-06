@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import builtins
+import nibabel as nib
 from modules.models.example_loader import PointExamples
 from sklearn.externals import joblib
 
@@ -78,5 +79,22 @@ def parse_hooks(hooks, locals, outdir):
     return training_hooks
 
 
-def print(string, **kwargs):
-    builtins.print(string, flush=True, **kwargs)
+def save_fibers(fiber_list, header, out_name="fibers"):
+    """Save fibers form a list.
+
+    Args:
+    fiber_list: The list of fibers (lists of lists of points) to be saved.
+    header: Original header of the fibers.
+    out_name: Name with which to save the '.trk' file.
+    """
+    streamline = []
+    for fiber_idx, _ in enumerate(fiber_list):
+        cur_fiber = np.asarray(fiber_list[fiber_idx])
+        streamline.append([cur_fiber, None, None])
+        # Save new tractography using the header of the predicted fibers
+        nib.trackvis.write(out_name + ".trk", streamline, points_space='voxel',
+        hdr_mapping=header)
+
+
+def print(*args, **kwargs):
+    builtins.print(*args, flush=True, **kwargs)
