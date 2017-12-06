@@ -67,7 +67,7 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
     def input_fn(self, X, y):
         if isinstance(X, np.ndarray):
             X_ = {"X": X}
-        elif isinstance(X, dict)
+        elif isinstance(X, dict):
             X_ = X
         else:
             raise ValueError("Expected input X instance of type "
