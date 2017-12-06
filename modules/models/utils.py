@@ -6,6 +6,14 @@ import nibabel as nib
 from modules.models.example_loader import PointExamples
 from sklearn.externals import joblib
 
+
+def np_placeholder(X):
+    assert isinstance(X, np.ndarray)
+    return tf.placeholder(
+                shape=[None] + list(X.shape[1:]),
+                dtype=X.dtype.name)
+
+
 def convert_nii_and_trk_to_npy(
         nii_file,
         trk_file,
