@@ -246,9 +246,14 @@ class BaseTracker(BaseTF):
                                                    incoming_point,
                                                    outgoing,
                                                    label_type)
+            X_sample = {
+                'centers': sample['center'],
+                'incoming': sample['incoming'],
+                'blocks': sample['data_block']
+            }
             # Add example to examples by appending individual lists
             for key, cur_list in X.items():
-                cur_list.append(sample[key])
+                cur_list.append(X_sample[key])
         return X
 
     def _seeds_from_wm_mask(self):
