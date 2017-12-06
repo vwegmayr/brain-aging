@@ -9,7 +9,7 @@ import time
 
 from sklearn.externals import joblib
 from abc import ABC, abstractmethod
-from modules.configparse import ConfigParser
+from modules.configparse import ConfigParser, parse_more_args
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
@@ -24,8 +24,8 @@ class Action(ABC):
     def __init__(self, args):
         self.args = args
         self._check_action(args.action)
-        if self.args.X is not None:
-            self.X, self.y = self._load_data()
+        self.X = self._load_data(self.args.X)
+        self.y = self._load_data(self.args.y)
         self._mk_save_folder()
         self.X_new, self.y_new = None, None
 
@@ -68,15 +68,15 @@ class Action(ABC):
             exit()
         return data
 
-    def _load_data(self):
+    def _load_data(self, data_path):
 
-        X_loader = self._get_loader_from_extension(self.args.X)
-        X = self._load(self.args.X, X_loader)
+        if data_path is None:
+            return None
 
-        y_loader = self._get_loader_from_extension(self.args.y)
-        y = self._load(self.args.y, y_loader)
+        loader = self._get_loader_from_extension(data_path)
+        data = self._load(data_path, loader)
 
-        return X, y
+        return data
 
     def _mk_save_folder(self):
         if self.args.smt_label != "debug":
@@ -162,16 +162,16 @@ class ModelAction(Action):
     Args:
         args (Namespace): Parsed arguments
     """
-    def __init__(self, args):
+    def __init__(self, args, more_args=None):
         super(ModelAction, self).__init__(args)
+        self.more_args = more_args
         self.act()
 
-    def track(self):
-        track_config = ConfigParser().parse(self.args.predict_params)
-        self.model.track(track_config)
-
     def predict(self):
-        self.y_new = self.model.predict(self.X)
+        if "args" in getfullargspec(self.model.predict).args:
+            self.y_new = self.model.predict(self.X, args=self.more_args)
+        else:
+            self.y_new = self.model.predict(self.X)
 
     def predict_proba(self):
         self.y_new = self.model.predict_proba(self.X)
@@ -212,7 +212,7 @@ class ModelAction(Action):
         return model
 
     def _check_action(self, action):
-        if action not in ["transform", "predict", "score", "predict_proba", "track"]:
+        if action not in ["transform", "predict", "score", "predict_proba"]:
             raise RuntimeError("Can only run transform, predict, predict_proba"
                                " or score from model, got {}.".format(action))
 
@@ -228,20 +228,18 @@ if __name__ == '__main__':
     arg_parser.add_argument("-y", help="Input labels")
 
     arg_parser.add_argument("-a", "--action", choices=["transform", "predict",
-                            "fit", "fit_transform", "score", "predict_proba", "track"],
+                            "fit", "fit_transform", "score", "predict_proba"],
                             help="Action to perform.",
                             required=True)
 
-    arg_parser.add_argument(
-        "-pp", "--predict_params",
-        help="Parameters for prediction")
-
     arg_parser.add_argument("smt_label", nargs="?", default="debug")
 
-    args = arg_parser.parse_args()
+    args, more_args = arg_parser.parse_known_args()
+
+    more_args = parse_more_args(more_args)
 
     if args.config is None:
-        ModelAction(args)
+        ModelAction(args, more_args)
     else:
         config = ConfigParser().parse(args.config)
         ConfigAction(args, config)

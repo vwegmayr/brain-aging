@@ -5,7 +5,7 @@ import importlib
 import importlib.util
 import os
 import yaml
-
+import argparse
 
 class ConfigParser:
     """Parser for yaml files"""
@@ -82,3 +82,27 @@ def get_full_keys_containing(string, dict):
         if string in key:
             keys.append(key)
     return keys
+
+
+def parse_more_args(more_args):
+    """Parse unknown args returned by argparse
+
+    Args:
+        more_args (list): List which contains the args
+            in the form ["--arg1=val1", "--arg2=val2", ...].
+
+    Returns:
+        parsed_args (argpars.Namespace)
+    """
+    
+    if len(more_args) > 0:
+        arg_dict = {}
+        for arg in more_args:
+            key, val = arg.split("=")
+            assert key[:2] == "--"
+            key = key[2:]
+            arg_dict[key] = int(val)
+
+        return argparse.Namespace(**arg_dict)
+    else:
+        return None

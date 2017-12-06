@@ -1,11 +1,11 @@
 # This config is only provisional
 # It is used to design the BaseTracker class
 # Mandatory
-nii_file: data/FODl4.nii.gz
+#nii_file: data/FODl4.nii.gz
 n_fibers: 10000
 block_size: 3
 n_last_incoming: 3
-wm_mask: data/wm_mask.nii.gz
+#wm_mask: data/wm_mask.nii.gz
 step_size: 1
 # Optional
 #seeds:

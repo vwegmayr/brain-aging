@@ -28,10 +28,18 @@ def convert_dwi_and_mask_to_pkl(
         None: Saves pickle to save_path
     """
 
-    dwi = nib.load(dwi_file).get_data()
-    mask = nib.load(mask_file).get_data()
+    dwi = nib.load(dwi_file)
+    mask = nib.load(mask_file)
 
-    features = {"dwi": dwi, "mask": mask}
+    header = nib.trackvis.empty_header()
+    nib.trackvis.aff_to_hdr(dwi.affine, header, True, True)
+    header["dim"] = dwi.header.structarr["dim"][1:4]
+
+    features = {
+        "dwi": dwi.get_data(),
+        "mask": mask.get_data(),
+        "header": header
+    }
 
     joblib.dump(features, save_path)
 
@@ -112,7 +120,7 @@ def parse_hooks(hooks, locals, outdir):
     return training_hooks
 
 
-def save_fibers(fiber_list, header, out_name="fibers"):
+def save_fibers(fiber_list, header, out_name="fibers.trk"):
     """Save fibers form a list.
 
     Args:
@@ -125,7 +133,7 @@ def save_fibers(fiber_list, header, out_name="fibers"):
         cur_fiber = np.asarray(fiber_list[fiber_idx])
         streamline.append([cur_fiber, None, None])
         # Save new tractography using the header of the predicted fibers
-        nib.trackvis.write(out_name + ".trk", streamline, points_space='voxel',
+        nib.trackvis.write(out_name, streamline, points_space='voxel',
         hdr_mapping=header)
 
 
