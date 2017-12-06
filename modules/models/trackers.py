@@ -19,7 +19,7 @@ class SimpleTracker(BaseTracker):
         params={},
         track_config={}):  # noqa: E129
 
-        super(ExampleTF, self).__init__(
+        super(SimpleTracker, self).__init__(
             input_fn_config,
             config, 
             params,
