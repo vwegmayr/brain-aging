@@ -110,7 +110,7 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
 class BaseTracker(BaseTF):
     """Exension to BaseTF to enable fiber tracking."""
 
-    def __init__(self, input_fn_config, config, params, track_config=None):
+    def __init__(self, input_fn_config, config, params, track_config):
         super(BaseTracker, self).__init__(input_fn_config, config, params)
         self.track_config = track_config
         self.wm_mask = nib.load(track_config['wm_mask']).get_data()
@@ -128,7 +128,7 @@ class BaseTracker(BaseTF):
         brain_size = brain_data.shape
         voxel_size = brain_header["pixdim"][1:4]
 
-        if self.track_config['seeds']:
+        if not self.track_config['seeds']:
             seeds = self._seeds_from_wm_mask()
 
         self.tractography = []         # The final result will be here
