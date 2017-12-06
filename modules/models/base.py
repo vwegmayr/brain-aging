@@ -71,6 +71,11 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         if isinstance(X, np.ndarray):
             X_ = {"X": X}
         elif isinstance(X, dict):
+            for key, val in X.items():
+                if not isinstance(val, np.ndarray):
+                    raise ValueError(("Expected values of dict X "
+                        "as type np.ndarray, got {} for key {}")
+                        .format(type(val), key))
             X_ = X
         else:
             raise ValueError("Expected input X instance of type "
@@ -131,11 +136,18 @@ class BaseTracker(BaseTF):
     def __init__(self, input_fn_config, config, params):
         super(BaseTracker, self).__init__(input_fn_config, config, params)
 
+    def fit(self, X, y):
+        
+        self.n_incoming = int(X["incoming"].shape[1] / 3)
+        self.block_size = X["blocks"].shape[1]
+
+        super(BaseTracker, self).fit(X, y)
 
     def predict(self, X, args):
         """Generate the tracktography with the current model on the given brain."""
         # Check model
         #check_is_fitted(self, ['estimator'])
+
         self.args = args
 
         try:
@@ -232,12 +244,12 @@ class BaseTracker(BaseTF):
 
         for fiber in self.ongoing_fibers:
             center_point = fiber[-1]
-            incoming_point = np.zeros((self.args.n_last_incoming, 3))
+            incoming_point = np.zeros((self.n_incoming, 3))
             outgoing = np.zeros(3)
-            for i in range(min(self.args.n_last_incoming, len(fiber)-1)):
+            for i in range(min(self.n_incoming, len(fiber)-1)):
                 incoming_point[i] = fiber[-i - 2]
             sample = PointExamples.build_datablock(self.brain_data,
-                                                   self.args.block_size,
+                                                   self.block_size,
                                                    center_point,
                                                    incoming_point,
                                                    outgoing,
