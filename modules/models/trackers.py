@@ -16,14 +16,12 @@ class SimpleTracker(BaseTracker):
         self,
         input_fn_config={"shuffle": True},
         config={},
-        params={},
-        track_config={}):  # noqa: E129
+        params={}):  # noqa: E129
 
         super(SimpleTracker, self).__init__(
             input_fn_config,
             config, 
-            params,
-            track_config)
+            params)
 
     def model_fn(self, features, labels, mode, params, config):
 
@@ -46,9 +44,9 @@ class SimpleTracker(BaseTracker):
         unnormed = tf.layers.dense(
             dense_layer_2,
             units=3,
-            activation=tf.nn.relu)
+            activation=None)
 
-        normed = tf.divide(unnormed, tf.norm(unnormed))
+        normed = tf.nn.l2_normalize(unnormed, dim=1)
 
         predictions = normed
         # ================================================================

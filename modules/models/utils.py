@@ -51,7 +51,8 @@ def convert_nii_and_trk_to_npy(
             example_loader.brain_data,
             example_loader.block_size,
             label['center'],
-            label['incoming'], label['outgoing'],
+            label['incoming'],
+            label['outgoing'],
             label_type)
         X['blocks'].append(block['data_block'])
         X['incoming'].append(block['incoming'])

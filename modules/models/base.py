@@ -198,12 +198,12 @@ class BaseTracker(BaseTF):
             for j, fiber in enumerate(self.ongoing_fibers):
                 new_position = fiber[-1] + predictions[j] * self.track_config['step_size']
 
-                if i == 1 and self.is_border(fiber[-1] + predictions[j]):
+                if i == 1 and self._is_border(fiber[-1] + predictions[j]):
                     # First step is ambiguous and leads into boarder -> flip it.
                     new_position = fiber[-1] - predictions[j] * self.track_config['step_size']
 
                 # Only continue fibers inside the boundaries and short enough
-                if self.is_border(new_position) or \
+                if self._is_border(new_position) or \
                         i * self.track_config['step_size'] > self.max_fiber_length:
                     self.tractography.append(fiber)
                 else:

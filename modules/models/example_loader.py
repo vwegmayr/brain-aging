@@ -183,6 +183,8 @@ class Examples(object):
         """
         if not np.array_equal(_from, np.zeros(3)) and not np.array_equal(to, np.zeros(3)):
             relative = np.asarray(to) - np.asarray(_from)
+            if np.linalg.norm(relative) < 1e-9:
+              raise ValueError("Norm of relative vector is vanishingly small.")
             return relative / np.linalg.norm(relative)
         else:
             return np.zeros(3)
