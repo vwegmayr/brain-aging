@@ -46,7 +46,7 @@ class Action(ABC):
         getattr(self, self.args.action)()
         self._save()
 
-    def _get_loader_from_extension(file_path):
+    def _get_loader_from_extension(self, file_path):
         extension = file_path.split(".")[-1]
 
         if extension == "npy":
@@ -59,7 +59,7 @@ class Action(ABC):
 
         return loader
 
-    def _load(file_path, loader):
+    def _load(self, file_path, loader):
         try:
             data = loader(file_path)
         except FileNotFoundError:
