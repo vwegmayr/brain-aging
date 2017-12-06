@@ -47,13 +47,17 @@ def convert_dwi_and_mask_to_pkl(
 def convert_nii_and_trk_to_pkl(
         nii_file,
         trk_file,
-        block_size,
-        path,
+        pkl_path,
+        block_size=3,
         samples_percent=1.0,
         n_samples=None,
         min_fiber_length=0,
         last_incoming=1):
     """Save the samples to numpy binary format."""
+
+    if samples_percent < 1 and n_samples is not None:
+        raise RuntimeError("n_samples must be None, if samples_percent < 1.")
+
     # The labels are the real vectors.
     label_type = "point"
 
@@ -91,13 +95,15 @@ def convert_nii_and_trk_to_pkl(
         X['centers'].append(block['center'])
         y.append(block['outgoing'])
 
-
     for key in X.keys():
         X[key] = np.array(X[key])
     y = np.array(y)
 
-    joblib.dump(X, os.path.join(path, "X.pkl"))
-    joblib.dump(y, os.path.join(path, "y.pkl"))
+    if pkl_path[-4:] == ".pkl":
+        pkl_path = pkl_path[:-4]
+
+    joblib.dump(X, pkl_path + "_X.pkl")
+    joblib.dump(y, pkl_path + "_y.pkl")
 
 def parse_hooks(hooks, locals, outdir):
     training_hooks = []
