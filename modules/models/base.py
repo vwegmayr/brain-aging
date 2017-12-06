@@ -8,6 +8,7 @@ from sklearn.utils.validation import check_is_fitted
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
 from modules.models.utils import print
+from modules.models.example_loader import PointExamples
 from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
 
@@ -128,13 +129,14 @@ class BaseTracker(BaseTF):
         brain_size = brain_data.shape
         voxel_size = brain_header["pixdim"][1:4]
 
+        # If no seeds are specified, build them from the wm mask
         if not self.track_config['seeds']:
             seeds = self._seeds_from_wm_mask()
 
         self.tractography = []         # The final result will be here
         self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
 
-    def _build_next_X(self, last_incoming):
+    def _build_next_X(self):
         """Builds the next X-batch to be fed to the model.
 
         The X-batch created continues the streamline based on the outgoing directions obtained at
@@ -143,7 +145,29 @@ class BaseTracker(BaseTF):
         Returns:
             next_X: The next batch of point values (blocks, incoming, centers).
         """
-        pass
+        label_type = "point"
+        X = {
+            'centers': [],
+            'incoming': [],
+            'blocks': []
+        }
+
+        for fiber in self.ongoing_fibers:
+            center_point = fiber[-1]
+            incoming_point = np.zeros((self.track_config['last_incoming'], 3))
+            outgoing = np.zeros(3)
+            for i in range(min(self.track_config['last_incoming'], len(fiber)-1)):
+                incoming_point[i] = fiber[-i - 2]
+            sample = PointExamples.build_datablock(self.brain_data,
+                                                   self.track_config['block_size'],
+                                                   center_point,
+                                                   incoming_point,
+                                                   outgoing,
+                                                   label_type)
+            # Add example to examples by appending individual lists
+            for key, cur_list in X.items():
+                cur_list.append(sample[key])
+        return X
 
     def _seeds_from_wm_mask(self):
         """Compute the seeds for the streamlining from the white matter mask.
