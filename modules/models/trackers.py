@@ -12,15 +12,20 @@ from tensorflow.python.saved_model.signature_constants import (
 from tensorflow.python.estimator.export.export_output import PredictOutput
 
 
-class BasicTracker(BaseTF):
+class BasicTracker(BaseTracker):
     """docstring for ExampleTF"""
     def __init__(
         self,
         input_fn_config={"shuffle": True},
         config={},
-        params={}):  # noqa: E129
+        params={},
+        track_config={}):  # noqa: E129
 
-        super(ExampleTF, self).__init__(input_fn_config, config, params)
+        super(ExampleTF, self).__init__(
+            input_fn_config,
+            config, 
+            params,
+            track_config)
 
     def model_fn(self, features, labels, mode, params, config):
 
