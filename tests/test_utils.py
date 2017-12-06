@@ -16,6 +16,7 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
             TRK,
             block_size=3,
             path=PATH,
+            samples_percent=0.3,
             n_samples=100)
 
         if os.path.exists("tests/X.pkl"):
@@ -26,7 +27,7 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
             cls.y = joblib.load("tests/y.pkl")
         else:
             cls.y = None
-    
+
     @classmethod
     def tearDownClass(cls):
         if os.path.exists("tests/X.pkl"):
@@ -34,16 +35,13 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
         if os.path.exists("tests/y.pkl"):
             os.remove("tests/y.pkl")
 
-
     def test_if_pkls_are_created(self):
         self.assertIsNotNone(self.X)
         self.assertIsNotNone(self.y)
 
-
     def test_X_blocks_shape(self):
         self.assertEqual(self.X["blocks"].shape, (100, 3, 3, 3, 15))
         self.assertEqual(self.y.shape, (100, 3))
-
 
 
 if __name__ == '__main__':

@@ -367,12 +367,12 @@ class PointExamples(Examples):
         if self.example_percent < 1.0:
             # Subsample the labels
             n_old = len(train_labels)
-            one_every = np.round(1 / self.example_percent).astype(int)
-            train_labels = train_labels[::one_every]    # Subsample
+            n_wanted = np.round(n_old * self.example_percent).astype(int)
+            train_labels = train_labels[0:n_wanted]    # Subsample
             n_new = len(train_labels)
-            print("Training labels are {} / {}, correspoiding to {} %".format(n_old,
-                                                                              n_new,
-                                                                              n_new / n_old))
+            print("Training labels are {} / {}, i.e. {:3.2f} %".format(n_new,
+                                                                       n_old,
+                                                                       n_new / n_old * 100))
 
         print("Generated {} train and {} eval fiber labels\n".format(len(train_labels),
                                                                      len(eval_labels)))
