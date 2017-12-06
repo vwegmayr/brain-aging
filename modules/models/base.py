@@ -65,8 +65,16 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         return self.predict(X, head="probabs")
 
     def input_fn(self, X, y):
+        if isinstance(X, np.ndarray):
+            X_ = {"X": X}
+        elif isinstance(X, dict)
+            X_ = X
+        else:
+            raise ValueError("Expected input X instance of type "
+                "ndarray or dict, got {}".format(type(X)))
+
         return tf.estimator.inputs.numpy_input_fn(
-            x={"X": X},
+            x=X_,
             y=y,
             **self.input_fn_config)
 
