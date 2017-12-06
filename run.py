@@ -13,6 +13,7 @@ from modules.configparse import ConfigParser, parse_more_args
 from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
+from shutil import rmtree
 
 
 class Action(ABC):
@@ -43,8 +44,12 @@ class Action(ABC):
 
     def act(self):
         self.model = self._load_model()
+
         getattr(self, self.args.action)()
         self._save()
+
+        if self.args.cleanup:
+            rmtree(self.save_path)
 
     def _get_loader_from_extension(self, file_path):
         extension = file_path.split(".")[-1]
@@ -233,6 +238,7 @@ if __name__ == '__main__':
                             required=True)
 
     arg_parser.add_argument("smt_label", nargs="?", default="debug")
+    arg_parser.add_argument("--cleanup", action="store_true")
 
     args, more_args = arg_parser.parse_known_args()
 
