@@ -128,8 +128,7 @@ class BaseTracker(BaseTF):
 
         # Get brain information
         brain_file = nib.load(self.track_config['nii_file'])
-        brain_data = brain_file.get_data()
-        brain_header = brain_file.header.structarr
+        self.brain_data = brain_file.get_data()
 
         # If no seeds are specified, build them from the wm mask
         if not self.track_config['seeds']:
