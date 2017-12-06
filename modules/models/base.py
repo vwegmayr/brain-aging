@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.utils.validation import check_is_fitted
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
-from modules.models.utils import print
+from modules.models.utils import print, np_placeholder
 from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
 
@@ -47,13 +47,9 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
             self.estimator.train(input_fn=self.input_fn(X, y))
         except KeyboardInterrupt:
             print("\nEarly stop of training, saving model...")
-            self.export_estimator(
-                input_shape=list(X.shape[1:]),
-                input_dtype=X.dtype.name)
+            self.export_estimator(X)
         else:
-            self.export_estimator(
-                input_shape=list(X.shape[1:]),
-                input_dtype=X.dtype.name)
+            self.export_estimator(X)
 
         return self
 
@@ -83,10 +79,18 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         if self._restore_path is None:
             self.config["model_dir"] = save_path
 
-    def export_estimator(self, input_shape, input_dtype):
-        feature_spec = {"X": tf.placeholder(
-            shape=[None] + input_shape,
-            dtype=input_dtype)}
+    def export_estimator(self, X):
+        feature_spec = {}
+        if isinstance(X, np.ndarray):
+            feature_spec["X"] = np_placeholder(X)
+        elif isinstance(X, dict):
+            for key, val in X.items():
+                if isinstance(val, np.ndarray):
+                    feature_spec[key] = np_placeholder(val)
+                else:
+                    raise ValueError("Expected X to be dict to ndarray, "
+                        "got key {} which is {}.".format(key, type(val)))
+
         receiver_fn = input_receiver_fn(feature_spec)
         self._restore_path = self.estimator.export_savedmodel(
             self.save_path,
