@@ -7,11 +7,11 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        TRK = "data/iFOD2.trk"
+        TRK = "data/iFOD2_skip100.trk"
         NII = "data/FODl4.nii.gz"
         PATH = "tests"
 
-        utils.convert_nii_and_trk_to_npy(
+        utils.convert_nii_and_trk_to_pkl(
             NII,
             TRK,
             block_size=3,
