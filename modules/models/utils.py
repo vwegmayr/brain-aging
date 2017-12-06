@@ -14,7 +14,29 @@ def np_placeholder(X):
                 dtype=X.dtype.name)
 
 
-def convert_nii_and_trk_to_npy(
+def convert_dwi_and_mask_to_pkl(
+    dwi_file,
+    mask_file,
+    save_path):
+    """Convert diffusion data and white matter mask to pickle.
+
+    Args:
+        dwi_file (str): Path to nifti file containing diffusion data.
+        mask_file (str): Path to nifti file containing white matter mask.
+
+    Returns:
+        None: Saves pickle to save_path
+    """
+
+    dwi = nib.load(dwi_file).get_data()
+    mask = nib.load(mask_file).get_data()
+
+    features = {"dwi": dwi, "mask": mask}
+
+    joblib.dump(features, save_path)
+
+
+def convert_nii_and_trk_to_pkl(
         nii_file,
         trk_file,
         block_size,
@@ -53,7 +75,8 @@ def convert_nii_and_trk_to_npy(
             example_loader.brain_data,
             example_loader.block_size,
             label['center'],
-            label['incoming'], label['outgoing'],
+            label['incoming'],
+            label['outgoing'],
             label_type)
         X['blocks'].append(block['data_block'])
         X['incoming'].append(block['incoming'])

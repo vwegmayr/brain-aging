@@ -58,7 +58,11 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
 
     def predict(self, X, head="predictions"):
         predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
-        return predictor({"X": X})[head]
+
+        if isinstance(X, np.ndarray):
+            return predictor({"X": X})[head]
+        elif isinstance(X, dict):
+            return predictor(X)[head]
 
     def predict_proba(self, X):
         return self.predict(X, head="probabs")
@@ -124,38 +128,39 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
 class BaseTracker(BaseTF):
     """Exension to BaseTF to enable fiber tracking."""
 
-    def __init__(self, input_fn_config, config, params, track_config):
+    def __init__(self, input_fn_config, config, params):
         super(BaseTracker, self).__init__(input_fn_config, config, params)
+
+
+    def track(self, track_config):
+        """Generate the tracktography with the current model on the given brain."""
+        # Check model
+        #check_is_fitted(self, ['estimator'])
         self.track_config = track_config
 
         try:
             self.wm_mask = nib.load(track_config['wm_mask']).get_data()
             self.nii = nib.load(track_config['nii_file']).get_data()
-            if track_config['max_fiber_length']:
+            if 'max_fiber_length' in track_config:
                 self.max_fiber_length = track_config['max_fiber_length']
             else:
                 self.max_fiber_length = 400
         except KeyError as err:
-            print(err)
-
-    def track(self):
-        """Generate the tracktography with the current model on the given brain."""
-        # Check model
-        check_is_fitted(self, ['estimator'])
+            print("KeyError: {}".format(err))
 
         # Get brain information
         brain_file = nib.load(self.track_config['nii_file'])
         self.brain_data = brain_file.get_data()
 
         # If no seeds are specified, build them from the wm mask
-        if not self.track_config['seeds']:
+        if 'seeds' not in self.track_config:
             seeds = self._seeds_from_wm_mask()
 
         self.tractography = []         # The final result will be here
         self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
 
         # Start tractography generation
-        if self.track_config['reseed_endpoints']:
+        if 'reseed_endpoints' in self.track_config:
             self._generate_masked_tractography(self.track_config['reseed_endpoints'])
         else:
             self._generate_masked_tractography()
@@ -167,7 +172,7 @@ class BaseTracker(BaseTF):
         nib.trackvis.aff_to_hdr(affine, new_header, True, True)
         new_header["dim"] = brain_file.header.structarr["dim"][1:4]
         # Save the Fibers
-        if self.track_config['out_name']:
+        if 'out_name' in self.track_config:
             save_fibers(self.tractography, new_header, self.track_config['out_name'])
         else:
             save_fibers(self.tractography, new_header)
@@ -180,8 +185,9 @@ class BaseTracker(BaseTF):
             reseed_endpoints: Boolean. If True, use the end points of the fibers produced to
                 generate another tractography. This is to symmetrize the process.
         """
+
         i = 0
-        while not self.ongoing_fibers:
+        while self.ongoing_fibers:
             i += 1
             # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
             # the tracto alignment.
@@ -192,12 +198,12 @@ class BaseTracker(BaseTF):
             for j, fiber in enumerate(self.ongoing_fibers):
                 new_position = fiber[-1] + predictions[j] * self.track_config['step_size']
 
-                if i == 1 and self.is_border(fiber[-1] + predictions[j]):
+                if i == 1 and self._is_border(fiber[-1] + predictions[j]):
                     # First step is ambiguous and leads into boarder -> flip it.
                     new_position = fiber[-1] - predictions[j] * self.track_config['step_size']
 
                 # Only continue fibers inside the boundaries and short enough
-                if self.is_border(new_position) or \
+                if self._is_border(new_position) or \
                         i * self.track_config['step_size'] > self.max_fiber_length:
                     self.tractography.append(fiber)
                 else:
@@ -234,9 +240,9 @@ class BaseTracker(BaseTF):
 
         for fiber in self.ongoing_fibers:
             center_point = fiber[-1]
-            incoming_point = np.zeros((self.track_config['last_incoming'], 3))
+            incoming_point = np.zeros((self.track_config['n_last_incoming'], 3))
             outgoing = np.zeros(3)
-            for i in range(min(self.track_config['last_incoming'], len(fiber)-1)):
+            for i in range(min(self.track_config['n_last_incoming'], len(fiber)-1)):
                 incoming_point[i] = fiber[-i - 2]
             sample = PointExamples.build_datablock(self.brain_data,
                                                    self.track_config['block_size'],
