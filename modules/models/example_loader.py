@@ -10,9 +10,8 @@ import os
 
 import numpy as np
 import nibabel as nib
-# from .utils import extract_direction
 import functools
-
+from .utils import aff_to_rot
 
 print = functools.partial(print, flush=True)
 
@@ -190,7 +189,7 @@ class Examples(object):
             return np.zeros(3)
 
     @staticmethod
-    def build_datablock(data, block_size, center_point, incoming_point, outgoing_point, label_type):
+    def build_datablock(data, block_size, center_point, incoming_point, outgoing_point, label_type, affine):
         """Creates an example with all the label information and data added.
 
         Args:
@@ -215,22 +214,34 @@ class Examples(object):
 
         voxel = np.round(center_point).astype(int)
 
+        rot = aff_to_rot(affine)
+
         if label_type == "one_hot":
             example["center"] = np.round(center_point).astype(int)
-            example["incoming"] = Examples.points_to_one_hot(center_point, incoming_point)
-            example["outgoing"] = Examples.points_to_one_hot(center_point, outgoing_point)
+            example["incoming"] = Examples.points_to_one_hot(
+                center_point,
+                incoming_point)
+            example["outgoing"] = Examples.points_to_one_hot(
+                center_point,
+                outgoing_point)
         elif label_type == "point":
             example["center"] = np.array(center_point)
-            # example["incoming"] = Examples.points_to_relative(incoming_point[0], center_point)  # HACK TRAINING
-            example["incoming"] = Examples.points_to_relative(incoming_point[0], center_point) * np.array([1, -1, 1])  # HACK PREDICTION
+            example["incoming"] = Examples.points_to_relative(
+              incoming_point[0],
+              center_point)
+            example["incoming"] = rot.dot(example["incoming"])
             for i in range(len(incoming_point) - 1):
-                example["incoming"] = np.append(example["incoming"],  # HACK TRAINING
-                                                Examples.points_to_relative(incoming_point[i + 1],    #HACK TRAINING
-                                                incoming_point[i]))  # HACK TRAINING
-                # example["incoming"] = np.append(example["incoming"],    #HACK PREDICTION
-                #                                 Examples.points_to_relative(incoming_point[i + 1],  #HACK PREDICTION
-                #                                 incoming_point[i]) * np.array([1, -1, 1]))  # HACK PREDICTION
-            example["outgoing"] = Examples.points_to_relative(center_point, outgoing_point)
+                next_incoming = Examples.points_to_relative(
+                    incoming_point[i + 1],
+                    incoming_point[i])
+                next_incoming = rot.dot(next_incoming)
+                example["incoming"] = np.append(example["incoming"],
+                                                next_incoming)
+
+            example["outgoing"] = Examples.points_to_relative(
+                center_point,
+                outgoing_point)
+            example["outgoing"] = rot.dot(example["outgoing"])
 
         data_shape = np.shape(data)
         example["data_block"] = np.zeros((block_size,
