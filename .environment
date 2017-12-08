@@ -13,3 +13,4 @@ dependencies:
     - pyyaml==3.12
     - tensorflow-gpu==1.4.0
     - nibabel==2.1.0
+    - jupyter
