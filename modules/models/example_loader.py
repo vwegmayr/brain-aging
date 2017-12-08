@@ -189,7 +189,14 @@ class Examples(object):
             return np.zeros(3)
 
     @staticmethod
-    def build_datablock(data, block_size, center_point, incoming_point, outgoing_point, label_type, affine):
+    def build_datablock(
+        data,
+        block_size,
+        center_point,
+        incoming_point,
+        outgoing_point,
+        label_type,
+        affine):
         """Creates an example with all the label information and data added.
 
         Args:
