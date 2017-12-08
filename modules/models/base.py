@@ -167,14 +167,19 @@ class BaseTracker(BaseTF):
         if 'seeds' not in self.args:
             seeds = self._seeds_from_wm_mask()
 
-        self.tractography = []         # The final result will be here
-        self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
+        # The final result will be here
+        self.tractography = []
+        # Fibers that are still under construction. At first seeds.
+        self.ongoing_fibers = seeds
 
         # Start tractography generation
         if 'reseed_endpoints' in self.args:
-            self._generate_masked_tractography(self.args.reseed_endpoints)
+            self._generate_masked_tractography(
+                self.args.reseed_endpoints,
+                affine=X["header"].affine)
         else:
-            self._generate_masked_tractography()
+            self._generate_masked_tractography(
+                affine=X["header"].affine)
 
         # Save the Fibers
         fiber_path = os.path.join(self.save_path, "fibers.trk")
@@ -182,7 +187,7 @@ class BaseTracker(BaseTF):
 
 
 
-    def _generate_masked_tractography(self, reseed_endpoints=False):
+    def _generate_masked_tractography(self, reseed_endpoints=False, affine=None):
         """Generate the tractography using the white matter mask.
 
         Args:
@@ -196,6 +201,7 @@ class BaseTracker(BaseTF):
             # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
             # the tracto alignment.
             predictions = super(BaseTracker, self).predict(self._build_next_X())
+            predictions = aff_to_rot(affine).dot(predictions.T).T
 
             # Update the positions of the fibers and check if they are still ongoing
             cur_ongoing = []
