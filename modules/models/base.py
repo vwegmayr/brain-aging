@@ -148,6 +148,8 @@ class BaseTracker(BaseTF):
         # Check model
         #check_is_fitted(self, ['estimator'])
 
+        predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
+
         self.args = args
 
         try:
@@ -176,10 +178,12 @@ class BaseTracker(BaseTF):
         if 'reseed_endpoints' in self.args:
             self._generate_masked_tractography(
                 self.args.reseed_endpoints,
-                affine=X["header"]["vox_to_ras"])
+                affine=X["header"]["vox_to_ras"],
+                predictor=predictor)
         else:
             self._generate_masked_tractography(
-                affine=X["header"]["vox_to_ras"])
+                affine=X["header"]["vox_to_ras"],
+                predictor=predictor)
 
         # Save the Fibers
         fiber_path = os.path.join(self.save_path, "fibers.trk")
@@ -187,7 +191,11 @@ class BaseTracker(BaseTF):
 
 
 
-    def _generate_masked_tractography(self, reseed_endpoints=False, affine=None):
+    def _generate_masked_tractography(
+        self,
+        reseed_endpoints=False,
+        affine=None,
+        predictor=None):
         """Generate the tractography using the white matter mask.
 
         Args:
@@ -200,7 +208,7 @@ class BaseTracker(BaseTF):
             i += 1
             # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
             # the tracto alignment.
-            predictions = super(BaseTracker, self).predict(self._build_next_X(affine))
+            predictions = predictor(self._build_next_X(affine))["predictions"]
             predictions = aff_to_rot(affine).dot(predictions.T).T
 
             # Update the positions of the fibers and check if they are still ongoing
