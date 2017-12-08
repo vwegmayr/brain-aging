@@ -80,6 +80,11 @@ def convert_nii_and_trk_to_pkl(
     if n_samples is None:
         n_samples = len(example_loader.train_labels)
 
+    nii_aff = example_loader.brain_file.affine
+    trk_aff = trackvis.aff_from_hdr(example_loader.fiber_header)
+
+    assert np.all_close(nii_aff, trk_aff)
+
     for idx, label in enumerate(example_loader.train_labels):
         if idx >= n_samples:
             break
@@ -89,7 +94,8 @@ def convert_nii_and_trk_to_pkl(
             label['center'],
             label['incoming'],
             label['outgoing'],
-            label_type)
+            label_type,
+            nii_aff)
         X['blocks'].append(block['data_block'])
         X['incoming'].append(block['incoming'])
         X['centers'].append(block['center'])
