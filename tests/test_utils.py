@@ -47,20 +47,20 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
         self.assertEqual(self.y.shape, (38794, 3))
 
 
-class TestAffToRot(unittest.TestCase):
+class Test_aff_to_rot(unittest.TestCase):
 
-    def test_aff_to_rot(self):
+    def test_if_rotation_is_correct(self):
         # 90 deg rotation
         aff = np.asarray(
-            [[0, -1, 0, 10],
-             [1, 0, 0, 20],
-             [0, 0, 2, 30],
-             [0, 0, 0, 1]
+            [[0, -2, 0, 10],
+             [1,  0, 0, 20],
+             [0,  0, 3, 30],
+             [0,  0, 0, 1]
             ]
         )
         rot = utils.aff_to_rot(aff)
-        vec = np.asarray([1, 0, 0])
-        self.assertEqual((rot.dot(vec)).tolist(), [0, 1, 0])
+
+        self.assertEqual(rot.tolist(), [[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 
 
 if __name__ == '__main__':
