@@ -14,7 +14,7 @@ def np_placeholder(X):
                 dtype=X.dtype.name)
 
 
-def convert_dwi_and_mask_to_pkl(
+def make_test_set(
     dwi_file,
     mask_file,
     save_path):
@@ -44,7 +44,7 @@ def convert_dwi_and_mask_to_pkl(
     joblib.dump(features, save_path)
 
 
-def convert_nii_and_trk_to_pkl(
+def make_train_set(
         nii_file,
         trk_file,
         pkl_path,
@@ -53,7 +53,7 @@ def convert_nii_and_trk_to_pkl(
         n_samples=None,
         min_fiber_length=0,
         last_incoming=1):
-    """Save the samples to numpy binary format."""
+    """Save training set as pickle"""
 
     if samples_percent < 1 and n_samples is not None:
         raise RuntimeError("n_samples must be None, if samples_percent < 1.")

@@ -7,7 +7,7 @@ from sklearn.externals import joblib
 import modules.models.utils as utils
 
 
-class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
+class Test_make_train_set(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -15,7 +15,7 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
         NII = "data/FODl4.nii.gz"
         PATH = "tests"
 
-        utils.convert_nii_and_trk_to_pkl(
+        utils.make_train_set(
             NII,
             TRK,
             block_size=3,
