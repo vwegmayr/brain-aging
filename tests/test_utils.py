@@ -1,7 +1,11 @@
 import os
 import unittest
-import modules.models.utils as utils
+
+import numpy as np
 from sklearn.externals import joblib
+
+import modules.models.utils as utils
+
 
 class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
 
@@ -15,33 +19,48 @@ class Test_Nii_Trk_To_Pkl_Conversion(unittest.TestCase):
             NII,
             TRK,
             block_size=3,
-            path=PATH,
-            samples_percent=0.3,
-            n_samples=100)
+            pkl_path=PATH,
+            samples_percent=0.3)
 
-        if os.path.exists("tests/X.pkl"):
-            cls.X = joblib.load("tests/X.pkl")
+        if os.path.exists("tests_X.pkl"):
+            cls.X = joblib.load("tests_X.pkl")
         else:
             cls.X = None
-        if os.path.exists("tests/y.pkl"):
-            cls.y = joblib.load("tests/y.pkl")
+        if os.path.exists("tests_y.pkl"):
+            cls.y = joblib.load("tests_y.pkl")
         else:
             cls.y = None
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists("tests/X.pkl"):
-            os.remove("tests/X.pkl")
-        if os.path.exists("tests/y.pkl"):
-            os.remove("tests/y.pkl")
+        if os.path.exists("tests_X.pkl"):
+            os.remove("tests_X.pkl")
+        if os.path.exists("tests_y.pkl"):
+            os.remove("tests_y.pkl")
 
     def test_if_pkls_are_created(self):
         self.assertIsNotNone(self.X)
         self.assertIsNotNone(self.y)
 
     def test_X_blocks_shape(self):
-        self.assertEqual(self.X["blocks"].shape, (100, 3, 3, 3, 15))
-        self.assertEqual(self.y.shape, (100, 3))
+        self.assertEqual(self.X["blocks"].shape, (38794, 3, 3, 3, 15))
+        self.assertEqual(self.y.shape, (38794, 3))
+
+
+class TestAffToRot(unittest.TestCase):
+
+    def test_aff_to_rot(self):
+        # 90 deg rotation
+        aff = np.asarray(
+            [[0, -1, 0, 10],
+            [1, 0, 0, 20],
+            [0, 0, 1, 30],
+            [0, 0, 0, 1]
+            ]
+        )
+        rot = utils.aff_to_rot(aff)
+        vec = np.asarray([1, 0, 0])
+        self.assertEqual((rot.dot(vec)).tolist(), [0, 1, 0])
 
 
 if __name__ == '__main__':
