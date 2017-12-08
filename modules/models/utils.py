@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import builtins
 import nibabel as nib
-from modules.models.example_loader import PointExamples
+from modules.models.example_loader import PointExamples, aff_to_rot
 from sklearn.externals import joblib
 
 
@@ -81,9 +81,9 @@ def convert_nii_and_trk_to_pkl(
         n_samples = len(example_loader.train_labels)
 
     nii_aff = example_loader.brain_file.affine
-    trk_aff = trackvis.aff_from_hdr(example_loader.fiber_header)
+    trk_aff = nib.trackvis.aff_from_hdr(example_loader.fiber_header)
 
-    assert np.all_close(nii_aff, trk_aff)
+    assert np.allclose(nii_aff, trk_aff)
 
     for idx, label in enumerate(example_loader.train_labels):
         if idx >= n_samples:
@@ -147,20 +147,6 @@ def save_fibers(fiber_list, header, out_name="fibers.trk"):
         # Save new tractography using the header of the predicted fibers
         nib.trackvis.write(out_name, streamline, points_space='voxel',
         hdr_mapping=header)
-
-
-def aff_to_rot(aff):
-    """Computes the rotation matrix corresponding to the given affine matrix.
-
-    Args:
-        aff: The affine matrix (4, 4).
-    Returns:
-        rotation: The (3, 3) matrix corresponding to the rotation in the affine.
-    """
-    mat = aff[0:3, 0:3]
-    scales = np.linalg.norm(mat, axis=0)
-    rotation = np.divide(mat, scales)
-    return rotation
 
 
 def print(*args, **kwargs):

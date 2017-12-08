@@ -11,9 +11,22 @@ import os
 import numpy as np
 import nibabel as nib
 import functools
-from .utils import aff_to_rot
 
 print = functools.partial(print, flush=True)
+
+
+def aff_to_rot(aff):
+    """Computes the rotation matrix corresponding to the given affine matrix.
+
+    Args:
+        aff: The affine matrix (4, 4).
+    Returns:
+        rotation: The (3, 3) matrix corresponding to the rotation in the affine.
+    """
+    mat = aff[0:3, 0:3]
+    scales = np.linalg.norm(mat, axis=0)
+    rotation = np.divide(mat, scales)
+    return rotation
 
 
 class Examples(object):
