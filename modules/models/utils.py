@@ -143,5 +143,19 @@ def save_fibers(fiber_list, header, out_name="fibers.trk"):
         hdr_mapping=header)
 
 
+def aff_to_rot(aff):
+    """Computes the rotation matrix corresponding to the given affine matrix.
+
+    Args:
+        aff: The affine matrix (4, 4).
+    Returns:
+        rotation: The (3, 3) matrix corresponding to the rotation in the affine.
+    """
+    mat = aff[0:3, 0:3]
+    scales = np.linalg.norm(mat, axis=0)
+    rotation = np.divide(mat, scales)
+    return rotation
+
+
 def print(*args, **kwargs):
     builtins.print(*args, flush=True, **kwargs)
