@@ -53,9 +53,9 @@ class TestAffToRot(unittest.TestCase):
         # 90 deg rotation
         aff = np.asarray(
             [[0, -1, 0, 10],
-            [1, 0, 0, 20],
-            [0, 0, 1, 30],
-            [0, 0, 0, 1]
+             [1, 0, 0, 20],
+             [0, 0, 2, 30],
+             [0, 0, 0, 1]
             ]
         )
         rot = utils.aff_to_rot(aff)
