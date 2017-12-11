@@ -1,4 +1,4 @@
-class: modules.models.TrainDataTransformer
+class: modules.models.data_transform.TrainDataTransformer
 params:
   dwi_file: data/FODl4.nii.gz
   trk_file: data/iFOD2.trk
