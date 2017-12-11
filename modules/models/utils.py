@@ -6,6 +6,32 @@ import nibabel as nib
 from modules.models.example_loader import PointExamples, aff_to_rot
 from sklearn.externals import joblib
 
+from tensorflow.python.estimator.model_fn import ModeKeys
+
+def parse_layers(inputs, layers, mode=ModeKeys.TRAIN):
+    """Parse layer config to tensors
+
+    Args:
+        layers (dict): Dictionary containing the layer config.
+
+    Returns:
+        dict: Dictionary to tensor.
+    """
+
+    for layer, params in layers.items():
+        if layer == "dropout":
+            if mode in [ModeKeys.EVAL, ModeKeys.PREDICT]:
+                inputs = getattr(tf.layers, layer)(
+                    inputs, training=False, **params)
+            elif mode == ModeKeys.TRAIN:
+                inputs = getattr(tf.layers, layer)(
+                    inputs, training=True, **params)
+        else:
+            inputs = getattr(tf.layers, layer)(
+                inputs, **params)
+
+    return inputs
+
 
 def np_placeholder(X):
     assert isinstance(X, np.ndarray)

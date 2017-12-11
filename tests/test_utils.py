@@ -59,7 +59,7 @@ class Test_Pipeline(unittest.TestCase):
                     "num_epochs": 3,
                     "shuffle": True,
                     "queue_capacity": 10000,
-                    "num_threads": 2
+                    "num_threads": 1
                 },
                 "config": {
                     "save_summary_steps": 10,
@@ -68,7 +68,20 @@ class Test_Pipeline(unittest.TestCase):
                     "keep_checkpoint_max": 5
                 },
                 "params": {
-                    "learning_rate": 0.0001
+                    "learning_rate": 0.0001,
+                    "layers": {
+                        "dense": {
+                            "units": 2048,
+                            "activation": "tensorflow.nn.relu"
+                        },
+                        "dense": {
+                            "units": 3,
+                            "activation": "tensorflow.identity"
+                        },
+                        "dropout": {
+                          "rate": 0.1
+                        }
+                    }
                 }
             }
         }
@@ -78,7 +91,9 @@ class Test_Pipeline(unittest.TestCase):
 
     @classmethod
     def tearDownClass(self):
-        pass # Taken care of by tearDownModule
+        if (hasattr(self, "save_path") and 
+        os.path.exists(self.save_path)):
+            rmtree(self.save_path)
 
     def test_training(self):
 
@@ -97,8 +112,11 @@ class Test_Pipeline(unittest.TestCase):
             universal_newlines=True,
             shell=True)
         stdout, stderr = proc.communicate()
+        returncode = proc.returncode
 
-        save_path = stdout.split("\n")[-2]
+        self.assertEqual(returncode, 0)
+
+        self.save_path = stdout.split("\n")[-2]
 
 
 class Test_aff_to_rot(unittest.TestCase):
