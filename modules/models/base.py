@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from modules.models.utils import print, save_fibers, np_placeholder
-from modules.models.example_loader import PointExamples
+from modules.models.example_loader import PointExamples, aff_to_rot
 
 from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
@@ -148,6 +148,8 @@ class BaseTracker(BaseTF):
         # Check model
         #check_is_fitted(self, ['estimator'])
 
+        predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
+
         self.args = args
 
         try:
@@ -167,14 +169,21 @@ class BaseTracker(BaseTF):
         if 'seeds' not in self.args:
             seeds = self._seeds_from_wm_mask()
 
-        self.tractography = []         # The final result will be here
-        self.ongoing_fibers = seeds    # Fibers that are still under construction. At first seeds.
+        # The final result will be here
+        self.tractography = []
+        # Fibers that are still under construction. At first seeds.
+        self.ongoing_fibers = seeds
 
         # Start tractography generation
         if 'reseed_endpoints' in self.args:
-            self._generate_masked_tractography(self.args.reseed_endpoints)
+            self._generate_masked_tractography(
+                self.args.reseed_endpoints,
+                affine=X["header"]["vox_to_ras"],
+                predictor=predictor)
         else:
-            self._generate_masked_tractography()
+            self._generate_masked_tractography(
+                affine=X["header"]["vox_to_ras"],
+                predictor=predictor)
 
         # Save the Fibers
         fiber_path = os.path.join(self.save_path, "fibers.trk")
@@ -182,7 +191,11 @@ class BaseTracker(BaseTF):
 
 
 
-    def _generate_masked_tractography(self, reseed_endpoints=False):
+    def _generate_masked_tractography(
+        self,
+        reseed_endpoints=False,
+        affine=None,
+        predictor=None):
         """Generate the tractography using the white matter mask.
 
         Args:
@@ -195,7 +208,8 @@ class BaseTracker(BaseTF):
             i += 1
             # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
             # the tracto alignment.
-            predictions = super(BaseTracker, self).predict(self._build_next_X())
+            predictions = predictor(self._build_next_X(affine))["predictions"]
+            predictions = aff_to_rot(affine).dot(predictions.T).T
 
             # Update the positions of the fibers and check if they are still ongoing
             cur_ongoing = []
@@ -224,9 +238,9 @@ class BaseTracker(BaseTF):
         if reseed_endpoints:
             ending_seeds = [[fiber[-1]] for fiber in self.tractography]
             self.ongoing_fibers = ending_seeds
-            self._generate_masked_tractography(reseed_endpoints=False)
+            self._generate_masked_tractography(reseed_endpoints=False, affine=affine)
 
-    def _build_next_X(self):
+    def _build_next_X(self, affine):
         """Builds the next X-batch to be fed to the model.
 
         The X-batch created continues the streamline based on the outgoing directions obtained at
@@ -253,7 +267,8 @@ class BaseTracker(BaseTF):
                                                    center_point,
                                                    incoming_point,
                                                    outgoing,
-                                                   label_type)
+                                                   label_type,
+                                                   affine)
             X_sample = {
                 'centers': sample['center'],
                 'incoming': sample['incoming'],

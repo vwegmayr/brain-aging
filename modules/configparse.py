@@ -37,7 +37,11 @@ class ConfigParser:
         if isinstance(yaml_dict, dict):
 
             # Add custom replacements here
-            replace_obj_from_module(["_fn", "_func", "class"], yaml_dict)
+            replace_obj_from_module([
+                "_fn",
+                "_func",
+                "class",
+                "activation"], yaml_dict)
 
             for key, value in yaml_dict.items():
                 self.parse_python_objects(value)

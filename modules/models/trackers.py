@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import sklearn as skl
 
-from modules.models.utils import parse_hooks
+from modules.models.utils import parse_hooks, parse_layers
 from modules.models.base import BaseTracker
 
 from tensorflow.python.saved_model.signature_constants import (
@@ -31,20 +31,8 @@ class SimpleTracker(BaseTracker):
 
         concat = tf.concat([blocks, incoming], axis=1)
 
-        dense_layer_1 = tf.layers.dense(
-            concat,
-            units=2048,
-            activation=tf.nn.relu)
-
-        dense_layer_2 = tf.layers.dense(
-            dense_layer_1,
-            units=2048,
-            activation=tf.nn.relu)
-
-        unnormed = tf.layers.dense(
-            dense_layer_2,
-            units=3,
-            activation=None)
+        unnormed = parse_layers(
+            concat, layers=params["layers"], mode=mode)
 
         normed = tf.nn.l2_normalize(unnormed, dim=1)
 
