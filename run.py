@@ -51,6 +51,8 @@ class Action(ABC):
         if self.args.cleanup:
             rmtree(self.save_path)
 
+        print(self.save_path)
+
     def _get_loader_from_extension(self, file_path):
         extension = file_path.split(".")[-1]
 
