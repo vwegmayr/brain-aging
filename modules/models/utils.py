@@ -3,9 +3,9 @@ import numpy as np
 import tensorflow as tf
 import builtins
 import nibabel as nib
+
 from modules.models.example_loader import PointExamples, aff_to_rot
 from sklearn.externals import joblib
-
 from tensorflow.python.estimator.model_fn import ModeKeys
 
 def parse_layers(inputs, layers, mode=ModeKeys.TRAIN):
