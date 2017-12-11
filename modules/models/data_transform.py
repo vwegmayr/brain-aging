@@ -18,7 +18,7 @@ class TrainDataTransformer(BaseEstimator, TransformerMixin):
         min_fiber_length=0,
         n_incoming=1):
 
-        super(TransformTrainData, self).__init__()
+        super(TrainDataTransformer, self).__init__()
 
         self.dwi_file = dwi_file
         self.trk_file = trk_file
