@@ -120,10 +120,7 @@ class ConfigAction(Action):
         self.act()
 
     def fit(self):
-        if self.args.X is not None and self.args.y is not None:
-            self.model.fit(self.X, self.y)
-        else:
-            print("Expected X and y for fit.")
+        self.model.fit(self.X, self.y)
 
     def fit_transform(self):
         self.fit()
