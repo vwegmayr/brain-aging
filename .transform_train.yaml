@@ -1,0 +1,9 @@
+class: modules.models.TrainDataTransformer
+params:
+  dwi_file: data/FODl4.nii.gz
+  trk_file: data/iFOD2.trk
+  block_size: 3
+  samples_percent: 0.0001
+  n_samples: None
+  min_fiber_length: 0
+  n_incoming: 3
