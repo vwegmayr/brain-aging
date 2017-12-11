@@ -44,5 +44,5 @@ class TrainDataTransformer(BaseEstimator, TransformerMixin):
             n_incoming = self.n_incoming
         )
 
-    def set_save_path(self, save_path)
+    def set_save_path(self, save_path):
         self.save_path = save_path
