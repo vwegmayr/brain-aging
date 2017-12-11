@@ -2,9 +2,10 @@
 import sys
 import subprocess
 from os.path import normpath
+import argparse
 
 
-def setup():
+def setup(args):
     """Setup function
 
     Requires:
@@ -27,21 +28,29 @@ def setup():
     else:
         action = getattr(subprocess, "run")
 
-    action(["conda", "env", "create", "-n", PROJECT_NAME, "-f",
-            ".environment"])
+    if args.conda or args.all:
+        action(["conda", "env", "create", "-n", PROJECT_NAME, "-f",
+                ".environment"])
 
-    action(["bash", "-c", "source activate {} && ".format(PROJECT_NAME) +
-            "smt init -d {datapath} -i {datapath} -e python -m run.py "
-            "-c error -l cmdline {project_name}".format(
-            datapath=normpath('./data'), project_name=PROJECT_NAME)])
+    if args.smt or args.all:
+        action(["bash", "-c", "source activate {} && ".format(PROJECT_NAME) +
+                "smt init -d {datapath} -i {datapath} -e python -m run.py "
+                "-c error -l cmdline {project_name}".format(
+                datapath=normpath('./data'), project_name=PROJECT_NAME)])
 
-    action(["cp", ".example_config.yaml", ".config.yaml"])
-
-    print("\n========================================================")
-    print("Type 'source activate {}' ".format(PROJECT_NAME) +
-          "to activate environment.")
-    print("==========================================================")
+    if args.config or args.all:
+        action(["cp", ".example_config.yaml", ".config.yaml"])
 
 
 if __name__ == '__main__':
-    setup()
+
+    parser = argparse.ArgumentParser(description="Setup of conda and sumatra.")
+
+    parser.addArgument("--smt", action="store_true")
+    parser.addArgument("--conda", action="store_true")
+    parser.addArgument("--config", action="store_true")
+    parser.addArgument("--all", action="store_true")
+
+    args = parser.parse_args()
+
+    setup(args)
