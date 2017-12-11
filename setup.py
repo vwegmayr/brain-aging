@@ -46,10 +46,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Setup of conda and sumatra.")
 
-    parser.addArgument("--smt", action="store_true")
-    parser.addArgument("--conda", action="store_true")
-    parser.addArgument("--config", action="store_true")
-    parser.addArgument("--all", action="store_true")
+    parser.add_argument("--smt", action="store_true")
+    parser.add_argument("--conda", action="store_true")
+    parser.add_argument("--config", action="store_true")
+    parser.add_argument("--all", action="store_true")
 
     args = parser.parse_args()
 
