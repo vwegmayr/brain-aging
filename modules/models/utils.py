@@ -164,11 +164,7 @@ def make_test_set(
         "header": header
     }
 
-
-    if save_path[-4:] == ".pkl":
-        save_path = save_path[:-4]
-
-    joblib.dump(features, save_path + "_X.pkl")
+    joblib.dump(features, os.path.join(save_path, "test_X.pkl"))
 
 
 def make_train_set(

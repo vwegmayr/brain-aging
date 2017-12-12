@@ -39,7 +39,7 @@ def setup(args):
                 datapath=normpath('./data'), project_name=PROJECT_NAME)])
 
     if args.config or args.all:
-        action(["cp", ".example_config.yaml", ".config.yaml"])
+        action(["cp", "configs/example_config.yaml", "configs/config.yaml"])
 
 
 if __name__ == '__main__':

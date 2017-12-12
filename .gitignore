@@ -4,5 +4,6 @@
 __pycache__/
 .kaggle-cli/
 data/
-.config.yaml
+configs/
+!configs/.example_config.yaml
 .smt/

@@ -21,8 +21,6 @@ class TrainDataTransformer(DataTransformer):
     """
     def __init__(
         self,
-        dwi_file=None,
-        trk_file=None,
         block_size=3,
         samples_percent=1.0,
         n_samples=None,
@@ -31,8 +29,6 @@ class TrainDataTransformer(DataTransformer):
 
         super(TrainDataTransformer, self).__init__()
 
-        self.dwi_file = dwi_file
-        self.trk_file = trk_file
         self.block_size = block_size
         self.samples_percent = samples_percent
         self.n_samples = n_samples
@@ -61,10 +57,7 @@ class TrainDataTransformer(DataTransformer):
 
 class TestDataTransformer(DataTransformer):
     """docstring for TestDataTransformer"""
-    def __init__(
-        self,
-        dwi_file=None,
-        mask_file=None):
+    def __init__(self):
 
         super(TestDataTransformer, self).__init__()
 

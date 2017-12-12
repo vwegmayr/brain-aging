@@ -1,7 +1,0 @@
-class: modules.models.data_transform.TrainDataTransformer
-params:
-  block_size: 3
-  samples_percent: 0.0001
-  n_samples:
-  min_fiber_length: 0
-  n_incoming: 3
