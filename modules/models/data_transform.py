@@ -1,8 +1,18 @@
 from hashlib import sha1
 from sklearn.base import BaseEstimator, TransformerMixin
-from modules.models.utils import make_train_set
+from modules.models.utils import make_train_set, make_test_set
 
-class TrainDataTransformer(TransformerMixin):
+
+class DataTransformer(TransformerMixin):
+    """docstring for DataTransformer"""
+    def __init__(self):
+        super(DataTransformer, self).__init__()
+
+    def set_save_path(self, save_path):
+        self.save_path = save_path
+
+
+class TrainDataTransformer(DataTransformer):
     """Convert dwi.nii and fiber.trk into a pickle.pkl
 
     This is a wrapper for utils.make_train_set, to enable
@@ -34,15 +44,12 @@ class TrainDataTransformer(TransformerMixin):
         assert isinstance(X, list)
         assert len(X) == 2
 
-        if "nii" in X[0] and "trk" in X[1]:
+        if "trk" in X[0] and "nii" in X[1]:
             X = X[::-1]
 
-        trk = X[0]
-        dwi = X[1]
-
         make_train_set(
-            dwi_file = dwi,
-            trk_file = trk,
+            dwi_file = X[0],
+            trk_file = X[1],
             save_path = self.save_path,
             block_size = self.block_size,
             samples_percent = self.samples_percent,
@@ -51,5 +58,25 @@ class TrainDataTransformer(TransformerMixin):
             n_incoming = self.n_incoming
         )
 
-    def set_save_path(self, save_path):
-        self.save_path = save_path
+
+class TestDataTransformer(DataTransformer):
+    """docstring for TestDataTransformer"""
+    def __init__(
+        self,
+        dwi_file=None,
+        mask_file=None):
+
+        super(TestDataTransformer, self).__init__()
+
+    def transform(self, X, y=None):
+        
+        assert isinstance(X, list)
+        assert len(X) == 2
+
+        if "mask" in X[0]:
+            X = X[::-1]
+
+        make_test_set(
+            dwi_file=X[0],
+            mask_file=X[1],
+            save_path=self.save_path)
