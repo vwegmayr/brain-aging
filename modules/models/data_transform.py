@@ -1,7 +1,8 @@
+from hashlib import sha1
 from sklearn.base import BaseEstimator, TransformerMixin
 from modules.models.utils import make_train_set
 
-class TrainDataTransformer(BaseEstimator, TransformerMixin):
+class TrainDataTransformer(TransformerMixin):
     """Convert dwi.nii and fiber.trk into a pickle.pkl
 
     This is a wrapper for utils.make_train_set, to enable
@@ -28,14 +29,20 @@ class TrainDataTransformer(BaseEstimator, TransformerMixin):
         self.min_fiber_length = min_fiber_length
         self.n_incoming = n_incoming
 
+    def transform(self, X, y=None):
 
-    def fit(self, X=None, y=None):
-        pass
+        assert isinstance(X, list)
+        assert len(X) == 2
 
-    def transform(self, X=None, y=None):
+        if "nii" in X[0] and "trk" in X[1]:
+            X = X[::-1]
+
+        trk = X[0]
+        dwi = X[1]
+
         make_train_set(
-            dwi_file = self.dwi_file,
-            trk_file = self.trk_file,
+            dwi_file = dwi,
+            trk_file = trk,
             save_path = self.save_path,
             block_size = self.block_size,
             samples_percent = self.samples_percent,

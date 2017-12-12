@@ -232,11 +232,8 @@ def make_train_set(
         X[key] = np.array(X[key])
     y = np.array(y)
 
-    if save_path[-4:] == ".pkl":
-        save_path = save_path[:-4]
-
-    joblib.dump(X, save_path + "_X.pkl")
-    joblib.dump(y, save_path + "_y.pkl")
+    joblib.dump(X, os.path.join(save_path, "train_X.pkl"))
+    joblib.dump(y, os.path.join(save_path, "train_y.pkl"))
 
 def parse_hooks(hooks, locals, outdir):
     training_hooks = []

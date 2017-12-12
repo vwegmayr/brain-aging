@@ -105,7 +105,10 @@ def parse_more_args(more_args):
             key, val = arg.split("=")
             assert key[:2] == "--"
             key = key[2:]
-            arg_dict[key] = int(val)
+            try:
+                arg_dict[key] = int(val)
+            except ValueError:
+                arg_dict[key] = val
 
         return argparse.Namespace(**arg_dict)
     else:

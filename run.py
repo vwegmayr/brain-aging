@@ -22,8 +22,9 @@ class Action(ABC):
     Args:
         args (Namespace): Parsed arguments
     """
-    def __init__(self, args):
+    def __init__(self, args, more_args):
         self.args = args
+        self.more_args = more_args
         self._check_action(args.action)
         self.X = self._load_data(self.args.X)
         self.y = self._load_data(self.args.y)
@@ -61,8 +62,7 @@ class Action(ABC):
         elif extension == "pkl":
             loader = joblib.load
         else:
-            raise ValueError("Expected extension to be in {npy, pkl}, "
-                "got {}".format(extension))
+            loader = None
 
         return loader
 
@@ -73,16 +73,28 @@ class Action(ABC):
             print("{} not found. "
                   "Please download data first.".format(file_path))
             exit()
+        except TypeError:
+            data = file_path
+
         return data
 
     def _load_data(self, data_path):
 
-        if data_path is None:
-            return None
+        if isinstance(data_path, list):
+            return list(map(self._load_data, data_path))
 
-        loader = self._get_loader_from_extension(data_path)
-        data = self._load(data_path, loader)
+        elif isinstance(data_path, str):
 
+            loader = self._get_loader_from_extension(data_path)
+            data = self._load(data_path, loader)
+
+        elif data_path is None:
+            data = None
+
+        else:
+            raise ValueError("Expected data_path as strings "
+            "or list of strings.")
+        
         return data
 
     def _mk_save_folder(self):
@@ -93,16 +105,17 @@ class Action(ABC):
                 "%Y%m%d-%H%M%S",
                 time.gmtime()) + "-debug")
 
-        path = os.path.join("data", self.time_stamp)
+        path = os.path.join("/local/entrack/data", self.time_stamp)
         os.mkdir(os.path.normpath(path))
 
         self.save_path = path
 
     def transform(self):
-        if "y" in getfullargspec(self.model.transform).args:
-            self.X_new = self.model.transform(self.X, self.y)
+        if "args" in getfullargspec(self.model.transform).args:
+            self.X_new = self.model.transform(
+                X=self.X, args=self.more_args)
         else:
-            self.X_new = self.model.transform(self.X)
+            self.X_new = self.model.transform(X=self.X)
 
 
 class ConfigAction(Action):
@@ -113,14 +126,17 @@ class ConfigAction(Action):
         config (dict): Parsed config file
 
     """
-    def __init__(self, args, config):
-        super(ConfigAction, self).__init__(args)
+    def __init__(self, args, config, more_args=None):
+        super(ConfigAction, self).__init__(args, more_args)
         self.config = config
         self.pprint_config()
         self.act()
 
     def fit(self):
-        self.model.fit(self.X, self.y)
+        if "args" in getfullargspec(self.model.fit).args:
+            self.model.fit(self.X, self.y, args=self.more_args)
+        else:
+            self.model.fit(self.X, self.y)
 
     def fit_transform(self):
         self.fit()
@@ -149,7 +165,7 @@ class ConfigAction(Action):
         return model
 
     def _check_action(self, action):
-        if action not in ["fit", "fit_transform"]:
+        if action not in ["fit", "fit_transform", "transform"]:
             raise RuntimeError("Can only run fit or fit_transform from config,"
                                " got {}.".format(action))
 
@@ -167,8 +183,7 @@ class ModelAction(Action):
         args (Namespace): Parsed arguments
     """
     def __init__(self, args, more_args=None):
-        super(ModelAction, self).__init__(args)
-        self.more_args = more_args
+        super(ModelAction, self).__init__(args, more_args)
         self.act()
 
     def predict(self):
@@ -228,7 +243,7 @@ if __name__ == '__main__':
     arg_parser.add_argument("-C", "--config", help="config file")
     arg_parser.add_argument("-M", "--model", help="model file")
 
-    arg_parser.add_argument("-X", help="Input data")
+    arg_parser.add_argument("-X", help="Input data", action="append")
     arg_parser.add_argument("-y", help="Input labels")
 
     arg_parser.add_argument("-a", "--action", choices=["transform", "predict",
@@ -247,4 +262,4 @@ if __name__ == '__main__':
         ModelAction(args, more_args)
     else:
         config = ConfigParser().parse(args.config)
-        ConfigAction(args, config)
+        ConfigAction(args, config, more_args)
