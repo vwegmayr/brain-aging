@@ -7,28 +7,46 @@ import nibabel as nib
 from modules.models.example_loader import PointExamples, aff_to_rot
 from sklearn.externals import joblib
 from tensorflow.python.estimator.model_fn import ModeKeys
+from tensorflow.python.ops.variable_scope import variable_scope as var_scope
+from tensorflow.python.summary import summary
 
-def parse_layers(inputs, layers, mode=ModeKeys.TRAIN):
+
+def zero_fraction(name, value):
+    summary.scalar("ZeroFraction_{}".format(name), tf.nn.zero_fraction(value))
+        
+
+def parse_layers(inputs, layers, mode=ModeKeys.TRAIN, default_summaries=None):
     """Parse layer config to tensors
 
     Args:
-        layers (dict): Dictionary containing the layer config.
+        layers (list): List containing the layer config.
 
     Returns:
-        dict: Dictionary to tensor.
+        tensor: Final output of layers applied to inputs.
     """
+    for idx, layer in enumerate(layers):
+        assert len(list(layer)) == 1
+        key = list(layer)[0]
+        params = layer[key]
+        if "name" not in params:
+            params["name"] = key + str(idx)
+        name = str(params["name"])
+        params.pop("name")
+        with var_scope(name, values=(inputs,)) as scope:
+            if key == "dropout" or key == "batchnorm":
+                if mode in [ModeKeys.EVAL, ModeKeys.PREDICT]:
+                    inputs = getattr(tf.layers, key)(
+                        inputs, training=False, **params, name=scope)
+                elif mode == ModeKeys.TRAIN:
+                    inputs = getattr(tf.layers, key)(
+                        inputs, training=True, **params, name=scope)
+            else:
+                inputs = getattr(tf.layers, key)(
+                    inputs, **params, name=scope)
 
-    for layer, params in layers.items():
-        if layer == "dropout":
-            if mode in [ModeKeys.EVAL, ModeKeys.PREDICT]:
-                inputs = getattr(tf.layers, layer)(
-                    inputs, training=False, **params)
-            elif mode == ModeKeys.TRAIN:
-                inputs = getattr(tf.layers, layer)(
-                    inputs, training=True, **params)
-        else:
-            inputs = getattr(tf.layers, layer)(
-                inputs, **params)
+        if default_summaries is not None:
+            for summary in default_summaries:
+                summary["sum_op"](name, inputs)
 
     return inputs
 
@@ -231,21 +249,25 @@ def make_train_set(
     joblib.dump(X, os.path.join(save_path, "train_X.pkl"))
     joblib.dump(y, os.path.join(save_path, "train_y.pkl"))
 
-def parse_hooks(hooks, locals, outdir):
+def parse_hooks(hooks, locals, save_path):
     training_hooks = []
     for hook in hooks:
-        if hook["type"] == "SummarySaverHook":
-            name = hook["params"]["name"]
-            summary_op = getattr(tf.summary, hook["params"]["op"])
-            summary_op = summary_op(name, locals[name])
+        if "SummarySaverHook" in hook:
+            params = hook["SummarySaverHook"]
+
+            tensor_name = params["tensor"]
+            sum_op = params["sum_op"](tensor_name, locals[tensor_name])
+
             hook_class = getattr(tf.train, "SummarySaverHook")
             hook_instance = hook_class(
-                summary_op=summary_op,
-                output_dir=outdir,
-                save_steps=hook["params"]["save_steps"])
+                summary_op=sum_op,
+                output_dir=save_path,
+                save_steps=params["save_steps"])
         else:
-            hook_class = getattr(tf.train, hook["type"])
-            hook_instance = hook_class(**hook["params"])
+            assert len(list(hook)) == 1
+            hook_name = list(hook)[0]
+            hook_class = getattr(tf.train, hook_name)
+            hook_instance = hook_class(**hook[hook_name])
 
         training_hooks.append(hook_instance)
 
