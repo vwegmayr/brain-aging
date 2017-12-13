@@ -31,8 +31,6 @@ class SimpleTracker(BaseTracker):
 
         concat = tf.concat([blocks, incoming], axis=1)
 
-        concat_norm = tf.norm(concat)
-
         unnormed = parse_layers(
             inputs=concat,
             layers=params["layers"],

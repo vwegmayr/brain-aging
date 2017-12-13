@@ -11,6 +11,10 @@ from tensorflow.python.ops.variable_scope import variable_scope as var_scope
 from tensorflow.python.summary import summary
 
 
+def norm(name, value):
+    summary.scalar("Norm_{}".format(name), tf.norm(value))
+
+
 def zero_fraction(name, value):
     summary.scalar("ZeroFraction_{}".format(name), tf.nn.zero_fraction(value))
         
@@ -29,7 +33,7 @@ def parse_layers(inputs, layers, mode=ModeKeys.TRAIN, default_summaries=None):
         key = list(layer)[0]
         params = layer[key]
         if "name" not in params:
-            params["name"] = key + str(idx)
+            params["name"] = key + "_" + str(idx)
         name = str(params["name"])
         params.pop("name")
         with var_scope(name, values=(inputs,)) as scope:
