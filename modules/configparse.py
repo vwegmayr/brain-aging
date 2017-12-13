@@ -13,6 +13,14 @@ class ConfigParser:
     def __init__(self):
         self.config = None
 
+    def parse_raw(self, filename):
+
+        filename = os.path.normpath(os.path.expanduser(filename))
+        with open(filename) as config_file:
+            raw_config = yaml.load(config_file)
+
+        return raw_config
+
     def parse(self, filename):
         """Parse a yaml file.
         Args:
@@ -22,9 +30,7 @@ class ConfigParser:
                 but parts replaced with objects as specified
                 in parse_python_objects.
         """
-        filename = os.path.normpath(os.path.expanduser(filename))
-        with open(filename) as config_file:
-            config_dict = yaml.load(config_file)
+        config_dict = self.parse_raw(filename)
         # Replace parts of config_dict yaml in place
         self.parse_python_objects(config_dict)
         return config_dict
@@ -41,7 +47,8 @@ class ConfigParser:
                 "_fn",
                 "_func",
                 "class",
-                "activation"], yaml_dict)
+                "activation",
+                "_op"], yaml_dict)
 
             for key, value in yaml_dict.items():
                 self.parse_python_objects(value)
