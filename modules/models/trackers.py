@@ -31,8 +31,14 @@ class SimpleTracker(BaseTracker):
 
         concat = tf.concat([blocks, incoming], axis=1)
 
+        concat_norm = tf.norm(concat)
+
         unnormed = parse_layers(
-            concat, layers=params["layers"], mode=mode)
+            inputs=concat,
+            layers=params["layers"],
+            mode=mode,
+            default_summaries=params["default_summaries"]
+        )
 
         normed = tf.nn.l2_normalize(unnormed, dim=1)
 
@@ -58,6 +64,7 @@ class SimpleTracker(BaseTracker):
         train_op = optimizer.minimize(
             loss=loss, global_step=tf.train.get_global_step())
         # ================================================================
+
         if "hooks" in params:
             training_hooks = parse_hooks(
                 params["hooks"],
