@@ -14,6 +14,7 @@ from pprint import pprint
 from os.path import normpath
 from inspect import getfullargspec
 from shutil import rmtree
+from traceback import print_tb
 
 
 class Action(ABC):
@@ -44,15 +45,24 @@ class Action(ABC):
         pass
 
     def act(self):
-        self.model = self._load_model()
+        if self.args.debug:
+            try:
+                self.model = self._load_model()
+                getattr(self, self.args.action)()
+                self._save()
+                print(self.save_path)
+            except Exception as err:
+                print_tb(err.__traceback__)
+                print(err.__class__.__name__)
+                print(err.__str__)
+            finally:
+                rmtree(self.save_path)
+        else:
+            self.model = self._load_model()
+            getattr(self, self.args.action)()
+            self._save()
+            print(self.save_path)
 
-        getattr(self, self.args.action)()
-        self._save()
-
-        if self.args.cleanup:
-            rmtree(self.save_path)
-
-        print(self.save_path)
 
     def _get_loader_from_extension(self, file_path):
         extension = file_path.split(".")[-1]
@@ -81,10 +91,12 @@ class Action(ABC):
     def _load_data(self, data_path):
 
         if isinstance(data_path, list):
-            return list(map(self._load_data, data_path))
+            if len(data_path) > 1:
+                return list(map(self._load_data, data_path))
+            else:
+                return self._load_data(data_path[0])
 
         elif isinstance(data_path, str):
-
             loader = self._get_loader_from_extension(data_path)
             data = self._load(data_path, loader)
 
@@ -128,8 +140,9 @@ class ConfigAction(Action):
     """
     def __init__(self, args, config, more_args=None):
         super(ConfigAction, self).__init__(args, more_args)
-        self.config = config
-        self.pprint_config()
+        self.raw_config = ConfigParser().parse_raw(config)
+        self.config = ConfigParser().parse(config)
+        self.pprint_config(self.raw_config)
         self.act()
 
     def fit(self):
@@ -169,9 +182,9 @@ class ConfigAction(Action):
             raise RuntimeError("Can only run fit or fit_transform from config,"
                                " got {}.".format(action))
 
-    def pprint_config(self):
+    def pprint_config(self, raw_config):
         print("\n=========== Config ===========")
-        pprint(self.config)
+        pprint(raw_config)
         print("==============================\n")
         sys.stdout.flush()
 
@@ -252,7 +265,7 @@ if __name__ == '__main__':
                             required=True)
 
     arg_parser.add_argument("smt_label", nargs="?", default="debug")
-    arg_parser.add_argument("--cleanup", action="store_true")
+    arg_parser.add_argument("--debug", action="store_true")
 
     args, more_args = arg_parser.parse_known_args()
 
@@ -261,5 +274,4 @@ if __name__ == '__main__':
     if args.config is None:
         ModelAction(args, more_args)
     else:
-        config = ConfigParser().parse(args.config)
-        ConfigAction(args, config, more_args)
+        ConfigAction(args, args.config, more_args)
