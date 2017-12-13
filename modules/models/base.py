@@ -138,6 +138,8 @@ class BaseTracker(BaseTF):
 
     def fit(self, X, y):
         
+        assert isinstance(X, dict)
+
         self.n_incoming = int(X["incoming"].shape[1] / 3)
         self.block_size = X["blocks"].shape[1]
 
