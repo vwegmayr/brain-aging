@@ -4,6 +4,8 @@ import tensorflow as tf
 import builtins
 import nibabel as nib
 
+import modules.hooks as custom_hooks
+
 from modules.models.example_loader import PointExamples, aff_to_rot
 from sklearn.externals import joblib
 from tensorflow.python.estimator.model_fn import ModeKeys
@@ -256,9 +258,8 @@ def make_train_set(
 def parse_hooks(hooks, locals, save_path):
     training_hooks = []
     for hook in hooks:
-        if "SummarySaverHook" in hook:
-            params = hook["SummarySaverHook"]
-
+        params = hooks[hook]
+        if hook == "SummarySaverHook":
             tensor_name = params["tensor"]
             sum_op = params["sum_op"](tensor_name, locals[tensor_name])
 
@@ -268,10 +269,11 @@ def parse_hooks(hooks, locals, save_path):
                 output_dir=save_path,
                 save_steps=params["save_steps"])
         else:
-            assert len(list(hook)) == 1
-            hook_name = list(hook)[0]
-            hook_class = getattr(tf.train, hook_name)
-            hook_instance = hook_class(**hook[hook_name])
+            try:
+                hook_class = getattr(tf.train, hook)
+            except AttributeError:
+                hook_class = getattr(custom_hooks, hook)
+            hook_instance = hook_class(**params)
 
         training_hooks.append(hook_instance)
 

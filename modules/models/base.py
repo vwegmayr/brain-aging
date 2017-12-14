@@ -33,6 +33,18 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
             BaseTF.num_instances += 1
 
     def fit(self, X, y):
+        if "LogTotalSteps" in self.params["hooks"]:
+            self.params["hooks"]["LogTotalSteps"]["batch_size"] = self.input_fn_config["batch_size"]
+            self.params["hooks"]["LogTotalSteps"]["epochs"] = self.input_fn_config["num_epochs"]
+            if isinstance(X, np.ndarray):
+                train_size = X.shape[0]
+            elif isinstance(X, dict):
+                for key, val in X.items():
+                    if isinstance(val, np.ndarray):
+                        train_size = val.shape[0]
+                        break
+            self.params["hooks"]["LogTotalSteps"]["train_size"] = train_size
+
         with BaseTF.lock:
             config = self.config
             if BaseTF.num_instances > 1:
