@@ -159,6 +159,8 @@ class ConfigAction(Action):
         assert isinstance(self.X, list)
         assert len(self.X) >= 2
         X_train = self.X[:-1]
+        if len(X_train) == 1:
+            X_train = X_train[0]
         X_test = self.X[-1]
         self.X = X_train
         self.fit()
