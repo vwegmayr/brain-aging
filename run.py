@@ -155,6 +155,19 @@ class ConfigAction(Action):
         self.fit()
         self.transform()
 
+    def fit_predict(self):
+        self.fit()
+        self._predict()
+
+    def _predict(self):
+        assert isinstance(self.X, list)
+        assert len(self.X) >= 2
+
+        if "args" in getfullargspec(self.model.predict).args:
+            self.y_new = self.model.predict(self.X[-1], args=self.more_args)
+        else:
+            self.y_new = self.model.predict(self.X[-1])
+
     def _save(self):
         class_name = self.config["class"].__name__
         model_path = normpath(os.path.join(self.save_path, class_name+".pkl"))
