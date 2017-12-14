@@ -156,17 +156,19 @@ class ConfigAction(Action):
         self.transform()
 
     def fit_predict(self):
-        self.fit()
-        self._predict()
-
-    def _predict(self):
         assert isinstance(self.X, list)
         assert len(self.X) >= 2
+        X_train = self.X[:-1]
+        X_test = self.X[-1]
+        self.X = X_train
+        self.fit()
+        self._predict(X_test)
 
+    def _predict(self, X):
         if "args" in getfullargspec(self.model.predict).args:
-            self.y_new = self.model.predict(self.X[-1], args=self.more_args)
+            self.y_new = self.model.predict(X, args=self.more_args)
         else:
-            self.y_new = self.model.predict(self.X[-1])
+            self.y_new = self.model.predict(X)
 
     def _save(self):
         class_name = self.config["class"].__name__
