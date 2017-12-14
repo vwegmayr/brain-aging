@@ -191,7 +191,7 @@ class ConfigAction(Action):
         return model
 
     def _check_action(self, action):
-        if action not in ["fit", "fit_transform", "transform"]:
+        if action not in ["fit", "fit_transform", "transform", "fit_predict"]:
             raise RuntimeError("Can only run fit or fit_transform from config,"
                                " got {}.".format(action))
 
@@ -273,7 +273,8 @@ if __name__ == '__main__':
     arg_parser.add_argument("-y", help="Input labels")
 
     arg_parser.add_argument("-a", "--action", choices=["transform", "predict",
-                            "fit", "fit_transform", "score", "predict_proba"],
+                            "fit", "fit_transform", "score", "predict_proba",
+                            "fit_predict"],
                             help="Action to perform.",
                             required=True)
 
