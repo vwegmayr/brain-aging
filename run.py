@@ -17,6 +17,52 @@ from shutil import rmtree
 from traceback import print_tb
 
 
+def get_loader_from_extension(file_path):
+    extension = file_path.split(".")[-1]
+
+    if extension == "npy":
+        loader = np.load
+    elif extension == "pkl":
+        loader = joblib.load
+    else:
+        loader = None
+
+    return loader
+
+def load(file_path, loader):
+    try:
+        data = loader(file_path)
+    except FileNotFoundError:
+        print("{} not found. "
+              "Please download data first.".format(file_path))
+        exit()
+    except TypeError:
+        data = file_path
+
+    return data
+
+def load_data(data_path):
+
+    if isinstance(data_path, list):
+        if len(data_path) > 1:
+            return list(map(load_data, data_path))
+        else:
+            return load_data(data_path[0])
+
+    elif isinstance(data_path, str):
+        loader = get_loader_from_extension(data_path)
+        data = load(data_path, loader)
+
+    elif data_path is None:
+        data = None
+
+    else:
+        raise ValueError("Expected data_path as strings "
+        "or list of strings.")
+    
+    return data
+
+
 class Action(ABC):
     """Abstract Action class
 
@@ -27,8 +73,8 @@ class Action(ABC):
         self.args = args
         self.more_args = more_args
         self._check_action(args.action)
-        self.X = self._load_data(self.args.X)
-        self.y = self._load_data(self.args.y)
+        self.X = load_data(self.args.X)
+        self.y = load_data(self.args.y)
         self._mk_save_folder()
         self.X_new, self.y_new = None, None
 
@@ -63,51 +109,6 @@ class Action(ABC):
             self._save()
             print(self.save_path)
 
-
-    def _get_loader_from_extension(self, file_path):
-        extension = file_path.split(".")[-1]
-
-        if extension == "npy":
-            loader = np.load
-        elif extension == "pkl":
-            loader = joblib.load
-        else:
-            loader = None
-
-        return loader
-
-    def _load(self, file_path, loader):
-        try:
-            data = loader(file_path)
-        except FileNotFoundError:
-            print("{} not found. "
-                  "Please download data first.".format(file_path))
-            exit()
-        except TypeError:
-            data = file_path
-
-        return data
-
-    def _load_data(self, data_path):
-
-        if isinstance(data_path, list):
-            if len(data_path) > 1:
-                return list(map(self._load_data, data_path))
-            else:
-                return self._load_data(data_path[0])
-
-        elif isinstance(data_path, str):
-            loader = self._get_loader_from_extension(data_path)
-            data = self._load(data_path, loader)
-
-        elif data_path is None:
-            data = None
-
-        else:
-            raise ValueError("Expected data_path as strings "
-            "or list of strings.")
-        
-        return data
 
     def _mk_save_folder(self):
         if self.args.smt_label != "debug":

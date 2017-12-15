@@ -51,7 +51,6 @@ class SimpleTracker(BaseTracker):
                     DEFAULT_SERVING_SIGNATURE_DEF_KEY:
                     PredictOutput({"predictions": predictions})})
         # ================================================================
-
         loss = -tf.multiply(normed, labels)
         loss = tf.reduce_sum(loss, axis=1)
         loss = tf.reduce_mean(loss)
@@ -62,7 +61,6 @@ class SimpleTracker(BaseTracker):
         train_op = optimizer.minimize(
             loss=loss, global_step=tf.train.get_global_step())
         # ================================================================
-
         if "hooks" in params:
             training_hooks = parse_hooks(
                 params["hooks"],

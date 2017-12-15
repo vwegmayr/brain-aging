@@ -15,6 +15,47 @@ from tensorflow.python.estimator.export.export import (
     build_raw_serving_input_receiver_fn as input_receiver_fn)
 
 
+def train_size(X):
+    if isinstance(X, np.ndarray):
+        return X.shape[0]
+    elif isinstance(X, dict):
+        for key, val in X.items():
+            if isinstance(val, np.ndarray):
+                return val.shape[0]
+
+
+def input_fn(X, y=None, input_fn_config={}):
+    if isinstance(X, np.ndarray):
+        X_ = {"X": X}
+    elif isinstance(X, dict):
+        for key, val in X.items():
+            if not isinstance(val, np.ndarray):
+                raise ValueError(("Expected values of dict X "
+                    "as type np.ndarray, got {} for key {}")
+                    .format(type(val), key))
+        X_ = X
+    else:
+        raise ValueError("Expected input X instance of type "
+            "ndarray or dict, got {}".format(type(X)))
+
+    return tf.estimator.inputs.numpy_input_fn(x=X_, y=y,
+        **input_fn_config)
+
+
+def feature_spec_from(X):
+    feature_spec = {}
+    if isinstance(X, np.ndarray):
+        feature_spec["X"] = np_placeholder(X)
+    elif isinstance(X, dict):
+        for key, val in X.items():
+            if isinstance(val, np.ndarray):
+                feature_spec[key] = np_placeholder(val)
+            else:
+                raise ValueError("Expected X to be dict to ndarray, "
+                    "got key {} which is {}.".format(key, type(val)))
+    return feature_spec
+
+
 class BaseTF(ABC, BaseEstimator, TransformerMixin):
     """docstring for BaseTF"""
     lock = multiprocessing.Lock()
@@ -36,14 +77,7 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         if "LogTotalSteps" in self.params["hooks"]:
             self.params["hooks"]["LogTotalSteps"]["batch_size"] = self.input_fn_config["batch_size"]
             self.params["hooks"]["LogTotalSteps"]["epochs"] = self.input_fn_config["num_epochs"]
-            if isinstance(X, np.ndarray):
-                train_size = X.shape[0]
-            elif isinstance(X, dict):
-                for key, val in X.items():
-                    if isinstance(val, np.ndarray):
-                        train_size = val.shape[0]
-                        break
-            self.params["hooks"]["LogTotalSteps"]["train_size"] = train_size
+            self.params["hooks"]["LogTotalSteps"]["train_size"] = train_size(X)
 
         with BaseTF.lock:
             config = self.config
@@ -57,18 +91,22 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
             params=self.params,
             config=tf.estimator.RunConfig(**config))
 
+        self.feature_spec = feature_spec_from(X)
+
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
-            self.estimator.train(input_fn=self.input_fn(X, y))
+            self.estimator.train(input_fn=input_fn(X, y, self.input_fn_config))
         except KeyboardInterrupt:
             print("\nEarly stop of training, saving model...")
-            self.export_estimator(X)
+            self.export_estimator()
         else:
-            self.export_estimator(X)
+            self.export_estimator()
 
         return self
 
     def predict(self, X, head="predictions"):
+        check_is_fitted(self, ["_restore_path"])
+
         predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
 
         if isinstance(X, np.ndarray):
@@ -76,46 +114,29 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
         elif isinstance(X, dict):
             return predictor(X)[head]
 
+    def predictor(self, feature_spec):
+        if self._restore_path is not None:
+            return tf.contrib.predictor.from_saved_model(self._restore_path)
+
+        elif self.estimator.latest_checkpoint() is not None:
+            return tf.contrib.predictor.from_estimator(
+                self.estimator,
+                input_receiver_fn(self.feature_spec)
+            )
+
+        else:
+            return None
+
     def predict_proba(self, X):
         return self.predict(X, head="probabs")
-
-    def input_fn(self, X, y):
-        if isinstance(X, np.ndarray):
-            X_ = {"X": X}
-        elif isinstance(X, dict):
-            for key, val in X.items():
-                if not isinstance(val, np.ndarray):
-                    raise ValueError(("Expected values of dict X "
-                        "as type np.ndarray, got {} for key {}")
-                        .format(type(val), key))
-            X_ = X
-        else:
-            raise ValueError("Expected input X instance of type "
-                "ndarray or dict, got {}".format(type(X)))
-
-        return tf.estimator.inputs.numpy_input_fn(
-            x=X_,
-            y=y,
-            **self.input_fn_config)
 
     def set_save_path(self, save_path):
         self.save_path = save_path
         if self._restore_path is None:
             self.config["model_dir"] = save_path
 
-    def export_estimator(self, X):
-        feature_spec = {}
-        if isinstance(X, np.ndarray):
-            feature_spec["X"] = np_placeholder(X)
-        elif isinstance(X, dict):
-            for key, val in X.items():
-                if isinstance(val, np.ndarray):
-                    feature_spec[key] = np_placeholder(val)
-                else:
-                    raise ValueError("Expected X to be dict to ndarray, "
-                        "got key {} which is {}.".format(key, type(val)))
-
-        receiver_fn = input_receiver_fn(feature_spec)
+    def export_estimator(self):
+        receiver_fn = input_receiver_fn(self.feature_spec)
         self._restore_path = self.estimator.export_savedmodel(
             self.save_path,
             receiver_fn)
@@ -132,9 +153,15 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
     def __getstate__(self):
         state = self.__dict__.copy()
 
-        for key, val in list(state.items()):
-            if "tensorflow" in getattr(val, "__module__", "None"):
-                del state[key]
+
+        def remove_tensorflow(state):
+            for key, val in list(state.items()):
+                if "tensorflow" in getattr(val, "__module__", "None"):
+                    del state[key]
+                elif isinstance(val, dict):
+                    remove_tensorflow(val)
+
+        remove_tensorflow(state)
 
         return state
 
@@ -160,9 +187,13 @@ class BaseTracker(BaseTF):
     def predict(self, X, args):
         """Generate the tracktography with the current model on the given brain."""
         # Check model
-        #check_is_fitted(self, ['estimator'])
+        check_is_fitted(self, ["n_incoming", "block_size"])
+        assert isinstance(X, dict)
 
-        predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
+
+        #predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
+
+        predictor = self.predictor(self.feature_spec)
 
         self.args = args
 
@@ -188,20 +219,21 @@ class BaseTracker(BaseTF):
         # Fibers that are still under construction. At first seeds.
         self.ongoing_fibers = seeds
 
-        # Start tractography generation
-        if 'reseed_endpoints' in self.args:
-            self._generate_masked_tractography(
-                self.args.reseed_endpoints,
-                affine=X["header"]["vox_to_ras"],
-                predictor=predictor)
-        else:
-            self._generate_masked_tractography(
-                affine=X["header"]["vox_to_ras"],
-                predictor=predictor)
+        if predictor is not None:
+            # Start tractography generation
+            if 'reseed_endpoints' in self.args:
+                self._generate_masked_tractography(
+                    self.args.reseed_endpoints,
+                    affine=X["header"]["vox_to_ras"],
+                    predictor=predictor)
+            else:
+                self._generate_masked_tractography(
+                    affine=X["header"]["vox_to_ras"],
+                    predictor=predictor)
 
-        # Save the Fibers
-        fiber_path = os.path.join(self.save_path, "fibers.trk")
-        save_fibers(self.tractography, X["header"], fiber_path)
+            # Save the Fibers
+            fiber_path = os.path.join(self.save_path, "fibers.trk")
+            save_fibers(self.tractography, X["header"], fiber_path)
 
 
 
@@ -291,6 +323,10 @@ class BaseTracker(BaseTF):
             # Add example to examples by appending individual lists
             for key, cur_list in X.items():
                 cur_list.append(X_sample[key])
+
+        for key, _ in X.items():
+            X[key] = np.array(X[key])
+
         return X
 
     def _seeds_from_wm_mask(self):

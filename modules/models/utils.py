@@ -255,24 +255,29 @@ def make_train_set(
     joblib.dump(X, os.path.join(save_path, "train_X.pkl"))
     joblib.dump(y, os.path.join(save_path, "train_y.pkl"))
 
+
 def parse_hooks(hooks, locals, save_path):
     training_hooks = []
     for hook in hooks:
         params = hooks[hook]
+
+        try:
+            hook_class = getattr(tf.train, hook)
+        except AttributeError:
+            hook_class = getattr(custom_hooks, hook)
+        
         if hook == "SummarySaverHook":
             tensor_name = params["tensor"]
             sum_op = params["sum_op"](tensor_name, locals[tensor_name])
 
-            hook_class = getattr(tf.train, "SummarySaverHook")
             hook_instance = hook_class(
                 summary_op=sum_op,
                 output_dir=save_path,
-                save_steps=params["save_steps"])
+                save_steps=params["save_steps"])          
+        elif hook == "FiberTrackingHook":
+            tracker = locals["self"]
+            hook_instance = hook_class(tracker=tracker, **params)
         else:
-            try:
-                hook_class = getattr(tf.train, hook)
-            except AttributeError:
-                hook_class = getattr(custom_hooks, hook)
             hook_instance = hook_class(**params)
 
         training_hooks.append(hook_instance)
