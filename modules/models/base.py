@@ -170,13 +170,16 @@ class BaseTF(ABC, BaseEstimator, TransformerMixin):
 
 
 class BaseTracker(BaseTF):
-    """Exension to BaseTF to enable fiber tracking."""
+    """Exension to BaseTF to enable fiber tracking.
+
+    Extend this class to implement the methods and use for tracking.
+    """
 
     def __init__(self, input_fn_config, config, params):
         super(BaseTracker, self).__init__(input_fn_config, config, params)
 
     def fit(self, X, y):
-        
+
         assert isinstance(X, dict)
 
         self.n_incoming = int(X["incoming"].shape[1] / 3)
@@ -189,7 +192,6 @@ class BaseTracker(BaseTF):
         # Check model
         check_is_fitted(self, ["n_incoming", "block_size"])
         assert isinstance(X, dict)
-
 
         #predictor = tf.contrib.predictor.from_saved_model(self._restore_path)
 
@@ -235,36 +237,33 @@ class BaseTracker(BaseTF):
             fiber_path = os.path.join(self.save_path, "fibers.trk")
             save_fibers(self.tractography, X["header"], fiber_path)
 
-
-
     def _generate_masked_tractography(
-        self,
-        reseed_endpoints=False,
-        affine=None,
-        predictor=None):
+            self,
+            reseed_endpoints=False,
+            affine=None,
+            predictor=None):
         """Generate the tractography using the white matter mask.
 
         Args:
-            reseed_endpoints: Boolean. If True, use the end points of the fibers produced to
-                generate another tractography. This is to symmetrize the process.
+            reseed_endpoints: Boolean. If True, use the end points of the fibers
+                produced to generate another tractography. This is to symmetrize
+                the process.
         """
 
         i = 0
         while self.ongoing_fibers:
             i += 1
-            # TODO: WARNING: there is a HACK here in the origninal code. Probably the problem with
-            # the tracto alignment.
             predictions = predictor(self._build_next_X(affine))["predictions"]
-            predictions = aff_to_rot(affine).dot(predictions.T).T
+            directions = self.get_directions_from_predictions(predictions, affine)
 
             # Update the positions of the fibers and check if they are still ongoing
             cur_ongoing = []
             for j, fiber in enumerate(self.ongoing_fibers):
-                new_position = fiber[-1] + predictions[j] * self.args.step_size
+                new_position = fiber[-1] + directions[j] * self.args.step_size
 
-                if i == 1 and self._is_border(fiber[-1] + predictions[j]):
+                if i == 1 and self._is_border(fiber[-1] + directions[j]):
                     # First step is ambiguous and leads into boarder -> flip it.
-                    new_position = fiber[-1] - predictions[j] * self.args.step_size
+                    new_position = fiber[-1] - directions[j] * self.args.step_size
 
                 # Only continue fibers inside the boundaries and short enough
                 if self._is_border(new_position) or \
@@ -329,6 +328,21 @@ class BaseTracker(BaseTF):
 
         return X
 
+    @abstractmethod
+    def get_directions_from_predictions(self, predictions, affine):
+        """Computes fiber directions form the predictions of the network.
+
+        Method to be extended in subclasses. By extending this the outputs of
+        different types of networks can be used in the same way.
+
+        Args:
+            predictions: The output of the neural network model.
+            affine: The affine transformation for the voxel space.
+        Returns:
+            directions: The fiber directions corresponding to the predictions.
+        """
+        pass
+
     def _seeds_from_wm_mask(self):
         """Compute the seeds for the streamlining from the white matter mask.
 
@@ -392,3 +406,18 @@ class BaseTracker(BaseTF):
             return True
         # Check if out of white matter area
         return np.isclose(self.wm_mask[coord[0], coord[1], coord[2]], 0.0)
+
+
+class DeterministicTracker(BaseTracker):
+    """This is the base model for deterministic tracking.
+
+    A model does deterministic tracking when its output is the direction of the
+    fiber (given the possible different inputs), not a probablity distribution
+    (see ProbabilisticTracker).
+    """
+
+    def get_directions_from_predictions(self, predictions, affine):
+        """Compute the direction of the fibers from the deterministic predict.
+        """
+        predictions = aff_to_rot(affine).dot(predictions.T).T
+        return predictions
