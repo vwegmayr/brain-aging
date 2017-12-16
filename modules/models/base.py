@@ -432,4 +432,61 @@ class ProbabilisticTracker(BaseTracker):
     where mu is the 3-dimensional mean-direciton vector and k is the
     concentration parameter.
     """
-    pass
+
+    @staticmethod
+    def _sample_vMF(mu, k):
+        """Sampe from the von Mises-Fisher distribution.
+
+        See "Numerically stable sampling of the von Mises Fisher distribution
+        onS2 (and other tricks)".
+        https://www.mendeley.com/viewer/?fileId=1d3bb1ab-8211-60fb-218c-f11e1638
+        0bde&documentId=7eb942de-6dd9-3af7-b36c-8a9c37b6b6a6
+
+        Args:
+            mu: Mean of the distribution.
+            k: Concentration of the distribution.
+        """
+        # Make them
+        mu = np.asarray(mu)
+        k = np.asarray(k)
+        # Get the dimensions
+        n_samples, _ = mu.shape
+        if n_samples != k.shape[0]:
+            raise ValueError("The means and the concentations must be in the \
+                             same number.")
+        # Get the values for V and W
+        V = ProbabilisticTracker._sample_unif_unit_circle(n_samples)
+        W = ProbabilisticTracker._sample_W_values(n_samples, k)
+        # Compute the first part of the sampled vector with mean (0, 0, 1)
+        omega_1 = np.sqrt(1 - np.square(W)) * V
+        # The second part is W itself
+        samples
+
+    @staticmethod
+    def _sample_unif_unit_circle(n_samples):
+        """Sample form the uniform distribution on the unit circle.
+
+        Args:
+            n_samples: Number of samples required.
+        Returns:
+            samples: (n_samples,2) ndarray.
+        """
+        unnormed = np.random.randn(n_samples, 2)
+        samples = np.divide(unnormed,
+                            np.matrix(np.linalg.norm(unnormed, axis=1)).T)
+        return samples
+
+    @staticmethod
+    def _sample_W_values(n_samples, k):
+        """Sample the values of W."""
+        unif_points = np.random.uniform(size=n_samples)
+        return ProbabilisticTracker._inverse_cumulative_distriburtion(unif_points, k)
+
+
+    @staticmethod
+    def _inverse_cumulative_distriburtion(unif, k):
+        """Numerically stable version of the inverse cumulative distribution
+        function to sample from the vMF distribution."""
+        w_values = 1 + (1 / k) \
+                   * np.log(unif + (1 - unif) * np.exp(-2 * k))
+        return w_values
