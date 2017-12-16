@@ -261,7 +261,7 @@ class BaseTracker(BaseTF):
             for j, fiber in enumerate(self.ongoing_fibers):
                 new_position = fiber[-1] + directions[j] * self.args.step_size
 
-                if i == 1 and self._is_border(fiber[-1] + directions[j]):
+                if i == 1 and self._is_border(new_position):
                     # First step is ambiguous and leads into boarder -> flip it.
                     new_position = fiber[-1] - directions[j] * self.args.step_size
 
