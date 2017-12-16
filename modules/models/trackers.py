@@ -3,14 +3,14 @@ import tensorflow as tf
 import sklearn as skl
 
 from modules.models.utils import parse_hooks, parse_layers
-from modules.models.base import BaseTracker
+from modules.models.base import DeterministicTracker
 
 from tensorflow.python.saved_model.signature_constants import (
     DEFAULT_SERVING_SIGNATURE_DEF_KEY)
 from tensorflow.python.estimator.export.export_output import PredictOutput
 
 
-class SimpleTracker(BaseTracker):
+class SimpleTracker(DeterministicTracker):
     """docstring for ExampleTF"""
     def __init__(
         self,
@@ -20,7 +20,7 @@ class SimpleTracker(BaseTracker):
 
         super(SimpleTracker, self).__init__(
             input_fn_config,
-            config, 
+            config,
             params)
 
     def model_fn(self, features, labels, mode, params, config):
