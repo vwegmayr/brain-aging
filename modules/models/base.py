@@ -434,7 +434,7 @@ class ProbabilisticTracker(BaseTracker):
     """
 
     @staticmethod
-    def _sample_vMF(mu, k):
+    def sample_vMF(mu, k):
         """Sampe from the von Mises-Fisher distribution.
 
         See "Numerically stable sampling of the von Mises Fisher distribution
@@ -450,20 +450,27 @@ class ProbabilisticTracker(BaseTracker):
         mu = np.asarray(mu)
         k = np.asarray(k)
         # Get the dimensions
-        n_samples, _ = mu.shape
+        n_samples = mu.shape[0]
         if n_samples != k.shape[0]:
             raise ValueError("The means and the concentations must be in the \
                              same number.")
         # Get the values for V and W
-        V = ProbabilisticTracker._sample_unif_unit_circle(n_samples)
+        V = ProbabilisticTracker.sample_unif_unit_circle(n_samples)
         W = ProbabilisticTracker._sample_W_values(n_samples, k)
         # Compute the first part of the sampled vector with mean (0, 0, 1)
         omega_1 = np.sqrt(1 - np.square(W)) * V
+        print(omega_1)
         # The second part is W itself
-        samples
+        W = np.matrix(W).T
+        print(W)
+        omega = np.hstack((omega_1, W))
+        print(omega)
+        # Now apply the rotation to change the mean
+
+
 
     @staticmethod
-    def _sample_unif_unit_circle(n_samples):
+    def sample_unif_unit_circle(n_samples):
         """Sample form the uniform distribution on the unit circle.
 
         Args:
@@ -474,6 +481,7 @@ class ProbabilisticTracker(BaseTracker):
         unnormed = np.random.randn(n_samples, 2)
         samples = np.divide(unnormed,
                             np.matrix(np.linalg.norm(unnormed, axis=1)).T)
+        samples = np.asarray(samples)
         return samples
 
     @staticmethod
