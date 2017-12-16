@@ -458,16 +458,13 @@ class ProbabilisticTracker(BaseTracker):
         V = ProbabilisticTracker.sample_unif_unit_circle(n_samples)
         W = ProbabilisticTracker._sample_W_values(n_samples, k)
         # Compute the first part of the sampled vector with mean (0, 0, 1)
-        omega_1 = np.sqrt(1 - np.square(W)) * V
-        print(omega_1)
+        factor = np.matrix(np.sqrt(1 - np.square(W))).T
+        omega_1 = np.multiply(factor, V)
         # The second part is W itself
         W = np.matrix(W).T
-        print(W)
         omega = np.hstack((omega_1, W))
-        print(omega)
         # Now apply the rotation to change the mean
-
-
+        return np.asarray(omega)
 
     @staticmethod
     def sample_unif_unit_circle(n_samples):
