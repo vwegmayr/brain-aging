@@ -409,7 +409,7 @@ class BaseTracker(BaseTF):
 
 
 class DeterministicTracker(BaseTracker):
-    """This is the base model for deterministic tracking.
+    """Base model for deterministic tracking.
 
     A model does deterministic tracking when its output is the direction of the
     fiber (given the possible different inputs), not a probablity distribution
@@ -421,3 +421,15 @@ class DeterministicTracker(BaseTracker):
         """
         predictions = aff_to_rot(affine).dot(predictions.T).T
         return predictions
+
+
+class ProbabilisticTracker(BaseTracker):
+    """Base model for probabilistic tracking.
+
+    This model assumes that the network does not output a direction but a
+    probability distribution over the possible directions. In this case, the
+    distriburion is the Fisher-Von Mises distribution, with parameters [mu, k],
+    where mu is the 3-dimensional mean-direciton vector and k is the
+    concentration parameter.
+    """
+    pass
