@@ -428,10 +428,18 @@ class ProbabilisticTracker(BaseTracker):
 
     This model assumes that the network does not output a direction but a
     probability distribution over the possible directions. In this case, the
-    distriburion is the Fisher-Von Mises distribution, with parameters [mu, k],
+    distribution is the Fisher-Von Mises distribution, with parameters [mu, k],
     where mu is the 3-dimensional mean-direciton vector and k is the
     concentration parameter.
     """
+
+    def get_directions_from_predictions(self, predictions, affine):
+        # NOTE: WE MUST DECIDE HERE HOW TO STORE MEAN AND CONCENTRAION IN THE
+        # PREDICTIONS
+        mu = predictions['mean']
+        k = predictions['concentration']
+        directions = ProbabilisticTracker.sample_vMF(mu, k)
+        return directions
 
     @staticmethod
     def sample_vMF(mu, k):
@@ -443,8 +451,13 @@ class ProbabilisticTracker(BaseTracker):
         0bde&documentId=7eb942de-6dd9-3af7-b36c-8a9c37b6b6a6
 
         Args:
-            mu: Mean of the distribution.
-            k: Concentration of the distribution.
+            mu: Mean of the distribution. Shape (N, 3).
+            k: Concentration of the distribution. Shape (N, 3).
+        Returns:
+            samples: Samples from the specified vMF distribution. Ndarray of
+                shape (N, 3), where N is the number of different distributions.
+                A row of the matrix of index j is a sample from the vMF with
+                mean mu[j] and concentration k[j]
         """
         # Make them
         mu = np.asarray(mu)
@@ -462,9 +475,61 @@ class ProbabilisticTracker(BaseTracker):
         omega_1 = np.multiply(factor, V)
         # The second part is W itself
         W = np.matrix(W).T
-        omega = np.hstack((omega_1, W))
+        omega = np.asarray(np.hstack((omega_1, W)))
         # Now apply the rotation to change the mean
-        return np.asarray(omega)
+        # i.e. rotate from the direction of the z-axis to the mean direction
+        reference = np.asarray([[0, 0, 1]] * omega.shape[0])
+        rotation = ProbabilisticTracker._rotation_matrices(reference, mu)
+        samples = np.matmul(rotation, omega[:, :, np.newaxis])[:, :, 0]
+        return samples
+
+    @staticmethod
+    def _rotation_matrices(vectors, references):
+        """Compute all the rotation matrices from the vectors to the references.
+
+        Args:
+            vectors: Array of vectors that have to be rotated to match the
+                references.
+            references: Array of reference vectors.
+        Returns:
+            rotations: Array of matrices. Each matrix is the rotation form the
+                vector of corresponding index to its reference.
+        """
+        # TODO: Fix the inefficiency of the for loop to compute the rotation
+        # matrices
+        rotations_list = []
+        for idx in range(vectors.shape[0]):
+            rot_mat = ProbabilisticTracker._to_rotation(vectors[idx, :],
+                                                        references[idx, :])
+            rotations_list.append(rot_mat)
+        rotations = np.asarray(rotations_list)
+        return np.asarray(rotations)
+
+    @staticmethod
+    def _to_corss_skew_symmetric(vec, ref):
+        """Finds the skew-symmetric cross-product matrix."""
+        v = np.cross(vec, ref)
+
+        cross_mat = np.zeros(shape=(3, 3))
+        cross_mat[[0, 0, 1, 1, 2, 2], [1, 2, 0, 2, 0, 1]] = [-v[2],
+                                                             v[1],
+                                                             v[2],
+                                                             -v[0],
+                                                             -v[1],
+                                                             v[0]]
+        return cross_mat
+
+    @staticmethod
+    def _to_rotation(vec, ref):
+        """Compute rotation matrix from vec to ref.
+
+        NOTE: There must be a better way to do this.
+        """
+        cross = ProbabilisticTracker._to_corss_skew_symmetric(vec, ref)
+        c = np.reshape(np.asarray(np.dot(vec, ref)), newshape=-1)
+        square = np.dot(cross, cross)
+        R = np.eye(3) + cross + square * (1 / (1 + c))
+        return R
 
     @staticmethod
     def sample_unif_unit_circle(n_samples):
@@ -485,13 +550,12 @@ class ProbabilisticTracker(BaseTracker):
     def _sample_W_values(n_samples, k):
         """Sample the values of W."""
         unif_points = np.random.uniform(size=n_samples)
-        return ProbabilisticTracker._inverse_cumulative_distriburtion(unif_points, k)
-
+        return ProbabilisticTracker._inverse_cumulative_distribution(unif_points, k)
 
     @staticmethod
-    def _inverse_cumulative_distriburtion(unif, k):
+    def _inverse_cumulative_distribution(unif, k):
         """Numerically stable version of the inverse cumulative distribution
         function to sample from the vMF distribution."""
         w_values = 1 + (1 / k) \
-                   * np.log(unif + (1 - unif) * np.exp(-2 * k))
+            * np.log(unif + (1 - unif) * np.exp(-2 * k))
         return w_values
