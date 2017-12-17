@@ -1,8 +1,10 @@
+"""THE TESTS IN THIS MODULE ARE STUBSself."""
+
 import unittest
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D     # Import needed for 3D plotting
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D  # Import needed for 3D plotting
 
 from modules.models.base import ProbabilisticTracker as pt
 
@@ -17,18 +19,21 @@ class TestVMFSamplint(unittest.TestCase):
 
     def test_sample_vMF(self):
         n_samples = 500
-        mu = [[1,0,0]] * n_samples
-        k = [4] * n_samples
-        o = pt.sample_vMF(mu, k)
-        print(o.shape)
+        mu = [[1, 0, 0]] * n_samples
+        k = [5] * n_samples
+        samples = pt.sample_vMF(mu, k)
+        print(samples)
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.set_aspect('equal')
-        print(o[:,0])
-        print(o[:,1])
-        print(o[:,2])
-        ax.scatter(o[:, 0], o[:, 1], o[:, 2])
-        # plt.show()
+        # ax.set_aspect('equal')
+        ax.scatter(samples[:, 0], samples[:, 1], samples[:, 2])
+        plt.show()
+
+    def test_rotations(self):
+        vectors = np.asarray([[1, 0, 0]] * 4)
+        references = np.asarray([[0, 1, 0]] * 4)
+        rot = pt._rotation_matrices(vectors, references)
+
 
 if __name__ == '__main__':
     unittest.main()
