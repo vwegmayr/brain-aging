@@ -167,9 +167,7 @@ class MaxEntropyTracker(ProbabilisticTracker):
             loss: The maximum entropy loss.
         """
         dot_products = tf.reduce_sum(tf.multiply(mu, y), axis=1)
-        print(dot_products.eval())
         cost = - tf.multiply((tf.cosh(k) / tf.sinh(k) - 1 / k), dot_products)
-        print(cost.eval())
         entropy = 1 - k / tf.tanh(k) - tf.log(k / (4 * np.pi * tf.sinh(k)))
         loss = cost - T * entropy
         loss = tf.reduce_mean(loss)
