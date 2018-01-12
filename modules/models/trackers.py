@@ -92,15 +92,43 @@ class MaxEntropyTracker(ProbabilisticTracker):
 
         concat = tf.concat([blocks, incoming], axis=1)
 
-        unnormed = parse_layers(
+        last_layer = parse_layers(
             inputs=concat,
             layers=params["layers"],
             mode=mode,
             default_summaries=params["default_summaries"])
 
-        normed = tf.nn.l2_normalize(unnormed, dim=1)
+        # After the last layer specified, add just 1 weight layer to the mean
+        # vectors and one to the concentration values.
 
-        predictions = normed
+        # TODO: Make this modular. Parameters should be passed in the config
+        # file.
+        key = "dense"
+        mu_params = {'activation': tf.nn.relu, 'units': 512}
+        with var_scope("last_mean", values=(unnormed,)) as scope:
+            mu_out = getattr(tf.layers, key)(
+                inputs, **mu_params, name=scope)
+
+        k_params = {'activation': tf.nn.relu, 'units': 512}
+        with var_scope("last_k", values=(unnormed,)) as scope:
+            k_out = getattr(tf.layers, key)(
+                inputs, **k_params, name=scope)
+
+        if default_summaries is not None:
+            for summary in default_summaries:
+                summary["sum_op"](name, inputs)
+
+        # Normalize the mean vectors
+        mu_normed = tf.nn.l2_normalize(mu_out, dim=1)
+
+        # TODO: How to pass out more predictions than 1? Dictionary??
+        # In base.ProbabilisticTracker the implementation already includes
+        # a dictionary with 'mean' and 'concentration' keys. Sticking to that
+        # for the moment.
+        predictions = {
+            'mean': mu_normed,       # Complying with base.ProbabilisticTracker
+            'concentration': k_out   # Complying with base.ProbabilisticTracker
+        }
         # ================================================================
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -114,8 +142,9 @@ class MaxEntropyTracker(ProbabilisticTracker):
                 })
         # ================================================================
 
-        # TODO: Finish implementation of model and loss.
-        # loss = self.max_entropy_loss(y=labels, mu=, k=, T=)
+        # TODO: Introduce temperature parameter T in the config file.
+        cur_T = 1
+        loss = self.max_entropy_loss(y=labels, mu=mu_normed, k=k_out, T=cur_T)
 
         optimizer = tf.train.GradientDescentOptimizer(
             learning_rate=params["learning_rate"])
