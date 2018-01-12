@@ -7,3 +7,5 @@ data/
 configs/
 !configs/example_config.yaml
 .smt/
+.idea/
+.ropeproject/
