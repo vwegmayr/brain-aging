@@ -13,16 +13,10 @@ from tensorflow.python.estimator.export.export_output import PredictOutput
 class SimpleTracker(DeterministicTracker):
     """docstring for ExampleTF"""
 
-    def __init__(
-        self,
-        input_fn_config={"shuffle": True},
-        config={},
-        params={}):  # noqa: E129
+    def __init__(self, input_fn_config={"shuffle": True}, config={},
+                 params={}):  # noqa: E129
 
-        super(SimpleTracker, self).__init__(
-            input_fn_config,
-            config,
-            params)
+        super(SimpleTracker, self).__init__(input_fn_config, config, params)
 
     def model_fn(self, features, labels, mode, params, config):
 
@@ -36,8 +30,7 @@ class SimpleTracker(DeterministicTracker):
             inputs=concat,
             layers=params["layers"],
             mode=mode,
-            default_summaries=params["default_summaries"]
-        )
+            default_summaries=params["default_summaries"])
 
         normed = tf.nn.l2_normalize(unnormed, dim=1)
 
@@ -46,11 +39,13 @@ class SimpleTracker(DeterministicTracker):
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
-                predictions={
-                    "predictions": predictions},
+                predictions={"predictions": predictions},
                 export_outputs={
                     DEFAULT_SERVING_SIGNATURE_DEF_KEY:
-                    PredictOutput({"predictions": predictions})})
+                    PredictOutput({
+                        "predictions": predictions
+                    })
+                })
         # ================================================================
         loss = -tf.multiply(normed, labels)
         loss = tf.reduce_sum(loss, axis=1)
@@ -63,15 +58,13 @@ class SimpleTracker(DeterministicTracker):
             loss=loss, global_step=tf.train.get_global_step())
         # ================================================================
         if "hooks" in params:
-            training_hooks = parse_hooks(
-                params["hooks"],
-                locals(),
-                self.save_path)
+            training_hooks = parse_hooks(params["hooks"], locals(),
+                                         self.save_path)
         else:
             training_hooks = []
         # ================================================================
-        if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):  # noqa: E129
+        if (mode == tf.estimator.ModeKeys.TRAIN
+                or mode == tf.estimator.ModeKeys.EVAL):  # noqa: E129
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
@@ -85,16 +78,11 @@ class SimpleTracker(DeterministicTracker):
 class MaxEntropyTracker(ProbabilisticTracker):
     """Implementation of the maximimum entropy probabilistic tracking."""
 
-    def __init__(
-        self,
-        input_fn_config={"shuffle": True},
-        config={},
-        params={}):  # noqa: E129
+    def __init__(self, input_fn_config={"shuffle": True}, config={},
+                 params={}):  # noqa: E129
 
-        super(MaxEntropyTracker, self).__init__(
-            input_fn_config,
-            config,
-            params)
+        super(MaxEntropyTracker, self).__init__(input_fn_config, config,
+                                                params)
 
     def model_fn(self, features, labels, mode, params, config):
 
@@ -108,8 +96,7 @@ class MaxEntropyTracker(ProbabilisticTracker):
             inputs=concat,
             layers=params["layers"],
             mode=mode,
-            default_summaries=params["default_summaries"]
-        )
+            default_summaries=params["default_summaries"])
 
         normed = tf.nn.l2_normalize(unnormed, dim=1)
 
@@ -118,11 +105,13 @@ class MaxEntropyTracker(ProbabilisticTracker):
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
-                predictions={
-                    "predictions": predictions},
+                predictions={"predictions": predictions},
                 export_outputs={
                     DEFAULT_SERVING_SIGNATURE_DEF_KEY:
-                    PredictOutput({"predictions": predictions})})
+                    PredictOutput({
+                        "predictions": predictions
+                    })
+                })
         # ================================================================
 
         # TODO: Finish implementation of model and loss.
@@ -135,15 +124,13 @@ class MaxEntropyTracker(ProbabilisticTracker):
             loss=loss, global_step=tf.train.get_global_step())
         # ================================================================
         if "hooks" in params:
-            training_hooks = parse_hooks(
-                params["hooks"],
-                locals(),
-                self.save_path)
+            training_hooks = parse_hooks(params["hooks"], locals(),
+                                         self.save_path)
         else:
             training_hooks = []
         # ================================================================
-        if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):  # noqa: E129
+        if (mode == tf.estimator.ModeKeys.TRAIN
+                or mode == tf.estimator.ModeKeys.EVAL):  # noqa: E129
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
@@ -155,7 +142,7 @@ class MaxEntropyTracker(ProbabilisticTracker):
 
     @staticmethod
     def max_entropy_loss(y, mu, k, T):
-        """Implementation of the maximum entropy loss.
+        """Compute the maximum entropy loss.
 
         Args:
             y: Ground-truth fiber direction vectors.
@@ -165,9 +152,11 @@ class MaxEntropyTracker(ProbabilisticTracker):
 
         Returns:
             loss: The maximum entropy loss.
+
         """
         dot_products = tf.reduce_sum(tf.multiply(mu, y), axis=1)
-        cost = - tf.multiply((tf.cosh(k) / tf.sinh(k) - 1 / k), dot_products)
+        cost = -tf.multiply(
+            (tf.cosh(k) / tf.sinh(k) - tf.reciprocal(k)), dot_products)
         entropy = 1 - k / tf.tanh(k) - tf.log(k / (4 * np.pi * tf.sinh(k)))
         loss = cost - T * entropy
         loss = tf.reduce_mean(loss)
