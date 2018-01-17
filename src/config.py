@@ -8,3 +8,4 @@ test_database_file = 'test.tfrecord'
 image_shape = (256, 256, 128)
 dataset_compression = tf.python_io.TFRecordCompressionType.GZIP
 test_set_size_ratio = 0.2
+test_set_random_seed = 0
