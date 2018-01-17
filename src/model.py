@@ -15,14 +15,12 @@ class Model(DeepNN):
         mri = self.batch_norm(mri, scope="norm_input")
 
         conv = mri
-        #conv = self.conv2d_shared_all_dims_layer(conv, 'b1', strides=[2, 2, 2])
-        #conv = self.conv2d_shared_all_dims_layer(conv, 'b2')
-        #conv = self.conv2d_shared_all_dims_layer(conv, 'b3')
-        conv = self.conv3d_layer(conv, 8, scope="conv1")
-        conv = self.conv3d_layer(conv, 12, scope="conv2")
-        conv = self.conv3d_layer(conv, 16, scope="conv3")
+        conv = self.conv2d_shared_all_dims_layer(conv, 'b1', strides=[2, 2, 2])
+        conv = self.conv2d_shared_all_dims_layer(conv, 'b2')
+        conv = self.conv2d_shared_all_dims_layer(conv, 'b3')
         conv = self.conv3d_layer(conv, 24, scope="conv4")
-        conv = self.conv3d_layer(conv, 32, scope="conv5")
+
+        conv = tf.reduce_max(conv, axis=[1, 2, 3], keep_dims=True)
 
         num_features = np.prod(conv.get_shape().as_list()[1:])
         print '%d fc features' % (num_features)

@@ -48,7 +48,7 @@ class DeepNN(object):
             tf_scope.reuse_variables()
             b2 = do_c([s, 1, s], *args, **kwargs)
             b3 = do_c([1, s, s], *args, **kwargs)
-            return tf.concat(4, [b1, b2, b3])
+            return tf.concat([b1, b2, b3], 4)
 
     def conv3d_layer(self, x, num_filters,
                      filter_weights=[3, 3, 3],
