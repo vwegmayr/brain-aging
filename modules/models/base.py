@@ -25,24 +25,6 @@ def train_size(X):
                 return val.shape[0]
 
 
-def input_fn(X, y=None, input_fn_config={}):
-    if isinstance(X, np.ndarray):
-        X_ = {"X": X}
-    elif isinstance(X, dict):
-        for key, val in X.items():
-            if not isinstance(val, np.ndarray):
-                raise ValueError(("Expected values of dict X "
-                    "as type np.ndarray, got {} for key {}")
-                    .format(type(val), key))
-        X_ = X
-    else:
-        raise ValueError("Expected input X instance of type "
-            "ndarray or dict, got {}".format(type(X)))
-
-    return tf.estimator.inputs.numpy_input_fn(x=X_, y=y,
-        **input_fn_config)
-
-
 def feature_spec_from(X):
     feature_spec = {}
     if isinstance(X, np.ndarray):
@@ -97,7 +79,8 @@ class BaseTF(BaseEstimator, TransformerMixin):
 
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
-            self.estimator.train(input_fn=input_fn(X, y, self.input_fn_config))
+            self.estimator.train(input_fn=self.gen_input_fn(
+                X, y, self.input_fn_config))
         except KeyboardInterrupt:
             custom_print("\nEarly stop of training, saving model...")
             self.export_estimator()
@@ -152,9 +135,30 @@ class BaseTF(BaseEstimator, TransformerMixin):
     def model_fn(self, features, labels, mode, params, config):
         pass
 
+    def gen_input_fn(self, X, y=None, input_fn_config={}):
+        if isinstance(X, np.ndarray):
+            X_ = {"X": X}
+        elif isinstance(X, dict):
+            for key, val in X.items():
+                if not isinstance(val, np.ndarray):
+                    raise ValueError((
+                        "Expected values of dict X "
+                        "as type np.ndarray, got {} for key {}")
+                        .format(type(val), key))
+            X_ = X
+        else:
+            raise ValueError(
+                "Expected input X instance of type "
+                "ndarray or dict, got {}".format(type(X)))
+
+        return tf.estimator.inputs.numpy_input_fn(
+            x=X_,
+            y=y,
+            **input_fn_config
+        )
+
     def __getstate__(self):
         state = self.__dict__.copy()
-
 
         def remove_tensorflow(state):
             for key, val in list(state.items()):
