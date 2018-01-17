@@ -1,6 +1,7 @@
 *.gz
 *.tar
 *.npy
+*.pyc
 __pycache__/
 .kaggle-cli/
 data/
@@ -9,3 +10,4 @@ configs/
 .smt/
 .idea/
 .ropeproject/
+notebooks/.ipynb_checkpoints/
