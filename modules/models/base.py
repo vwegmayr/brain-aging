@@ -5,7 +5,8 @@ import nibabel as nib
 import numpy as np
 
 from sklearn.utils.validation import check_is_fitted
-from abc import ABC, abstractmethod
+import abc, six
+from abc import abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from modules.models.utils import print, save_fibers, np_placeholder
@@ -56,7 +57,8 @@ def feature_spec_from(X):
     return feature_spec
 
 
-class BaseTF(ABC, BaseEstimator, TransformerMixin):
+@six.add_metaclass(abc.ABCMeta)
+class BaseTF(BaseEstimator, TransformerMixin):
     """docstring for BaseTF"""
     lock = multiprocessing.Lock()
     num_instances = 0

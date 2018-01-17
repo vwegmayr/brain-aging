@@ -2,7 +2,6 @@
 Replace parts of yaml config with Python objects.
 """
 import importlib
-import importlib.util
 import os
 import yaml
 import argparse
@@ -105,7 +104,7 @@ def parse_more_args(more_args):
     Returns:
         parsed_args (argpars.Namespace)
     """
-    
+
     if len(more_args) > 0:
         arg_dict = {}
         for arg in more_args:

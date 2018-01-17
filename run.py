@@ -8,11 +8,12 @@ import csv
 import time
 
 from sklearn.externals import joblib
-from abc import ABC, abstractmethod
+import abc, six
+from abc import abstractmethod
 from modules.configparse import ConfigParser, parse_more_args
 from pprint import pprint
 from os.path import normpath
-from inspect import getfullargspec
+from inspect import getargspec
 from shutil import rmtree
 from traceback import print_tb
 
@@ -32,8 +33,8 @@ def get_loader_from_extension(file_path):
 def load(file_path, loader):
     try:
         data = loader(file_path)
-    except FileNotFoundError:
-        print("{} not found. "
+    except IOError:
+        print("{} not found or not accessible. "
               "Please download data first.".format(file_path))
         exit()
     except TypeError:
@@ -59,11 +60,12 @@ def load_data(data_path):
     else:
         raise ValueError("Expected data_path as strings "
         "or list of strings.")
-    
+
     return data
 
 
-class Action(ABC):
+@six.add_metaclass(abc.ABCMeta)
+class Action(object):
     """Abstract Action class
 
     Args:
@@ -124,7 +126,7 @@ class Action(ABC):
         self.save_path = path
 
     def transform(self):
-        if "args" in getfullargspec(self.model.transform).args:
+        if "args" in getargspec(self.model.transform).args:
             self.X_new = self.model.transform(
                 X=self.X, args=self.more_args)
         else:
@@ -147,7 +149,7 @@ class ConfigAction(Action):
         self.act()
 
     def fit(self):
-        if "args" in getfullargspec(self.model.fit).args:
+        if "args" in getargspec(self.model.fit).args:
             self.model.fit(self.X, self.y, args=self.more_args)
         else:
             self.model.fit(self.X, self.y)
@@ -168,7 +170,7 @@ class ConfigAction(Action):
         self._predict(X_test)
 
     def _predict(self, X):
-        if "args" in getfullargspec(self.model.predict).args:
+        if "args" in getargspec(self.model.predict).args:
             self.y_new = self.model.predict(X, args=self.more_args)
         else:
             self.y_new = self.model.predict(X)
@@ -218,7 +220,7 @@ class ModelAction(Action):
         self.act()
 
     def predict(self):
-        if "args" in getfullargspec(self.model.predict).args:
+        if "args" in getargspec(self.model.predict).args:
             self.y_new = self.model.predict(self.X, args=self.more_args)
         else:
             self.y_new = self.model.predict(self.X)

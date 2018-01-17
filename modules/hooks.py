@@ -5,7 +5,8 @@ import run
 from tensorflow.python.training.session_run_hook import SessionRunHook
 from tensorflow.python.training.basic_session_run_hooks import SecondOrStepTimer
 from tensorflow.python.platform import tf_logging as logging
-from abc import ABC, abstractmethod
+import abc, six
+from abc import abstractmethod
 from argparse import Namespace
 
 
@@ -24,7 +25,8 @@ def validate_every_n(steps, secs):
         raise ValueError("invalid every_n_steps=%s." % steps)
 
 
-class BaseHook(SessionRunHook, ABC):
+@six.add_metaclass(abc.ABCMeta)
+class BaseHook(SessionRunHook):
     """docstring for BaseHook"""
     def __init__(
         self,
@@ -72,7 +74,7 @@ class LogTotalSteps(BaseHook):
         super(LogTotalSteps, self).__init__(
             every_n_steps,
             every_n_secs)
- 
+
         self.batch_size = batch_size
         self.train_size = train_size
         self.epochs = epochs
