@@ -9,7 +9,7 @@ import abc, six
 from abc import abstractmethod
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from modules.models.utils import print, save_fibers, np_placeholder
+from modules.models.utils import custom_print, save_fibers, np_placeholder
 from modules.models.example_loader import PointExamples, aff_to_rot
 
 from tensorflow.python.estimator.export.export import (
@@ -99,7 +99,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
         try:
             self.estimator.train(input_fn=input_fn(X, y, self.input_fn_config))
         except KeyboardInterrupt:
-            print("\nEarly stop of training, saving model...")
+            custom_print("\nEarly stop of training, saving model...")
             self.export_estimator()
         else:
             self.export_estimator()
@@ -142,7 +142,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
         self._restore_path = self.estimator.export_savedmodel(
             self.save_path,
             receiver_fn)
-        print("Model saved to {}".format(self._restore_path))
+        custom_print("Model saved to {}".format(self._restore_path))
 
     @abstractmethod
     def score(self, X, y):
@@ -209,7 +209,7 @@ class BaseTracker(BaseTF):
             else:
                 self.max_fiber_length = 400
         except KeyError as err:
-            print("KeyError: {}".format(err))
+            custom_print("KeyError: {}".format(err))
 
         # Get brain information
         self.brain_data = X['dwi']
@@ -279,7 +279,7 @@ class BaseTracker(BaseTF):
             end = "\r"
             if i % 25 == 0:
                 end = "\n"
-            print("Round num:", '%4d' % i, "; ongoing:", '%7d' % len(self.ongoing_fibers),
+            custom_print("Round num:", '%4d' % i, "; ongoing:", '%7d' % len(self.ongoing_fibers),
                   "; completed:", '%7d' % len(self.tractography), end=end)
 
         if reseed_endpoints:
@@ -359,8 +359,8 @@ class BaseTracker(BaseTF):
         """
         # Take te border voxels as seeds
         seeds = self._find_borders()
-        print("Number of seeds on the white matter mask:", len(seeds))
-        print("Number of requested seeds:", self.args.n_fibers)
+        custom_print("Number of seeds on the white matter mask:", len(seeds))
+        custom_print("Number of requested seeds:", self.args.n_fibers)
         new_idxs = np.random.choice(len(seeds), self.args.n_fibers, replace=True)
         new_seeds = [[seeds[i] + np.clip(np.random.normal(0, 0.25, 3), -0.5, 0.5)]
                      for i in new_idxs]

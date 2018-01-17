@@ -5,14 +5,21 @@ Credit goes to Viktor Wegmayr
 Todo:
     Update doc
 """
+from __future__ import print_function
 
 import os
+import sys
 
 import numpy as np
 import nibabel as nib
-import functools
 
-print = functools.partial(print, flush=True)
+
+def custom_print(*args, **kwargs):
+    if sys.version_info[:2] < (3, 3):
+        print(*args, **kwargs)
+        sys.stdout.flush()
+    else:
+        builtins.print(*args, flush=True, **kwargs)
 
 
 def aff_to_rot(aff):
@@ -272,7 +279,7 @@ class Examples(object):
         if (voxel[0] < 0 or voxel[0] >= data_shape[0] or
             voxel[1] < 0 or voxel[1] >= data_shape[1] or
             voxel[2] < 0 or voxel[2] >= data_shape[2]):
-                print("Warning: voxel out of bounds: ({}, {}, {}), data: (0:{}, 0:{}, 0:{})".format(
+                custom_print("Warning: voxel out of bounds: ({}, {}, {}), data: (0:{}, 0:{}, 0:{})".format(
                         voxel[0], voxel[1], voxel[2], data_shape[0], data_shape[1], data_shape[2]))
                 return example
 
@@ -339,7 +346,7 @@ class PointExamples(Examples):
         self.check_empty_data(warning_only=True)
 
     def initialize_labels(self, num_eval_examples, augment_reverse_fibers=True):
-        print("Loading Fibers...")
+        custom_print("Loading Fibers...")
         fibers_filtered = []
         for fiber in self.fibers:
             fiber_length_mm = 0
@@ -350,7 +357,7 @@ class PointExamples(Examples):
                     break
 
         np.random.shuffle(fibers_filtered)
-        print("Found {}/{} fibers longer than {}mm".format(len(fibers_filtered), len(self.fibers),
+        custom_print("Found {}/{} fibers longer than {}mm".format(len(fibers_filtered), len(self.fibers),
                                                            self.min_length))
 
         label_list = []
@@ -392,7 +399,7 @@ class PointExamples(Examples):
 
         if len(eval_labels) < num_eval_examples:
             raise ValueError("PointExamples: Requested more evaluation examples than available")
-        print("finished loading, now shuffle")
+        custom_print("finished loading, now shuffle")
         train_labels = label_list
         np.random.shuffle(eval_labels)
         np.random.shuffle(train_labels)
@@ -403,11 +410,11 @@ class PointExamples(Examples):
             n_wanted = np.round(n_old * self.example_percent).astype(int)
             train_labels = train_labels[0:n_wanted]    # Subsample
             n_new = len(train_labels)
-            print("Training labels are {} / {}, i.e. {:3.2f} %".format(n_new,
+            custom_print("Training labels are {} / {}, i.e. {:3.2f} %".format(n_new,
                                                                        n_old,
                                                                        n_new / n_old * 100))
 
-        print("Generated {} train and {} eval fiber labels\n".format(len(train_labels),
+        custom_print("Generated {} train and {} eval fiber labels\n".format(len(train_labels),
                                                                      len(eval_labels)))
         # NOTE: Here is the corruption of the training labels.
         # First, we calculate how many labels have to be corrupted. Then, this number of labels is
@@ -416,7 +423,7 @@ class PointExamples(Examples):
         # NOTE: Labels have already been shuffled, so this can be carried on in sequential order.
         if self.data_corrupt_percent > 0.0:
             n_to_corrupt = int(np.floor(len(train_labels) * self.data_corrupt_percent))
-            print("DEBUG: Corrupting data. Corruption number is ",
+            custom_print("DEBUG: Corrupting data. Corruption number is ",
                   n_to_corrupt,
                   "on a total of",
                   len(train_labels))
@@ -433,7 +440,7 @@ class PointExamples(Examples):
 
     def example_generator(self, labels, label_type):
         if label_type not in ["one_hot", "point"]:
-            print("ERROR: PointExamples: build_batch: Unknown label_type")
+            custom_print("ERROR: PointExamples: build_batch: Unknown label_type")
 
         examples = []
         while True:
@@ -504,25 +511,25 @@ class PointExamples(Examples):
         return self.eval_set
 
     def print_statistics(self):
-        print("Statistics for evalution set:")
+        custom_print("Statistics for evalution set:")
         eval_set = self.get_eval_set()
         incoming = np.array(eval_set["incoming"])[:, 0:3]
         outgoing = np.array(eval_set["outgoing"])
         dot_prod = np.sum(incoming * outgoing, axis=1)
         dot_loss = 1 - np.average(dot_prod)
-        print("Average Dot Loss (1-<incoming, outgoing>): %f" % dot_loss)
+        custom_print("Average Dot Loss (1-<incoming, outgoing>): %f" % dot_loss)
         avg_angle = np.average(np.arccos(np.clip(dot_prod, -1, 1))) * 180 / np.pi
-        print("Average Angle: %f" % avg_angle)
+        custom_print("Average Angle: %f" % avg_angle)
         if not self.ignore_start_point:
             filter = [not np.array_equal(vec, [0, 0, 0]) for vec in incoming]
             dot_loss_filtered = 1 - np.average(dot_prod[filter])
-            print("Loss without starting fibers: %f" % dot_loss_filtered)
+            custom_print("Loss without starting fibers: %f" % dot_loss_filtered)
             avg_angle = np.average(np.arccos(np.clip(dot_prod[filter], -1, 1))) * 180 / np.pi
-            print("Angle without starting fibers: %f" % avg_angle)
-        print("-----------------------------")
+            custom_print("Angle without starting fibers: %f" % avg_angle)
+        custom_print("-----------------------------")
 
     def check_alignment(self):
-        print("Statistics for eigenvectors of tensors:")
+        custom_print("Statistics for eigenvectors of tensors:")
 
         eval_set = self.get_eval_set()
         outgoing = np.array(eval_set["outgoing"])
@@ -530,7 +537,7 @@ class PointExamples(Examples):
         voxels = np.round(center).astype(int)
         if self.V1 is None:
             if self.voxel_dimension != 6:
-                print("Data has wrong dimension to be tensor, skip check")
+                custom_print("Data has wrong dimension to be tensor, skip check")
                 return
             tensor = np.array([self.brain_data[voxel[0]][voxel[1]][voxel[2]] for voxel in voxels])
             eigenvec = extract_direction(tensor)
@@ -542,9 +549,9 @@ class PointExamples(Examples):
         dot_prod = np.abs(np.sum(eigenvec * outgoing, axis=1))
         dot_loss = 1 - np.average(dot_prod)
         avg_angle = np.average(np.arccos(np.clip(dot_prod, -1, 1))) * 180 / np.pi
-        print("Average Dot Loss (1-<eigenvector, outgoing>): %f" % dot_loss)
-        print("Average Angle: %f" % avg_angle)
-        print("-----------------------------")
+        custom_print("Average Dot Loss (1-<eigenvector, outgoing>): %f" % dot_loss)
+        custom_print("Average Angle: %f" % avg_angle)
+        custom_print("-----------------------------")
 
     def check_empty_data(self, warning_only=False, threshold=0.05):
         empty = 0
@@ -557,9 +564,9 @@ class PointExamples(Examples):
         percentage = empty / len(data_blocks)
         if warning_only:
             if percentage > threshold:
-                print("WARNING: Blocks with empty data: %f" % percentage)
+                custom_print("WARNING: Blocks with empty data: %f" % percentage)
         else:
-            print("Blocks with empty data: %f" % percentage)
+            custom_print("Blocks with empty data: %f" % percentage)
 
 
 class UnsupervisedExamples(PointExamples):
@@ -688,28 +695,28 @@ class TestExamples(object):
             path + "fibers.trk",
             block_size=3,
             num_eval_examples=1)
-        print("Created PointExamples instance with blocksize 3!")
+        custom_print("Created PointExamples instance with blocksize 3!")
 
         # Access interesting attributes
-        print("num_train_examples: {}".format(pt_ex.num_train_examples))
-        print("num_fibers: {}".format(pt_ex.num_fibers))
+        custom_print("num_train_examples: {}".format(pt_ex.num_train_examples))
+        custom_print("num_fibers: {}".format(pt_ex.num_fibers))
 
         # Check that the initial exampleState is indeed zero
-        print("Initial example_state: {}".format(pt_ex.example_state))
+        custom_print("Initial example_state: {}".format(pt_ex.example_state))
 
         # Get a first one-hot point example
         ex1 = pt_ex.get_train_batch(1, label_type="one_hot")
-        print("Got one example!")
+        custom_print("Got one example!")
 
         # Now the exampleState is one
-        print("Now the exampleState is: {}".format(pt_ex.example_state))
+        custom_print("Now the exampleState is: {}".format(pt_ex.example_state))
 
-        print("Content of the first example:")
-        print("center: {}".format(ex1["center"]))
-        print("incoming: {}".format(ex1["incoming"]))
-        print("outgoing: {}".format(ex1["outgoing"]))
-        print("data_block type: {}".format(type(ex1["data_block"][0])))
-        print("data_block shape: {}".format(ex1["data_block"][0].shape))
+        custom_print("Content of the first example:")
+        custom_print("center: {}".format(ex1["center"]))
+        custom_print("incoming: {}".format(ex1["incoming"]))
+        custom_print("outgoing: {}".format(ex1["outgoing"]))
+        custom_print("data_block type: {}".format(type(ex1["data_block"][0])))
+        custom_print("data_block shape: {}".format(ex1["data_block"][0].shape))
 
 
 if __name__ == "__main__":

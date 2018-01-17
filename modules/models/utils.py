@@ -1,8 +1,11 @@
+from __future__ import print_function
+
 import os
 import numpy as np
 import tensorflow as tf
 import builtins
 import nibabel as nib
+import sys
 
 import modules.hooks as custom_hooks
 
@@ -19,7 +22,7 @@ def norm(name, value):
 
 def zero_fraction(name, value):
     summary.scalar("ZeroFraction_{}".format(name), tf.nn.zero_fraction(value))
-        
+
 
 def parse_layers(inputs, layers, mode=ModeKeys.TRAIN, default_summaries=None):
     """Parse layer config to tensors
@@ -42,13 +45,24 @@ def parse_layers(inputs, layers, mode=ModeKeys.TRAIN, default_summaries=None):
             if key == "dropout" or key == "batchnorm":
                 if mode in [ModeKeys.EVAL, ModeKeys.PREDICT]:
                     inputs = getattr(tf.layers, key)(
-                        inputs, training=False, **params, name=scope)
+                        inputs,
+                        training=False,
+                        name=scope,
+                        **params
+                    )
                 elif mode == ModeKeys.TRAIN:
                     inputs = getattr(tf.layers, key)(
-                        inputs, training=True, **params, name=scope)
+                        inputs,
+                        training=True,
+                        name=scope,
+                        **params
+                    )
             else:
                 inputs = getattr(tf.layers, key)(
-                    inputs, **params, name=scope)
+                    inputs,
+                    name=scope,
+                    **params
+                )
 
         if default_summaries is not None:
             for summary in default_summaries:
@@ -76,7 +90,7 @@ def make_rand_data(save_path, mode="train_and_test"):
 
     """
     assert mode in ["train", "test", "train_and_test"]
-    
+
     dwi_train_path = None
     fiber_path = None
     dwi_test_path = None
@@ -96,7 +110,7 @@ def make_rand_data(save_path, mode="train_and_test"):
 
         dwi_train_path = os.path.join(save_path, "dwi_train.nii.gz")
         fiber_path = os.path.join(save_path, "fibers.trk")
-        
+
         nib.save(dwi_train, dwi_train_path)
         nib.trackvis.write(
             fiber_path,
@@ -131,7 +145,7 @@ def make_rand_data(save_path, mode="train_and_test"):
 def make_rand_sets(save_path, mode="train_and_test"):
     """Create and save small random train and test set for tracking"""
 
-    paths = make_rand_data(save_path, mode)    
+    paths = make_rand_data(save_path, mode)
 
     if mode == "test" or mode == "train_and_test":
         make_test_set(
@@ -265,7 +279,7 @@ def parse_hooks(hooks, locals, save_path):
             hook_class = getattr(tf.train, hook)
         except AttributeError:
             hook_class = getattr(custom_hooks, hook)
-        
+
         if hook == "SummarySaverHook":
             tensor_name = params["tensor"]
             sum_op = params["sum_op"](tensor_name, locals[tensor_name])
@@ -273,7 +287,7 @@ def parse_hooks(hooks, locals, save_path):
             hook_instance = hook_class(
                 summary_op=sum_op,
                 output_dir=save_path,
-                save_steps=params["save_steps"])          
+                save_steps=params["save_steps"])
         elif hook == "FiberTrackingHook":
             tracker = locals["self"]
             hook_instance = hook_class(tracker=tracker, **params)
@@ -302,5 +316,9 @@ def save_fibers(fiber_list, header, out_name="fibers.trk"):
         hdr_mapping=header)
 
 
-def print(*args, **kwargs):
-    builtins.print(*args, flush=True, **kwargs)
+def custom_print(*args, **kwargs):
+    if sys.version_info[:2] < (3, 3):
+        print(*args, **kwargs)
+        sys.stdout.flush()
+    else:
+        builtins.print(*args, flush=True, **kwargs)
