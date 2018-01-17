@@ -120,7 +120,7 @@ class Action(object):
                 "%Y%m%d-%H%M%S",
                 time.gmtime()) + "-debug")
 
-        path = os.path.join("/local/entrack/data", self.time_stamp)
+        path = os.path.join(self.args.save_folder_prefix, self.time_stamp)
         os.mkdir(os.path.normpath(path))
 
         self.save_path = path
@@ -273,6 +273,12 @@ if __name__ == '__main__':
 
     arg_parser = argparse.ArgumentParser(description="Scikit runner.")
 
+    arg_parser.add_argument(
+        "-S",
+        "--save-folder-prefix",
+        help="model file",
+        default="/local/entrack/data",
+    )
     arg_parser.add_argument("-C", "--config", help="config file")
     arg_parser.add_argument("-M", "--model", help="model file")
 
