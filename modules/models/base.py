@@ -50,6 +50,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
         self.input_fn_config = input_fn_config
         self.config = config
         self.params = params
+        self.feature_spec = None
 
         self._restore_path = None
 
@@ -75,7 +76,8 @@ class BaseTF(BaseEstimator, TransformerMixin):
             params=self.params,
             config=tf.estimator.RunConfig(**config))
 
-        self.feature_spec = feature_spec_from(X)
+        if self.feature_spec is None:
+            self.feature_spec = feature_spec_from(X)
 
         tf.logging.set_verbosity(tf.logging.INFO)
         try:

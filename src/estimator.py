@@ -10,6 +10,19 @@ from model import Model
 class Estimator(TensorflowBaseEstimator):
     """docstring for Estimator"""
 
+    def __init__(self, *args, **kwargs):
+        import features
+        super(Estimator, self).__init__(*args, **kwargs)
+        features.all_features.feature_info[features.MRI]['shape'] = \
+            self.input_fn_config['data_generation']['image_shape']
+        self.feature_spec = {
+            name: tf.placeholder(
+                    shape=[None] + ft_info['shape'],
+                    dtype=ft_info['type']
+                )
+            for name, ft_info in features.all_features.feature_info.items()
+        }
+
     def score(self, X, y):
         """
         Only used for prediction apparently. Dont need it now.
@@ -35,7 +48,12 @@ class Estimator(TensorflowBaseEstimator):
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
-                predictions={predicted_feature: predictions}
+                predictions={predicted_feature: predictions},
+                export_outputs={
+                    'outputs': tf.estimator.export.PredictOutput({
+                        predicted_feature: predictions
+                    })
+                }
             )
 
         loss = tf.losses.mean_squared_error(labels, predictions)
@@ -88,9 +106,6 @@ class Estimator(TensorflowBaseEstimator):
 
     def gen_input_fn(self, X, y=None, input_fn_config={}):
         # TODO: Return "test_input" for testing
-        import features
-        features.all_features.feature_info[features.MRI]['shape'] = \
-            input_fn_config['data_generation']['image_shape']
         preprocess_all_if_needed(input_fn_config['data_generation'])
 
         def _train_input():
