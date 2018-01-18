@@ -16,15 +16,18 @@ params:
       test_set_size_ratio: 0.2
       test_set_random_seed: 0
     data_streaming:
-      shuffle:
-        buffer_size: 8
-        seed: 0
-      batch:
-        batch_size: 8
-      repeat:
-        count: 10
-      map:
-        num_parallel_calls: 4
+      dataset:
+        - call: repeat
+          count: 10
+        - call: prefetch
+          buffer_size: 200
+        - call: shuffle
+          buffer_size: 100
+          seed: 0
+        - call: map
+          num_parallel_calls: 8
+        - call: batch
+          batch_size: 8
   params: # Params for model (model_fn)
     predicted_feature: age
     predicted_feature_avg: 63.7

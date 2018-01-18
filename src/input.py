@@ -29,11 +29,12 @@ def train_input(config_data_generation, config_data_streaming):
         ],
         compression_type=config_data_generation['dataset_compression'],
     )
-
-    for func, args in config_data_streaming.items():
-        if func == 'map':
-            args['map_func'] = parser
-        dataset = getattr(dataset, func)(**args)
+    for func_call in config_data_streaming['dataset']:
+        f = func_call['call']
+        del func_call['call']
+        if f == 'map':
+            func_call['map_func'] = parser
+        dataset = getattr(dataset, f)(**func_call)
 
     iterator = dataset.make_one_shot_iterator()
     return iterator.get_next()

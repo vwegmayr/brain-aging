@@ -81,8 +81,9 @@ class BaseTF(BaseEstimator, TransformerMixin):
 
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
-            self.estimator.train(input_fn=self.gen_input_fn(
-                X, y, self.input_fn_config))
+            self.estimator.train(
+                input_fn=self.gen_input_fn(X, y, self.input_fn_config)
+            )
         except KeyboardInterrupt:
             custom_print("\nEarly stop of training, saving model...")
             self.export_estimator()
