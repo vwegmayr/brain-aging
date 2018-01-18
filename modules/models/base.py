@@ -58,7 +58,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
             BaseTF.num_instances += 1
 
     def fit(self, X, y):
-        if "LogTotalSteps" in self.params["hooks"]:
+        if "hooks" in self.params and "LogTotalSteps" in self.params["hooks"]:
             self.params["hooks"]["LogTotalSteps"]["batch_size"] = self.input_fn_config["batch_size"]
             self.params["hooks"]["LogTotalSteps"]["epochs"] = self.input_fn_config["num_epochs"]
             self.params["hooks"]["LogTotalSteps"]["train_size"] = train_size(X)
