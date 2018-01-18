@@ -1,5 +1,4 @@
 import tensorflow as tf
-import config
 
 
 class FeaturesMgr:
@@ -18,7 +17,7 @@ all_features = FeaturesMgr()
 
 # List features here
 AGE = all_features.add('age')
-MRI = all_features.add('mri', shape=config.image_shape)
+MRI = all_features.add('mri')
 SEX = all_features.add('sex')
 STUDY_ID = all_features.add('study_id')
 STUDY_IMAGE_ID = all_features.add('study_image_id')

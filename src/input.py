@@ -1,9 +1,10 @@
 import tensorflow as tf
-import config
+import features
 
 
 def parser(record):
-    import features
+    # MRI image shape should be set at this point (taken from generator config)
+    assert(features.all_features.feature_info[features.MRI]['shape'] != [])
     keys_to_features = {
         name: tf.FixedLenFeature(shape=info['shape'], dtype=info['type'])
         for (name, info) in features.all_features.feature_info.items()}
@@ -21,24 +22,31 @@ def parser(record):
     }
 
 
-def train_input():
-    dataset = tf.data.TFRecordDataset(
-        [config.prefix_data_converted + config.train_database_file],
-        compression_type='GZIP',
+def train_input(config_data_generation, config_data_streaming):
+    dataset = tf.data.TFRecordDataset([
+            config_data_generation['data_converted_directory'] +
+            config_data_generation['train_database_file']
+        ],
+        compression_type=config_data_generation['dataset_compression'],
     )
-    dataset = dataset.map(parser)
-    dataset = dataset.shuffle(buffer_size=10000)
-    dataset = dataset.batch(8)
-    dataset = dataset.repeat(5)
+
+    for func, args in config_data_streaming.items():
+        if func == 'map':
+            args['map_func'] = parser
+        dataset = getattr(dataset, func)(**args)
+
     iterator = dataset.make_one_shot_iterator()
     return iterator.get_next()
 
 
-def test_input():
-    dataset = tf.data.TFRecordDataset(
-        [config.prefix_data_converted + config.test_database_file],
-        compression_type='GZIP',
+def test_input(config_data_generation, config_data_streaming):
+    dataset = tf.data.TFRecordDataset([
+            config_data_generation['data_converted_directory'] +
+            config_data_generation['train_database_file']
+        ],
+        compression_type=config_data_generation['dataset_compression'],
     )
+
     dataset = dataset.map(parser)
     dataset = dataset.batch(8)
     iterator = dataset.make_one_shot_iterator()

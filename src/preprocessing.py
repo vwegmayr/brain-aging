@@ -6,11 +6,10 @@ function. So that when their value change, data is regenerated automatically.
 """
 import numpy as np
 import tensorflow as tf
-import config
 import random
 
 
-def get_data_preprocessing_values():
+def get_data_preprocessing_values(config):
     """
     Returns a dictionnary with serializable values.
     Whenever the data should be re-generated, the content
@@ -19,21 +18,13 @@ def get_data_preprocessing_values():
     import json
     import os
     return {
-        'sources': [json.dumps(s.__dict__) for s in get_all_data_sources()],
+        'sources': [
+            json.dumps(s.__dict__) for s in get_all_data_sources(config)
+        ],
         'files': {
             os.path.basename(__file__): open(__file__).read(),
         },
-        'config': {
-            'prefix_data': config.prefix_data,
-            'prefix_data_raw': config.prefix_data_raw,
-            'prefix_data_converted': config.prefix_data_converted,
-            'train_database_file': config.train_database_file,
-            'test_database_file': config.test_database_file,
-            'image_shape': config.image_shape,
-            'dataset_compression': config.dataset_compression,
-            'test_set_size_ratio': config.test_set_size_ratio,
-            'test_set_random_seed': config.test_set_random_seed,
-        },
+        'config': config,
         'modules': {
             'tf': tf.__version__,
         }
@@ -41,16 +32,22 @@ def get_data_preprocessing_values():
 
 
 class DataAggregator:
-    def __init__(self, output_dir):
+    def __init__(self, config):
+        self.config = config
         self.study_to_id = {}
+        compression = getattr(
+            tf.python_io.TFRecordCompressionType,
+            config['dataset_compression'],
+        )
+        output_dir = config['data_converted_directory']
         self.writers = {
             'train': tf.python_io.TFRecordWriter(
-                output_dir + config.train_database_file,
-                tf.python_io.TFRecordOptions(config.dataset_compression),
+                output_dir + config['train_database_file'],
+                tf.python_io.TFRecordOptions(compression),
             ),
             'test': tf.python_io.TFRecordWriter(
-                output_dir + config.test_database_file,
-                tf.python_io.TFRecordOptions(config.dataset_compression),
+                output_dir + config['test_database_file'],
+                tf.python_io.TFRecordOptions(compression),
             ),
         }
         self.patient_to_writer = {}
@@ -72,7 +69,7 @@ class DataAggregator:
 
     def get_writer_for_image(self, patient_id):
         if patient_id not in self.patient_to_writer:
-            if random.random() < config.test_set_size_ratio:
+            if random.random() < self.config['test_set_size_ratio']:
                 self.patient_to_writer[patient_id] = self.writers['test']
             else:
                 self.patient_to_writer[patient_id] = self.writers['train']
@@ -93,11 +90,11 @@ class DataAggregator:
 
         img = nib.load(image_path)
         img_data = img.get_data()
-        if img_data.shape != config.image_shape:
+        if list(img_data.shape) != list(self.config['image_shape']):
             self.add_error(
                 image_path,
                 'Image has shape %s, expected %s' % (
-                    img_data.shape, config.image_shape)
+                    img_data.shape, self.config['image_shape'])
             )
             return
 
@@ -142,14 +139,16 @@ class DataAggregator:
 
 
 class KolnData(object):
-    def __init__(self):
+    def __init__(self, config):
         import glob
-        self.load_patients_features()
+        self.load_patients_features(
+            config['data_raw_directory'] + 'KOLN_PATIENTS/patients.csv'
+        )
         self.all_files = glob.glob(
-            config.prefix_data_raw + 'KOLN_T1/*/*/*.nii.gz'
+            config['data_raw_directory'] + 'KOLN_T1/*/*/*.nii.gz'
         )
 
-    def load_patients_features(self):
+    def load_patients_features(self, csv_file_path):
         """
         Load Koln Patients features from csv
         Indicative columns for CSV:
@@ -160,9 +159,7 @@ class KolnData(object):
         import csv
 
         self.koln_patients_ft = {}
-        with open(
-            config.prefix_data_raw + 'KOLN_PATIENTS/patients.csv'
-        ) as csvfile:
+        with open(csv_file_path) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 self.koln_patients_ft[int(row['id'])] = {
@@ -194,24 +191,24 @@ class KolnData(object):
             dataset.add_image(f, ft)
 
 
-def get_all_data_sources():
-    return [KolnData()]
+def get_all_data_sources(config):
+    return [KolnData(config)]
 
 
-def preprocess_all():
+def preprocess_all(config):
     print('[INFO] Extracting/preprocessing data...')
-    random.seed(config.test_set_random_seed)
-    dataset = DataAggregator(config.prefix_data_converted)
-    data_sources = get_all_data_sources()
+    random.seed(config['test_set_random_seed'])
+    dataset = DataAggregator(config)
+    data_sources = get_all_data_sources(config)
     for e in data_sources:
         e.preprocess(dataset)
     dataset.finish()
 
 
-def preprocess_all_if_needed():
+def preprocess_all_if_needed(config):
     import pickle
-    pkl_file = config.prefix_data_converted + "extractor_values.pkl"
-    current_extractor_values = get_data_preprocessing_values()
+    pkl_file = config['data_converted_directory'] + "extractor_values.pkl"
+    current_extractor_values = get_data_preprocessing_values(config)
     try:
         extracted_data_values = pickle.load(open(pkl_file, "rb"))
     except IOError:
@@ -221,5 +218,5 @@ def preprocess_all_if_needed():
         print('[INFO] Extracted data is up-to-date. Skipping preprocessing :)')
         return
     print('[INFO] Extracted data is outdated.')
-    preprocess_all()
+    preprocess_all(config)
     pickle.dump(current_extractor_values, open(pkl_file, "wb"))

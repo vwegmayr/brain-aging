@@ -1,70 +1,38 @@
-#Examples of config settings
-#===========================
-#Uncomment the example that you want to run
-#Leave the first two lines of the example commented, though
-#The second line of each example provides the command for the terminal
+#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S ~/entrack/data/entrack -a fit
 
-#Example 1
-#smt run --config .config.yaml -X data/X_train.npy -a fit_transform
-#class: ml_project.models.feature_selection.RandomSelection
-#params:
-#  n_components: 1000
-#  random_state: 37
-
-#Example 2 (Warning: might exceed your memory)
-#smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#class: ml_project.models.regression.KernelEstimator
-
-#Example 3
-#smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#class: ml_project.pipeline.Pipeline
-#params:
-#  class_list:
-#    - class: ml_project.models.feature_selection.RandomSelection
-#      params:
-#        random_state: 37
-#        n_components: 1000
-#    - class: sklearn.linear_model.LinearRegression
-
-#Example 4
-#smt run --config .config.yaml -X data/X_train.npy -y data/y_1.csv -a fit
-#class: ml_project.gridsearch.GridSearchCV
-#params:
-#  est_class: ml_project.pipeline.Pipeline
-#  est_params:
-#    - class: ml_project.models.feature_selection.RandomSelection
-#      params:
-#        random_state: 37
-#    - class: sklearn.linear_model.LinearRegression
-#  param_grid:
-#    RandomSelection__n_components:
-#      - 100
-#      - 1000
-#      - 10000
-#  cv:
-#    class: sklearn.model_selection.KFold
-#    params:
-#      n_splits: 3
-#      shuffle: True
-#      random_state: 37
-
-class: ml_project.models.regression.ExampleTF
+class: src.estimator.Estimator
 params:
-  input_fn_config:
-    batch_size: 64
-    num_epochs: 15
-    shuffle: True
-    queue_capacity: 1000
-    num_threads: 1
-  config:
+  input_fn_config: # Parameters for input generation (gen_input_fn)
+    data_generation:
+      data_raw_directory: data/raw/
+      data_converted_directory: data/ready/
+      train_database_file: train.tfrecord
+      test_database_file: test.tfrecord
+      image_shape:
+        - 256
+        - 256
+        - 128
+      dataset_compression: GZIP
+      test_set_size_ratio: 0.2
+      test_set_random_seed: 0
+    data_streaming:
+      shuffle:
+        buffer_size: 8
+        seed: 0
+      batch:
+        batch_size: 8
+      repeat:
+        count: 10
+      map:
+        num_parallel_calls: 4
+  params: # Params for model (model_fn)
+    predicted_feature: age
+    predicted_feature_avg: 63.7
+    log_loss_every_n_iter: 1
+  config: #TODO: What is this for?
     save_summary_steps: 1
     tf_random_seed: 42
     save_checkpoints_steps: 100
     #save_checkpoints_secs:
     keep_checkpoint_max: 5
     log_step_count_steps: 100
-  params:
-    learning_rate: 0.0001
-    hooks:
-      - type: SummarySaverHook
-        params: {name: dense_layer_1_norm, op: scalar, save_steps: 10}

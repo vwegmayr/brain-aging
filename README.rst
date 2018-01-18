@@ -1,4 +1,12 @@
 =============================
+Project specific instructions
+=============================
+smt init
+smt configure --main run.py
+smt configure --on-changed=store-diff
+pip install scipy pandas 
+
+=============================
 ETH Machine Learning Projects
 =============================
 
@@ -34,7 +42,7 @@ during the *Machine Learning* course at ETH Zurich. It serves two main purposes:
 2. Structured & reproducible experiments by integration of sumatra_ and miniconda_.
 
 
-The project description and result submission are hosted by Kaggle: 
+The project description and result submission are hosted by Kaggle:
 
 - `General Project Information`_
 - `Kaggle Project 1`_ (`invite link 1`_)
@@ -119,7 +127,7 @@ Make sure the environment is activated:
 .. code-block:: shell
 
     source activate ml_project
-    
+
 If you encounter problems with site-packages try:
 
 .. code-block:: shell
@@ -129,10 +137,10 @@ If you encounter problems with site-packages try:
 Then download the data:
 
 .. code-block:: shell
-    
+
     cd data/
     kg download -c ml-project-1 -u username -p password
-    
+
 Replace :code:`username` with your Kaggle Username and :code:`password` with your Kaggle password.
 
 Experiments
@@ -256,7 +264,7 @@ saving outputs, you can simply run
 .. code-block:: shell
 
     python run.py [-h] [-c CONFIG] [-m MODEL] -X X [-y Y] -a {transform,predict,fit,fit_transform}
-    
+
 Use this for debugging only, otherwise your experiments remain untracked and unsaved!
 
 Submission
@@ -315,19 +323,19 @@ the kaggle-cli_ tool:
 .. code-block:: shell
 
     kg submit data/YYMMDD-hhmmss/y_YYMMDD-hhmmss.csv -c ml-project-1 -u username -p password -m "Brief description"
-    
+
 To view your submissions, just type
 
 .. code-block:: shell
 
     kg submissions
-    
+
 which will list all your previous submissions. To set a default username, password and project:
 
 .. code-block:: shell
 
     kg config -u username -p password -c competition
-    
+
 Please note, you have to explicitly select your final submission on Kaggle (`here <https://inclass.kaggle.com/c/ml-project-1/submissions>`_).
 
 Otherwise, Kaggle will automatically select the submission with the best validation score.
