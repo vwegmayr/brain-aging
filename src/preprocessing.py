@@ -147,6 +147,7 @@ class DataSource(object):
         self.config = config
         self.load_patients_features(config['patients_features'])
         self.all_files = glob.glob(config['glob'])
+        random.shuffle(self.all_files)
 
     def load_patients_features(self, csv_file_path):
         """
