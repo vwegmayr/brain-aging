@@ -56,7 +56,7 @@ class DataAggregator:
         self.count = 0
         self.stats = {}
 
-    def begin_study(self, study_name):
+    def begin_study(self, study_name, total_files):
         self.study_to_id[study_name] = len(self.study_to_id)
         self.curr_study_id = self.study_to_id[study_name]
         self.curr_study_name = study_name
@@ -66,6 +66,7 @@ class DataAggregator:
         }
         self.count = 1
         self.patient_to_writer = {}
+        self.total_files = total_files
 
     def get_writer_for_image(self, patient_id):
         if patient_id not in self.patient_to_writer:
@@ -84,8 +85,8 @@ class DataAggregator:
         Example = tf.train.Example
 
         if self.count % 10 == 1:
-            print('[%s] Processing image #%d...' % (
-                self.curr_study_name, self.count))
+            print('[%s] Processing image #%d/%d...' % (
+                self.curr_study_name, self.count, self.total_files))
         self.count += 1
 
         img = nib.load(image_path)
@@ -113,10 +114,12 @@ class DataAggregator:
         )
 
         # Check we have all features set
-        assert(all(
-            ft_name in img_features
-            for ft_name in features.all_features.feature_info.keys()
-        ))
+        for ft_name in features.all_features.feature_info.keys():
+            if ft_name not in img_features:
+                print('[FATAL] Feature `%s` missing for %s' % (
+                    ft_name, image_path))
+                assert(False)
+
         example = Example(features=Features(feature=img_features))
         self.get_writer_for_image(
             int64_features[features.STUDY_PATIENT_ID]
@@ -157,18 +160,28 @@ class DataSource(object):
         import csv
 
         self.patients_ft = {}
+        self.images_ft = {}
         with open(csv_file_path) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                self.patients_ft[int(row['id'])] = {
-                    features.AGE: int(row['age']),
-                    features.SEX: int(row['sex']),
+                # Read features
+                ft = {
+                    col_name: int(col_value)
+                    for col_name, col_value in row.items()
+                    if col_name in features.all_features.feature_info
                 }
+                # Register them for later access
+                if features.STUDY_IMAGE_ID in ft:
+                    image_id = ft[features.STUDY_IMAGE_ID]
+                    self.images_ft[image_id] = ft
+                if features.STUDY_PATIENT_ID in ft:
+                    patient_id = ft[features.STUDY_PATIENT_ID]
+                    self.patients_ft[patient_id] = ft
 
     def preprocess(self, dataset):
         import re
         import features
-        dataset.begin_study(self.config['name'])
+        dataset.begin_study(self.config['name'], len(self.all_files))
 
         # MRI scans
         features_from_filename = self.config['features_from_filename']
@@ -187,18 +200,30 @@ class DataSource(object):
                 continue
             for ft_name, ft_group in features_in_regexp.items():
                 ft[ft_name] = int(match.group(ft_group))
-            if features.STUDY_PATIENT_ID not in ft:
-                dataset.add_error(f, 'Regexp should provide patient id')
-                continue
-            # Add features from CSV
-            patient_id = ft[features.STUDY_PATIENT_ID]
-            if patient_id not in self.patients_ft:
+            if features.STUDY_PATIENT_ID not in ft and \
+                    features.STUDY_IMAGE_ID not in ft:
                 dataset.add_error(
                     f,
-                    'No features for patient %d' % (patient_id),
-                )
+                    'Regexp should provide ft `%s` or `%s`' % (
+                        features.STUDY_IMAGE_ID, features.STUDY_PATIENT_ID
+                    ))
                 continue
-            ft.update(self.patients_ft[patient_id])
+            # Add features from CSV - by image ID
+            found_csv_entry = False
+            if features.STUDY_IMAGE_ID in ft:
+                image_id = ft[features.STUDY_IMAGE_ID]
+                if image_id in self.images_ft:
+                    ft.update(self.images_ft[image_id])
+                    found_csv_entry = True
+            # Or by patient ID
+            if features.STUDY_PATIENT_ID in ft:
+                patient_id = ft[features.STUDY_PATIENT_ID]
+                if patient_id in self.patients_ft:
+                    ft.update(self.patients_ft[patient_id])
+                    found_csv_entry = True
+            if not found_csv_entry:
+                dataset.add_error(f,'No CSV features found')
+                continue
             dataset.add_image(f, ft)
 
 

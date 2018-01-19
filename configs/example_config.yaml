@@ -9,21 +9,29 @@ params:
       train_database_file: train.tfrecord
       test_database_file: test.tfrecord
       image_shape:
-        - 256
-        - 256
-        - 128
+        - 91
+        - 109
+        - 91
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
       test_set_random_seed: 0
       data_sources:
-        - name: KOLN_T1
-          glob: data/raw/KOLN_T1/*/*/*.nii.gz
+        - name: ADNI_AIBL
+          # Skip augmented data. Example file '273666_normalized.nii.gz'
+          glob: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*
           features_from_filename:
-            regexp: .*/(\d+)/(\d+)_t1\.nii\.gz
+            regexp: .*/(\d+)_normalized\.nii\.gz
             features_group:
               study_image_id: 1
-              study_patient_id: 2
-          patients_features: data/raw/KOLN_PATIENTS/patients.csv
+          patients_features: data/raw/csv/adni_aibl.csv
+        # - name: KOLN_T1
+        #   glob: data/raw/KOLN_T1/*/*/*.nii.gz
+        #   features_from_filename:
+        #     regexp: .*/(\d+)/(\d+)_t1\.nii\.gz
+        #     features_group:
+        #       study_image_id: 1
+        #       study_patient_id: 2
+        #   patients_features: data/raw/csv/koln.csv
 
     data_streaming:
       dataset:
@@ -40,7 +48,7 @@ params:
           batch_size: 8
   params: # Params for model (model_fn)
     predicted_feature: age
-    predicted_feature_avg: 63.7
+    predicted_feature_avg: 76.64
     log_loss_every_n_iter: 1
   config: #TODO: What is this for?
     save_summary_steps: 1
