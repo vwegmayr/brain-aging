@@ -36,16 +36,16 @@ params:
     data_streaming:
       dataset:
         - call: repeat
-          count: 10
+          count: 2
         - call: prefetch
-          buffer_size: 200
+          buffer_size: 400
         - call: shuffle
           buffer_size: 100
           seed: 0
         - call: map
           num_parallel_calls: 8
         - call: batch
-          batch_size: 8
+          batch_size: 32
   params: # Params for model (model_fn)
     predicted_feature: age
     predicted_feature_avg: 76.64

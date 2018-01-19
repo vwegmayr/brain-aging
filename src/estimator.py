@@ -3,7 +3,7 @@ from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks
 
 from preprocessing import preprocess_all_if_needed
-from input import train_input
+from input import train_input, test_input
 from model import Model
 
 
@@ -93,6 +93,7 @@ class Estimator(TensorflowBaseEstimator):
                 tf.train.LoggingTensorHook({
                         "loss": loss,
                         "loss_v_avg": loss_v_avg,
+                        "global_step": tf.train.get_global_step(),
                     },
                     every_n_iter=params["log_loss_every_n_iter"],
                 )
@@ -102,15 +103,22 @@ class Estimator(TensorflowBaseEstimator):
             mode=mode,
             loss=loss,
             train_op=train_op,
+            eval_metric_ops=eval_metric_ops,
             training_hooks=training_hooks)
 
-    def gen_input_fn(self, X, y=None, input_fn_config={}):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         # TODO: Return "test_input" for testing
         preprocess_all_if_needed(input_fn_config['data_generation'])
 
-        def _train_input():
-            return train_input(
-                input_fn_config['data_generation'],
-                input_fn_config['data_streaming'],
-            )
-        return _train_input
+        def _input_fn():
+            if train:
+                return train_input(
+                    input_fn_config['data_generation'],
+                    input_fn_config['data_streaming'],
+                )
+            else:
+                return test_input(
+                    input_fn_config['data_generation'],
+                    input_fn_config['data_streaming'],
+                )
+        return _input_fn

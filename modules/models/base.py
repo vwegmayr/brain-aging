@@ -82,7 +82,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
             self.estimator.train(
-                input_fn=self.gen_input_fn(X, y, self.input_fn_config)
+                input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)
             )
         except KeyboardInterrupt:
             custom_print("\nEarly stop of training, saving model...")
@@ -90,6 +90,10 @@ class BaseTF(BaseEstimator, TransformerMixin):
         else:
             self.export_estimator()
 
+        evaluation = self.estimator.evaluate(
+            input_fn=self.gen_input_fn(X, y, False, self.input_fn_config)
+        )
+        custom_print(evaluation)
         return self
 
     def predict(self, X, head="predictions"):
@@ -138,7 +142,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
     def model_fn(self, features, labels, mode, params, config):
         pass
 
-    def gen_input_fn(self, X, y=None, input_fn_config={}):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         if isinstance(X, np.ndarray):
             X_ = {"X": X}
         elif isinstance(X, dict):

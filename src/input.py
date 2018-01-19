@@ -30,6 +30,7 @@ def train_input(config_data_generation, config_data_streaming):
         compression_type=config_data_generation['dataset_compression'],
     )
     for func_call in config_data_streaming['dataset']:
+        func_call = func_call.copy()
         f = func_call['call']
         del func_call['call']
         if f == 'map':
@@ -43,12 +44,17 @@ def train_input(config_data_generation, config_data_streaming):
 def test_input(config_data_generation, config_data_streaming):
     dataset = tf.data.TFRecordDataset([
             config_data_generation['data_converted_directory'] +
-            config_data_generation['train_database_file']
+            config_data_generation['test_database_file']
         ],
         compression_type=config_data_generation['dataset_compression'],
     )
+    for func_call in config_data_streaming['dataset']:
+        func_call = func_call.copy()
+        f = func_call['call']
+        del func_call['call']
+        if f == 'map':
+            func_call['map_func'] = parser
+        dataset = getattr(dataset, f)(**func_call)
 
-    dataset = dataset.map(parser)
-    dataset = dataset.batch(8)
     iterator = dataset.make_one_shot_iterator()
     return iterator.get_next()
