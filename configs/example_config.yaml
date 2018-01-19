@@ -15,6 +15,16 @@ params:
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
       test_set_random_seed: 0
+      data_sources:
+        - name: KOLN_T1
+          glob: data/raw/KOLN_T1/*/*/*.nii.gz
+          features_from_filename:
+            regexp: .*/(\d+)/(\d+)_t1\.nii\.gz
+            features_group:
+              study_image_id: 1
+              study_patient_id: 2
+          patients_features: data/raw/KOLN_PATIENTS/patients.csv
+
     data_streaming:
       dataset:
         - call: repeat

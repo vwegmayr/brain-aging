@@ -138,31 +138,29 @@ class DataAggregator:
                 print '    %s' % v['errors'][0]
 
 
-class KolnData(object):
+class DataSource(object):
     def __init__(self, config):
         import glob
-        self.load_patients_features(
-            config['data_raw_directory'] + 'KOLN_PATIENTS/patients.csv'
-        )
-        self.all_files = glob.glob(
-            config['data_raw_directory'] + 'KOLN_T1/*/*/*.nii.gz'
-        )
+        self.config = config
+        self.load_patients_features(config['patients_features'])
+        self.all_files = glob.glob(config['glob'])
 
     def load_patients_features(self, csv_file_path):
         """
-        Load Koln Patients features from csv
-        Indicative columns for CSV:
-        id,age,sex,symptom_onset,disease_duration,updrs_3_on,updrs_3_off,
-           led,ankk_1,drd_3,tar_score
+        Load Patients features from csv
+        This file should contain the following columns:
+        - id
+        - One column per feature from features.py file, excluding the ones
+          extracted from the file name (typically study id and image id)
         """
         import features
         import csv
 
-        self.koln_patients_ft = {}
+        self.patients_ft = {}
         with open(csv_file_path) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                self.koln_patients_ft[int(row['id'])] = {
+                self.patients_ft[int(row['id'])] = {
                     features.AGE: int(row['age']),
                     features.SEX: int(row['sex']),
                 }
@@ -170,29 +168,45 @@ class KolnData(object):
     def preprocess(self, dataset):
         import re
         import features
-        dataset.begin_study('KOLN_T1')
+        dataset.begin_study(self.config['name'])
 
         # MRI scans
-        extract_patient_id = re.compile(r".*/(\d+)/(\d+)_t1\.nii\.gz")
+        features_from_filename = self.config['features_from_filename']
+        features_in_regexp = features_from_filename['features_group']
+        assert(all([
+            n in features.all_features.feature_info
+            for n in features_in_regexp
+        ]))
+        extract_from_path = re.compile(features_from_filename['regexp'])
         for f in self.all_files:
-            match = extract_patient_id.match(f)
-            patient_id = int(match.group(2))
-            if patient_id not in self.koln_patients_ft:
+            ft = {}
+            # Add features from filename
+            match = extract_from_path.match(f)
+            if match is None:
+                dataset.add_error(f, 'Regexp doesnt match')
+                continue
+            for ft_name, ft_group in features_in_regexp.items():
+                ft[ft_name] = int(match.group(ft_group))
+            if features.STUDY_PATIENT_ID not in ft:
+                dataset.add_error(f, 'Regexp should provide patient id')
+                continue
+            # Add features from CSV
+            patient_id = ft[features.STUDY_PATIENT_ID]
+            if patient_id not in self.patients_ft:
                 dataset.add_error(
                     f,
                     'No features for patient %d' % (patient_id),
                 )
                 continue
-            ft = self.koln_patients_ft[patient_id]
-            ft.update({
-                    features.STUDY_PATIENT_ID: patient_id,
-                    features.STUDY_IMAGE_ID: int(match.group(1)),
-            })
+            ft.update(self.patients_ft[patient_id])
             dataset.add_image(f, ft)
 
 
 def get_all_data_sources(config):
-    return [KolnData(config)]
+    return [
+        DataSource(source_config)
+        for source_config in config['data_sources']
+    ]
 
 
 def preprocess_all(config):
