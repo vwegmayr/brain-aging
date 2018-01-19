@@ -147,7 +147,6 @@ class DataSource(object):
         self.config = config
         self.load_patients_features(config['patients_features'])
         self.all_files = glob.glob(config['glob'])
-        random.shuffle(self.all_files)
 
     def load_patients_features(self, csv_file_path):
         """
@@ -183,6 +182,8 @@ class DataSource(object):
         import re
         import features
         dataset.begin_study(self.config['name'], len(self.all_files))
+
+        random.shuffle(self.all_files)
 
         # MRI scans
         features_from_filename = self.config['features_from_filename']
