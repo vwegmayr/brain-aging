@@ -238,12 +238,14 @@ def get_all_data_sources(config):
 
 def preprocess_all(config):
     print('[INFO] Extracting/preprocessing data...')
+    random_state = random.getstate()
     random.seed(config['test_set_random_seed'])
     dataset = DataAggregator(config)
     data_sources = get_all_data_sources(config)
     for e in data_sources:
         e.preprocess(dataset)
     dataset.finish()
+    random.setstate(random_state)
 
 
 def preprocess_all_if_needed(config):
