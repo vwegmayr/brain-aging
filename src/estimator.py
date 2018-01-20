@@ -43,7 +43,7 @@ class Estimator(TensorflowBaseEstimator):
         predicted_feature_avg = params['predicted_feature_avg']
         labels = features[predicted_feature]
         m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
-        predictions = m.gen_output(features)
+        predictions = m.gen_output(features) + predicted_feature_avg
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
