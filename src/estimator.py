@@ -43,7 +43,9 @@ class Estimator(TensorflowBaseEstimator):
         predicted_feature_avg = params['predicted_feature_avg']
         labels = features[predicted_feature]
         m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
-        predictions = m.gen_output(features) + predicted_feature_avg
+        predictions = m.gen_output(features)
+        if params['shift_network_output_by_average']:
+            predictions += predicted_feature_avg
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -56,8 +58,8 @@ class Estimator(TensorflowBaseEstimator):
                 }
             )
 
-        loss = tf.losses.mean_squared_error(labels, predictions)
-        loss_v_avg = tf.losses.mean_squared_error(
+        loss = self.compute_loss(labels, predictions)
+        loss_v_avg = self.compute_loss(
             tf.cast(labels, tf.float32),
             tf.cast(labels, tf.float32)*0.0 + predicted_feature_avg,
         )
@@ -77,7 +79,7 @@ class Estimator(TensorflowBaseEstimator):
         optimizer = tf.train.AdamOptimizer()
         train_op = optimizer.minimize(
             loss=loss,
-            global_step=tf.train.get_global_step()
+            global_step=tf.train.get_global_step(),
         )
 
         if "hooks" in params:
@@ -105,6 +107,9 @@ class Estimator(TensorflowBaseEstimator):
             train_op=train_op,
             eval_metric_ops=eval_metric_ops,
             training_hooks=training_hooks)
+
+    def compute_loss(self, labels, predictions):
+        return tf.losses.mean_squared_error(labels, predictions)
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         # TODO: Return "test_input" for testing

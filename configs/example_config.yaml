@@ -35,6 +35,10 @@ params:
 
     data_streaming:
       dataset:
+        # - call: filter
+        #   keep_when_any_is_true:
+        #     - health_ad
+        #     - healthy
         - call: repeat
           count: 2
         - call: prefetch
@@ -50,6 +54,7 @@ params:
     predicted_feature: age
     predicted_feature_avg: 76.64
     log_loss_every_n_iter: 1
+    shift_network_output_by_average: True
   config: #TODO: What is this for?
     save_summary_steps: 1
     tf_random_seed: 42

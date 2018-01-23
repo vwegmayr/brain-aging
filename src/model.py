@@ -28,8 +28,10 @@ class Model(DeepNN):
         fc = tf.concat([
             # Features from convet
             tf.reshape(conv, [-1, num_features]),
-            # Additionnal features - shape [batch_size, feature_count], type float32
-            #tf.reshape(tf.cast(ft[features_def.AGE], tf.float32), [-1, 1]),
+            # Additionnal features:
+            #    shape [batch_size, feature_count]
+            #    type float32
+            # tf.reshape(tf.cast(ft[features_def.AGE], tf.float32), [-1, 1]),
         ], 1)
         fc = self.batch_norm(fc, scope="norm_ft")
 
