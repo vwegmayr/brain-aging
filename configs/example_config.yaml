@@ -36,10 +36,6 @@ params:
 
     data_streaming:
       dataset:
-        # - call: filter
-        #   keep_when_any_is_true:
-        #     - health_ad
-        #     - healthy
         - call: repeat
           count: 2
         - call: prefetch
@@ -48,6 +44,14 @@ params:
           buffer_size: 100
           seed: 0
         - call: map
+          map_func: src.input.parser
+          num_parallel_calls: 8
+        - call: filter
+          keep_when_any_is_true:
+            - health_ad
+            - healthy
+        - call: map
+          map_func: src.input.distort
           num_parallel_calls: 8
         - call: batch
           batch_size: 32
@@ -56,8 +60,10 @@ params:
     # Predict only one feature -> Regression mode
     # Predict two or more categorical features -> Classifier mode
     predicted:
-      - feature: age
-        average: 76.64
+      - feature: health_ad
+        average: 0
+      - feature: healthy
+        average: 0
   config: #TODO: What is this for?
     save_summary_steps: 1
     tf_random_seed: 42

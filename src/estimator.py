@@ -78,23 +78,57 @@ class Estimator(TensorflowBaseEstimator):
         labels = [features[ft_name] for ft_name in predicted_features]
         labels = tf.concat(labels, 1)
 
+        if regression:
+            eval_metric_ops = {
+                'rmse': tf.metrics.root_mean_squared_error(
+                    tf.cast(labels, tf.float32),
+                    predictions,
+                ),
+                'rmse_vs_avg': tf.metrics.root_mean_squared_error(
+                    tf.cast(labels, tf.float32),
+                    predictions*0.0 + predicted_features_avg,
+                ),
+            }
+        else:
+            eval_metric_ops = {
+                'accuracy': tf.metrics.accuracy(
+                    tf.argmax(predictions, 1),
+                    tf.argmax(labels, 1)
+                ),
+                'false_negatives': tf.metrics.false_negatives(
+                    tf.argmax(predictions, 1),
+                    tf.argmax(labels, 1)
+                ),
+                'false_positives': tf.metrics.false_positives(
+                    tf.argmax(predictions, 1),
+                    tf.argmax(labels, 1)
+                ),
+            }
+
         loss = compute_loss_fn(labels, predictions)
         loss_v_avg = compute_loss_fn(
             tf.cast(labels, tf.float32),
             tf.cast(labels, tf.float32)*0.0 + predicted_features_avg,
         )
+        accuracy = tf.reduce_mean(tf.cast(
+            tf.equal(tf.argmax(predictions, 1), tf.argmax(labels, 1)),
+            tf.float32,
+        ))
 
-        # Metrics run with Estimator.evaluate (on validation set)
-        eval_metric_ops = {
-            'rmse': tf.metrics.root_mean_squared_error(
-                tf.cast(labels, tf.float32),
-                predictions,
-            ),
-            'rmse_vs_avg': tf.metrics.root_mean_squared_error(
-                tf.cast(labels, tf.float32),
-                predictions*0.0 + predicted_features_avg,
-            ),
+        log_variables = {
+            "loss": loss,
+            "loss_v_avg": loss_v_avg,
+            "accuracy": accuracy,
         }
+        if not regression:
+            log_variables.update({
+                'count_predicted_%s' % predicted_features[i]:
+                tf.reduce_sum(tf.cast(
+                    tf.equal(tf.argmax(predictions, 1), i),
+                    tf.float32,
+                ))
+                for i in range(num_classes)
+            })
 
         optimizer = tf.train.AdamOptimizer()
         train_op = optimizer.minimize(
@@ -107,10 +141,13 @@ class Estimator(TensorflowBaseEstimator):
             loss=loss,
             train_op=train_op,
             eval_metric_ops=eval_metric_ops,
-            training_hooks=self.get_training_hooks(params, loss, loss_v_avg),
+            training_hooks=self.get_training_hooks(
+                params,
+                log_variables=log_variables,
+            ),
         )
 
-    def get_training_hooks(self, params, loss, loss_v_avg):
+    def get_training_hooks(self, params, log_variables):
         if "hooks" in params:
             training_hooks = parse_hooks(
                 params["hooks"],
@@ -120,12 +157,13 @@ class Estimator(TensorflowBaseEstimator):
             training_hooks = []
 
         if "log_loss_every_n_iter" in params:
+            hook_logged = log_variables.copy()
+            hook_logged.update({
+                "global_step": tf.train.get_global_step(),
+            })
             training_hooks.append(
-                tf.train.LoggingTensorHook({
-                        "loss": loss,
-                        "loss_v_avg": loss_v_avg,
-                        "global_step": tf.train.get_global_step(),
-                    },
+                tf.train.LoggingTensorHook(
+                    hook_logged,
                     every_n_iter=params["log_loss_every_n_iter"],
                 )
             )
