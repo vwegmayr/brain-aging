@@ -22,6 +22,14 @@ def parser(record):
     }
 
 
+def dataset_filter(record, keep_when_any_is_true=None):
+    if keep_when_any_is_true is not None:
+        cond = tf.constant(False)
+        for field in keep_when_any_is_true:
+            cond = cond or record[field] == 1
+    return True
+
+
 def gen_dataset_iterator(config, dataset):
     for func_call in config:
         func_call = func_call.copy()
@@ -29,6 +37,11 @@ def gen_dataset_iterator(config, dataset):
         del func_call['call']
         if f == 'map':
             func_call['map_func'] = parser
+        if f == 'filter':
+            # Forward all arguments to predicate
+            func_call = {
+                'predicate': lambda r: dataset_filter(r, **func_call)
+            }
         dataset = getattr(dataset, f)(**func_call)
 
     iterator = dataset.make_one_shot_iterator()
