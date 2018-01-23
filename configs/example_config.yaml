@@ -37,7 +37,7 @@ params:
     data_streaming:
       dataset:
         - call: repeat
-          count: 5
+          count: 10
         - call: prefetch
           buffer_size: 400
         - call: shuffle

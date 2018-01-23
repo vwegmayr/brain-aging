@@ -19,7 +19,7 @@ class Model(DeepNN):
         conv = self.conv2d_shared_all_dims_layer(conv, 'b1', strides=[2, 2, 2])
         conv = self.conv2d_shared_all_dims_layer(conv, 'b2')
         conv = self.conv2d_shared_all_dims_layer(conv, 'b3')
-        conv = self.conv3d_layer(conv, 24, scope="conv4")
+        conv = self.conv3d_layer(conv, 8, scope="conv4")
 
         conv = tf.reduce_max(conv, axis=[1, 2, 3], keep_dims=True)
 
