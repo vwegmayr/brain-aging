@@ -2,7 +2,7 @@ import tensorflow as tf
 import features
 
 
-def parser(record):
+def parse_record(record):
     # MRI image shape should be set at this point (taken from generator config)
     assert(features.all_features.feature_info[features.MRI]['shape'] != [])
     keys_to_features = {
@@ -10,6 +10,11 @@ def parser(record):
         for (name, info) in features.all_features.feature_info.items()}
 
     parsed = tf.parse_single_example(record, features=keys_to_features)
+    return parsed
+
+
+def parser(record):
+    parsed = parse_record(record)
 
     def process_feature(ft, ft_info):
         if ft_info['shape'] == []:
@@ -22,11 +27,20 @@ def parser(record):
     }
 
 
+def distort(record):
+    record[features.MRI] = tf.random_crop(record[features.MRI], [85, 95, 85])
+    return record
+
+
 def dataset_filter(record, keep_when_any_is_true=None):
     if keep_when_any_is_true is not None:
         cond = tf.constant(False)
         for field in keep_when_any_is_true:
-            cond = cond or record[field] == 1
+            cond = tf.logical_or(
+                cond,
+                tf.equal(tf.reshape(record[field], []), 1),
+            )
+        return cond
     return True
 
 
@@ -35,12 +49,12 @@ def gen_dataset_iterator(config, dataset):
         func_call = func_call.copy()
         f = func_call['call']
         del func_call['call']
-        if f == 'map':
-            func_call['map_func'] = parser
+        # Special cases
         if f == 'filter':
             # Forward all arguments to predicate
+            kwargs = func_call.copy()
             func_call = {
-                'predicate': lambda r: dataset_filter(r, **func_call)
+                'predicate': lambda r: dataset_filter(r, **kwargs)
             }
         dataset = getattr(dataset, f)(**func_call)
 
