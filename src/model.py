@@ -10,7 +10,7 @@ class Model(DeepNN):
         super(Model, self).__init__()
         self.is_training = is_training
 
-    def gen_output(self, ft):
+    def gen_last_layer(self, ft):
         mri = tf.cast(ft[features_def.MRI], tf.float32)
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
         mri = self.batch_norm(mri, scope="norm_input")
@@ -34,12 +34,19 @@ class Model(DeepNN):
             #    type float32
             # tf.reshape(tf.cast(ft[features_def.AGE], tf.float32), [-1, 1]),
         ], 1)
-        fc = self.batch_norm(fc, scope="norm_ft")
+        return self.batch_norm(fc, scope="norm_ft")
 
-        fc = self.fc_layer(
-            fc,
-            1,
+    def gen_head_regressor(self, last_layer, predicted_avg):
+        return predicted_avg + self.fc_layer(
+            last_layer,
+            len(predicted_avg),
             nl=tf.identity,
-            name="fc",
+            name="fc_regressor",
         )
-        return tf.reshape(fc, [-1], name='predictions')
+
+    def gen_head_classifier(self, last_layer, num_classes):
+        return self.fc_layer(
+            last_layer,
+            num_classes,
+            name="fc_classifier",
+        )

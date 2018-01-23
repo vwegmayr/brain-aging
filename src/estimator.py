@@ -39,32 +39,52 @@ class Estimator(TensorflowBaseEstimator):
         - config: tensorflow.python.estimator.run_config.RunConfig
         """
 
-        predicted_feature = params['predicted_feature']
-        predicted_feature_avg = params['predicted_feature_avg']
-        labels = features[predicted_feature]
+        prediction_info = params['predicted']
+        num_classes = len(prediction_info)
+        regression = num_classes == 1
+        predicted_features = [i['feature'] for i in prediction_info]
+        predicted_features_avg = [i['average'] for i in prediction_info]
+
         m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
-        predictions = m.gen_output(features)
-        if params['shift_network_output_by_average']:
-            predictions += predicted_feature_avg
+        last_layer = m.gen_last_layer(features)
+        if regression:
+            predictions = m.gen_head_regressor(
+                last_layer,
+                predicted_features_avg,
+            )
+            compute_loss_fn = tf.losses.mean_squared_error
+        else:
+            predictions = m.gen_head_classifier(
+                last_layer,
+                num_classes,
+            )
+            compute_loss_fn = tf.losses.softmax_cross_entropy
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
-                predictions={predicted_feature: predictions},
+                predictions={
+                    ft_name: predictions[:, i]
+                    for i, ft_name in enumerate(predicted_features)
+                },
                 export_outputs={
                     'outputs': tf.estimator.export.PredictOutput({
-                        predicted_feature: predictions
+                        ft_name: predictions[:, i]
+                        for i, ft_name in enumerate(predicted_features)
                     })
                 }
             )
 
-        loss = self.compute_loss(labels, predictions)
-        loss_v_avg = self.compute_loss(
+        labels = [features[ft_name] for ft_name in predicted_features]
+        labels = tf.concat(labels, 1)
+
+        loss = compute_loss_fn(labels, predictions)
+        loss_v_avg = compute_loss_fn(
             tf.cast(labels, tf.float32),
-            tf.cast(labels, tf.float32)*0.0 + predicted_feature_avg,
+            tf.cast(labels, tf.float32)*0.0 + predicted_features_avg,
         )
 
-        # Calculate root mean squared error as additional eval metric
+        # Metrics run with Estimator.evaluate (on validation set)
         eval_metric_ops = {
             'rmse': tf.metrics.root_mean_squared_error(
                 tf.cast(labels, tf.float32),
@@ -72,7 +92,7 @@ class Estimator(TensorflowBaseEstimator):
             ),
             'rmse_vs_avg': tf.metrics.root_mean_squared_error(
                 tf.cast(labels, tf.float32),
-                predictions*0.0 + predicted_feature_avg,
+                predictions*0.0 + predicted_features_avg,
             ),
         }
 
@@ -82,6 +102,15 @@ class Estimator(TensorflowBaseEstimator):
             global_step=tf.train.get_global_step(),
         )
 
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=loss,
+            train_op=train_op,
+            eval_metric_ops=eval_metric_ops,
+            training_hooks=self.get_training_hooks(params, loss, loss_v_avg),
+        )
+
+    def get_training_hooks(self, params, loss, loss_v_avg):
         if "hooks" in params:
             training_hooks = parse_hooks(
                 params["hooks"],
@@ -100,13 +129,7 @@ class Estimator(TensorflowBaseEstimator):
                     every_n_iter=params["log_loss_every_n_iter"],
                 )
             )
-
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            loss=loss,
-            train_op=train_op,
-            eval_metric_ops=eval_metric_ops,
-            training_hooks=training_hooks)
+        return training_hooks
 
     def compute_loss(self, labels, predictions):
         return tf.losses.mean_squared_error(labels, predictions)
@@ -127,3 +150,6 @@ class Estimator(TensorflowBaseEstimator):
                     input_fn_config['data_streaming'],
                 )
         return _input_fn
+
+    def validate_params(self, params):
+        assert("regression" in params ^ "classification" in params)

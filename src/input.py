@@ -13,7 +13,7 @@ def parser(record):
 
     def process_feature(ft, ft_info):
         if ft_info['shape'] == []:
-            return ft
+            return tf.reshape(ft, [1])
         return tf.reshape(ft, ft_info['shape'])
 
     return {
