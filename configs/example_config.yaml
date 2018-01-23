@@ -37,7 +37,7 @@ params:
     data_streaming:
       dataset:
         - call: repeat
-          count: 2
+          count: 5
         - call: prefetch
           buffer_size: 400
         - call: shuffle
@@ -54,7 +54,7 @@ params:
           map_func: src.input.distort
           num_parallel_calls: 8
         - call: batch
-          batch_size: 32
+          batch_size: 64
   params: # Params for model (model_fn)
     log_loss_every_n_iter: 1
     # Predict only one feature -> Regression mode
@@ -66,7 +66,7 @@ params:
         average: 0
   config: #TODO: What is this for?
     save_summary_steps: 1
-    tf_random_seed: 42
+    tf_random_seed: 40
     save_checkpoints_steps: 100
     #save_checkpoints_secs:
     keep_checkpoint_max: 5
