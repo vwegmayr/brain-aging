@@ -22,14 +22,8 @@ def parser(record):
     }
 
 
-def train_input(config_data_generation, config_data_streaming):
-    dataset = tf.data.TFRecordDataset([
-            config_data_generation['data_converted_directory'] +
-            config_data_generation['train_database_file']
-        ],
-        compression_type=config_data_generation['dataset_compression'],
-    )
-    for func_call in config_data_streaming['dataset']:
+def gen_dataset_iterator(config, dataset):
+    for func_call in config:
         func_call = func_call.copy()
         f = func_call['call']
         del func_call['call']
@@ -39,6 +33,16 @@ def train_input(config_data_generation, config_data_streaming):
 
     iterator = dataset.make_one_shot_iterator()
     return iterator.get_next()
+
+
+def train_input(config_data_generation, config_data_streaming):
+    dataset = tf.data.TFRecordDataset([
+            config_data_generation['data_converted_directory'] +
+            config_data_generation['train_database_file']
+        ],
+        compression_type=config_data_generation['dataset_compression'],
+    )
+    return gen_dataset_iterator(config_data_streaming['dataset'], dataset)
 
 
 def test_input(config_data_generation, config_data_streaming):
@@ -48,13 +52,10 @@ def test_input(config_data_generation, config_data_streaming):
         ],
         compression_type=config_data_generation['dataset_compression'],
     )
-    for func_call in config_data_streaming['dataset']:
-        func_call = func_call.copy()
-        f = func_call['call']
-        del func_call['call']
-        if f == 'map':
-            func_call['map_func'] = parser
-        dataset = getattr(dataset, f)(**func_call)
-
-    iterator = dataset.make_one_shot_iterator()
-    return iterator.get_next()
+    disable_for_test = ['repeat']
+    iter_config = [
+        v
+        for v in config_data_streaming['dataset']
+        if v['call'] not in disable_for_test
+    ]
+    return gen_dataset_iterator(iter_config, dataset)
