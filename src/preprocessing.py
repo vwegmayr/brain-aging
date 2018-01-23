@@ -8,6 +8,9 @@ function. So that when their value change, data is regenerated automatically.
 import numpy as np
 import tensorflow as tf
 import random
+import json
+import sys
+import inspect
 
 
 def get_data_preprocessing_values(config):
@@ -16,7 +19,6 @@ def get_data_preprocessing_values(config):
     Whenever the data should be re-generated, the content
     of the returned dictionnary should change.
     """
-    import json, os, sys, inspect
     return {
         'sources': [
             json.dumps(s.__dict__) for s in get_all_data_sources(config)
@@ -224,7 +226,7 @@ class DataSource(object):
                     ft.update(self.patients_ft[patient_id])
                     found_csv_entry = True
             if not found_csv_entry:
-                dataset.add_error(f,'No CSV features found')
+                dataset.add_error(f, 'No CSV features found')
                 continue
             dataset.add_image(f, ft)
 
