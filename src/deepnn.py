@@ -1,4 +1,5 @@
 import tensorflow as tf
+from modules.models.utils import custom_print
 
 
 class DeepNN(object):
@@ -96,8 +97,8 @@ class DeepNN(object):
                 "%s/output" % scope,
                 fullcontent=False,
             )
-            print '%s -> [%s] -> %s' % (
-                conv_input_shape, scope, out.get_shape()[1:].as_list())
+            custom_print('%s -> [%s] -> %s' % (
+                conv_input_shape, scope, out.get_shape()[1:].as_list()))
         return out
 
     def fc_layer(self, x, num_outputs, nl=tf.nn.relu, name="unnamedfc"):

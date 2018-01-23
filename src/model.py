@@ -1,4 +1,5 @@
 import tensorflow as tf
+from modules.models.utils import custom_print
 import features as features_def
 from deepnn import DeepNN
 import numpy as np
@@ -23,7 +24,7 @@ class Model(DeepNN):
         conv = tf.reduce_max(conv, axis=[1, 2, 3], keep_dims=True)
 
         num_features = np.prod(conv.get_shape().as_list()[1:])
-        print '%d fc features' % (num_features)
+        custom_print('%d fc features' % (num_features))
         fc = tf.reshape(conv, [-1, num_features])
         fc = tf.concat([
             # Features from convet

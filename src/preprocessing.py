@@ -11,6 +11,7 @@ import random
 import json
 import sys
 import inspect
+from modules.models.utils import custom_print
 
 
 def get_data_preprocessing_values(config):
@@ -87,7 +88,7 @@ class DataAggregator:
         Example = tf.train.Example
 
         if self.count % 10 == 1:
-            print('[%s] Processing image #%d/%d...' % (
+            custom_print('[%s] Processing image #%d/%d...' % (
                 self.curr_study_name, self.count, self.total_files))
         self.count += 1
 
@@ -118,7 +119,7 @@ class DataAggregator:
         # Check we have all features set
         for ft_name in features.all_features.feature_info.keys():
             if ft_name not in img_features:
-                print('[FATAL] Feature `%s` missing for %s' % (
+                custom_print('[FATAL] Feature `%s` missing for %s' % (
                     ft_name, image_path))
                 assert(False)
 
@@ -130,17 +131,18 @@ class DataAggregator:
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
-        print '[ERROR] %s (%s)' % (message, path)
+        custom_print('[ERROR] %s (%s)' % (message, path))
 
     def finish(self):
         for w in self.writers.values():
             w.close()
-        print '---- DATA CONVERSION STATS ----'
+        custom_print('---- DATA CONVERSION STATS ----')
         for k, v in self.stats.items():
-            print '%s: %d ok / %d errors' % (k, v['success'], len(v['errors']))
+            custom_print('%s: %d ok / %d errors' % (
+                k, v['success'], len(v['errors'])))
             if len(v['errors']) > 0:
-                print '    First error:'
-                print '    %s' % v['errors'][0]
+                custom_print('    First error:')
+                custom_print('    %s' % v['errors'][0])
 
 
 class DataSource(object):
@@ -239,7 +241,7 @@ def get_all_data_sources(config):
 
 
 def preprocess_all(config):
-    print('[INFO] Extracting/preprocessing data...')
+    custom_print('[INFO] Extracting/preprocessing data...')
     random_state = random.getstate()
     random.seed(config['test_set_random_seed'])
     dataset = DataAggregator(config)
@@ -260,8 +262,10 @@ def preprocess_all_if_needed(config):
         extracted_data_values = {}
 
     if extracted_data_values == current_extractor_values:
-        print('[INFO] Extracted data is up-to-date. Skipping preprocessing :)')
+        custom_print(
+            '[INFO] Extracted data is up-to-date. Skipping preprocessing :)'
+        )
         return
-    print('[INFO] Extracted data is outdated.')
+    custom_print('[INFO] Extracted data is outdated.')
     preprocess_all(config)
     pickle.dump(current_extractor_values, open(pkl_file, "wb"))
