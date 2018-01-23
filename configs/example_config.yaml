@@ -1,4 +1,4 @@
-#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S ~/entrack/data/entrack -a fit
+#CUDA_VISIBLE_DEVICES=5 smt run --config configs/example_config.yaml -S ~/entrack/data/entrack -a fit
 
 class: src.estimator.Estimator
 params:
