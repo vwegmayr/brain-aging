@@ -11,3 +11,7 @@ configs/
 .idea/
 .ropeproject/
 notebooks/.ipynb_checkpoints/
+# Because I have a mercurial AND git repo at the same
+.git/
+.hg/
+commit.sh
