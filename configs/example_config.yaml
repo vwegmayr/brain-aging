@@ -1,7 +1,7 @@
 # rm -rf .smt /local/dhaziza && mkdir /local/dhaziza
-# smt init -e python -m run.py -d data/output/ -c store-diff -s /local/dhaziza/records dhaziza
-#CUDA_VISIBLE_DEVICES=5 smt run -r "<reason>" --config configs/example_config.yaml -S ~/entrack/data/output -a fit
-#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S ~/entrack/data/output -a fit
+# smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data
+#CUDA_VISIBLE_DEVICES=2 smt run -r "3D_CNN_SPIE repro [pool, bn, 2 epochs, less conv]" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 
 class: src.estimator.Estimator
 params:
