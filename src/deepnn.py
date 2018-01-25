@@ -130,6 +130,6 @@ class DeepNN(object):
         )
 
     def dropout(self, x, prob):
-        if not self.is_train:
+        if not self.is_training:
             return x
         return tf.nn.dropout(x, keep_prob=prob)
