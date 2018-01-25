@@ -81,20 +81,25 @@ class BaseTF(BaseEstimator, TransformerMixin):
 
         tf.logging.set_verbosity(tf.logging.INFO)
         try:
-            self.estimator.train(
-                input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)
-            )
+            self.fit_main_training_loop(X, y)
         except KeyboardInterrupt:
             custom_print("\nEarly stop of training, saving model...")
             self.export_estimator()
+            return self
         else:
             self.export_estimator()
+            return self
 
-        evaluation = self.estimator.evaluate(
-            input_fn=self.gen_input_fn(X, y, False, self.input_fn_config)
+    def fit_main_training_loop(self, X, y):
+        self.estimator.train(
+            input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)
         )
+        evaluation_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
+        if evaluation_fn is None:
+            custom_print("No evaluation data available - skipping evaluation.")
+            return
+        evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
         custom_print(evaluation)
-        return self
 
     def predict(self, X, head="predictions"):
         check_is_fitted(self, ["_restore_path"])
@@ -143,6 +148,13 @@ class BaseTF(BaseEstimator, TransformerMixin):
         pass
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        """
+        Returns a function that when called returns the data iterator.
+        To support various datasets (train/validation/...), you need to
+        reimplement it in a child class
+        """
+        if not train:
+            return None
         if isinstance(X, np.ndarray):
             X_ = {"X": X}
         elif isinstance(X, dict):
