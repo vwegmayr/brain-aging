@@ -37,8 +37,6 @@ params:
 
     data_streaming:
       dataset:
-        - call: repeat
-          count: 5
         - call: prefetch
           buffer_size: 400
         - call: shuffle
@@ -65,10 +63,15 @@ params:
         average: 0
       - feature: healthy
         average: 0
-  config: #TODO: What is this for?
-    save_summary_steps: 1
-    tf_random_seed: 40
-    save_checkpoints_steps: 500
-    #save_checkpoints_secs:
-    keep_checkpoint_max: 5
-    log_step_count_steps: 100
+  run_config:
+    num_epochs: 5
+    validations_per_epoch: 1
+    # Tensorflow RunConfig
+    # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
+    tf_run_config:
+      save_summary_steps: 1
+      tf_random_seed: 40
+      save_checkpoints_steps: 500
+      #save_checkpoints_secs:
+      keep_checkpoint_max: 5
+      log_step_count_steps: 100
