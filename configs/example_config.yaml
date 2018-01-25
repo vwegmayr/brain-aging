@@ -1,6 +1,6 @@
 # rm -rf .smt /local/dhaziza && mkdir /local/dhaziza
 # smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data
-#CUDA_VISIBLE_DEVICES=2 smt run -r "3D_CNN_SPIE repro [pool, bn, 2 epochs, less conv]" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+#CUDA_VISIBLE_DEVICES=2 smt run -r "(new) AD v HC baseline" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 #CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 
 class: src.estimator.Estimator
@@ -38,7 +38,7 @@ params:
     data_streaming:
       dataset:
         - call: repeat
-          count: 10
+          count: 5
         - call: prefetch
           buffer_size: 400
         - call: shuffle
@@ -55,7 +55,7 @@ params:
           map_func: src.input.distort
           num_parallel_calls: 8
         - call: batch
-          batch_size: 64
+          batch_size: 16
   params: # Params for model (model_fn)
     log_loss_every_n_iter: 1
     # Predict only one feature -> Regression mode
@@ -68,7 +68,7 @@ params:
   config: #TODO: What is this for?
     save_summary_steps: 1
     tf_random_seed: 40
-    save_checkpoints_steps: 100
+    save_checkpoints_steps: 500
     #save_checkpoints_secs:
     keep_checkpoint_max: 5
     log_step_count_steps: 100

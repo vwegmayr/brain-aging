@@ -15,11 +15,24 @@ class Model(DeepNN):
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
         mri = self.batch_norm(mri, scope="norm_input")
 
+        def conv_wrap(conv, filters, size, scope):
+            return self.conv3d_layer(
+                conv,
+                filters,
+                size,
+                pool=True,
+                bn=True,
+                scope=scope,
+                mpadding='SAME',
+                padding='SAME',
+            )
+
         conv = mri
-        conv = self.conv2d_shared_all_dims_layer(conv, 'b1', strides=[2, 2, 2])
-        conv = self.conv2d_shared_all_dims_layer(conv, 'b2')
-        conv = self.conv2d_shared_all_dims_layer(conv, 'b3')
-        conv = self.conv3d_layer(conv, 8, scope="conv4")
+        conv = self.conv2d_shared_all_dims_layer(conv, 'b1')
+        conv = conv_wrap(conv, 60, [5, 5, 5], scope="c2")
+        conv = conv_wrap(conv, 60, [5, 5, 5], scope="c3")
+        conv = conv_wrap(conv, 100, [3, 3, 3], scope="c4")
+        conv = conv_wrap(conv, 100, [3, 3, 3], scope="c5")
 
         conv = tf.reduce_max(conv, axis=[1, 2, 3], keep_dims=True)
 
@@ -34,7 +47,14 @@ class Model(DeepNN):
             #    type float32
             # tf.reshape(tf.cast(ft[features_def.AGE], tf.float32), [-1, 1]),
         ], 1)
-        return self.batch_norm(fc, scope="norm_ft")
+
+        fc = self.fc_layer(
+            fc,
+            256,
+            name="fc_features",
+        )
+        self.dropout(fc, 0.3)
+        return self.batch_norm(fc, scope='ft_norm')
 
     def gen_head_regressor(self, last_layer, predicted_avg):
         return predicted_avg + self.fc_layer(
