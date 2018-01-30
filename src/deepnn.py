@@ -9,17 +9,22 @@ class DeepNN(object):
 
     def variable_summaries(self, var, name, fullcontent=True):
         """Attach a lot of summaries to a Tensor."""
-        if not self.debug_summaries:
-            return
-        with tf.name_scope('summaries'):
+        with tf.name_scope('%s_summary' % name):
             mean = tf.reduce_mean(var)
-            tf.scalar_summary('mean/' + name, mean)
-            with tf.name_scope('stddev'):
-                stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-            tf.scalar_summary('stddev/' + name, stddev)
-            tf.scalar_summary('max/' + name, tf.reduce_max(var))
-            tf.scalar_summary('min/' + name, tf.reduce_min(var))
-            tf.histogram_summary(name, var)
+            tf.summary.scalar('mean', mean)
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+            tf.summary.scalar('stddev', stddev)
+            tf.summary.scalar('max', tf.reduce_max(var))
+            tf.summary.scalar('min', tf.reduce_min(var))
+            tf.summary.histogram('hist', var)
+
+    def convet_filters_summary(self, filters, name):
+        """
+        input:
+        @filters: [x, y, nf] shaped tensor
+        """
+        with tf.name_scope('%s_summary' % name):
+            pass  # TODO(dhaziza)
 
     def conv3d(self, x, W, strides=[1, 1, 1, 1, 1], padding='VALID'):
         return tf.nn.conv3d(x, W, strides=strides, padding=padding)
@@ -44,7 +49,7 @@ class DeepNN(object):
                 *args,
                 **kwargs
             )
-        with tf.variable_scope('branch_%s' % scope) as tf_scope:
+        with tf.variable_scope('%s' % scope) as tf_scope:
             b1 = do_c([s, s, 1], *args, **kwargs)
             tf_scope.reuse_variables()
             b2 = do_c([s, 1, s], *args, **kwargs)
@@ -63,11 +68,13 @@ class DeepNN(object):
         import numpy as np
         with tf.variable_scope(scope):
             conv_input_shape = x.get_shape()[1:].as_list()
-            W_shape = filter_weights + [conv_input_shape[3], num_filters]
+            input_channels = conv_input_shape[3]
+            W_shape = filter_weights + [input_channels, num_filters]
             W = tf.get_variable(
                 "w",
-                shape=[np.prod(W_shape)],
-                initializer=tf.contrib.layers.xavier_initializer_conv2d(),
+                shape=[np.prod(filter_weights)] +
+                [input_channels, num_filters],
+                initializer=tf.contrib.layers.xavier_initializer(),
             )
             W = tf.reshape(W, W_shape)
             b = tf.get_variable(
@@ -81,7 +88,6 @@ class DeepNN(object):
                 strides=[1] + strides + [1],
                 padding=padding,
             )
-            self.variable_summaries(W, "%s/W" % scope)
             if pool:
                 out = tf.nn.max_pool3d(
                     out,
@@ -92,13 +98,14 @@ class DeepNN(object):
             if bn:
                 out = self.batch_norm(out)
             out = nl(out)
-            self.variable_summaries(
-                out,
-                "%s/output" % scope,
-                fullcontent=False,
-            )
+            if self.debug_summaries:
+                self.variable_summaries(W, "w")
+                self.variable_summaries(out, "output")
             custom_print('%s -> [%s] -> %s' % (
-                conv_input_shape, scope, out.get_shape()[1:].as_list()))
+                conv_input_shape,
+                tf.contrib.framework.get_name_scope(),
+                out.get_shape()[1:].as_list()
+            ))
         return out
 
     def fc_layer(self, x, num_outputs, nl=tf.nn.relu, name="unnamedfc"):
@@ -115,9 +122,10 @@ class DeepNN(object):
                 initializer=tf.constant_initializer(0.1)
             )
             out = nl(tf.matmul(x, W_fc) + b_fc)
-            self.variable_summaries(W_fc, "%s/W" % name)
-            self.variable_summaries(b_fc, "%s/b" % name)
-            self.variable_summaries(out, "%s/output" % name)
+            if self.debug_summaries:
+                self.variable_summaries(W_fc, "W")
+                self.variable_summaries(b_fc, "b")
+                self.variable_summaries(out, "output")
         return out
 
     def batch_norm(self, x, **kwargs):
