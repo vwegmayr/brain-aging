@@ -1,4 +1,6 @@
 import tensorflow as tf
+import math
+import numpy as np
 from modules.models.utils import custom_print
 
 
@@ -18,13 +20,50 @@ class DeepNN(object):
             tf.summary.scalar('min', tf.reduce_min(var))
             tf.summary.histogram('hist', var)
 
-    def convet_filters_summary(self, filters, name):
+    def convet_filters_summary(self, w, name):
         """
         input:
-        @filters: [x, y, nf] shaped tensor
+        @filters: [x, y, if, of] shaped tensor with
+            - @if number of features in input
+                Only value '1' is supported
+            - @of number of filters
         """
-        with tf.name_scope('%s_summary' % name):
-            pass  # TODO(dhaziza)
+        w_shape = w.get_shape().as_list()
+        assert(w_shape[2] == 1)
+        with tf.name_scope(name):
+            output_filters = w_shape[3]
+            num_rows = int(math.ceil(math.sqrt(output_filters)))
+            num_cols = int(math.ceil(output_filters/float(num_rows)))
+
+            # Pad W with more filters if needed
+            if w_shape[3] != num_rows*num_cols:
+                z = tf.zeros(
+                    w_shape[0:3] + [num_rows*num_cols - w_shape[3]],
+                    dtype=tf.float32,
+                )
+                w = tf.concat([w, z], 3)
+            # Pad x y only
+            padding = np.array([
+                [2, 2],  # x
+                [2, 2],  # y
+                [0, 0],  # input filters
+                [0, 0],  # output filters
+            ])
+            w = tf.pad(w, padding, "CONSTANT")
+            w_list = tf.split(
+                w,
+                num_or_size_splits=num_cols*num_rows,
+                axis=3,
+            )
+            rows = [
+                tf.concat(w_list[i*num_cols:i*num_cols+num_cols], 0)
+                for i in range(num_rows)
+            ]
+            img = tf.concat(rows, 1)  # [x, y, if, 1]
+            tf.summary.image(
+                name,
+                tf.reshape(img, [1] + img.get_shape().as_list()[0:3]),
+            )
 
     def conv3d(self, x, W, strides=[1, 1, 1, 1, 1], padding='VALID'):
         return tf.nn.conv3d(x, W, strides=strides, padding=padding)
@@ -49,7 +88,7 @@ class DeepNN(object):
                 *args,
                 **kwargs
             )
-        with tf.variable_scope('%s' % scope) as tf_scope:
+        with tf.variable_scope(scope) as tf_scope:
             b1 = do_c([s, s, 1], *args, **kwargs)
             tf_scope.reuse_variables()
             b2 = do_c([s, 1, s], *args, **kwargs)
@@ -65,7 +104,6 @@ class DeepNN(object):
                      mpadding='VALID',
                      scope="unnamed_conv",
                      bn=True):
-        import numpy as np
         with tf.variable_scope(scope):
             conv_input_shape = x.get_shape()[1:].as_list()
             input_channels = conv_input_shape[3]

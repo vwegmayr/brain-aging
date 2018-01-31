@@ -54,7 +54,18 @@ class Model(DeepNN):
             name="fc_features",
         )
         self.dropout(fc, 0.3)
-        return self.batch_norm(fc, scope='ft_norm')
+        output = self.batch_norm(fc, scope='ft_norm')
+
+        # Summaries:
+        with tf.variable_scope("b1/conv", reuse=True):
+            self.convet_filters_summary(
+                tf.reshape(
+                    tf.get_variable('w'),
+                    [5, 5, 1, -1],
+                ),
+                "Conv2D"
+            )
+        return output
 
     def gen_head_regressor(self, last_layer, predicted_avg):
         return predicted_avg + self.fc_layer(
