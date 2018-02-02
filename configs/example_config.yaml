@@ -1,5 +1,5 @@
 # rm -rf .smt /local/dhaziza && mkdir /local/dhaziza
-# smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data
+# smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data -l cmdline
 #CUDA_VISIBLE_DEVICES=2 smt run -r "(new) AD v HC baseline" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 #CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 
