@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import pickle as pkl
+import json
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
@@ -15,6 +16,7 @@ class Estimator(TensorflowBaseEstimator):
     def __init__(self, run_config, *args, **kwargs):
         import features
         self.run_config = run_config
+        self.sumatra_outcome = {}
         super(Estimator, self).__init__(
             config=run_config['tf_run_config'],
             *args,
@@ -243,6 +245,8 @@ class Estimator(TensorflowBaseEstimator):
             zip(*[d.values() for d in self.evaluations])
         ))
 
+        self.sumatra_outcome['numeric_outcome'] = {}
+
         for label, values in v.items():
             # Need to skip first value, because loss is not evaluated
             # at the beginning
@@ -264,9 +268,26 @@ class Estimator(TensorflowBaseEstimator):
             )
             plt.close()
 
+            # All this data needs to be serializable, so get rid of
+            # numpy arrays, np.float32 etc..
+            self.sumatra_outcome['numeric_outcome'][label] = {
+                'type': 'numeric',
+                'x': x_values[1:].tolist(),
+                'y': np.array(values).tolist(),
+            }
+
+        if 'accuracy' in v and len(v['accuracy']) > 3:
+            self.sumatra_outcome['text_outcome'] = \
+                'Final accuracy %s' % (v['accuracy'][-1])
+        else:
+            self.sumatra_outcome['text_outcome'] = 'TODO'
+
         with open('%s/eval_values.pkl' % (output_dir), 'wb') as f:
             pkl.dump({
                 'version': 1,
                 'validations_per_epoch': validations_per_epoch,
                 'evaluate': self.evaluations,
             }, f, pkl.HIGHEST_PROTOCOL)
+
+        with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
+            json.dump(self.sumatra_outcome, outfile)
