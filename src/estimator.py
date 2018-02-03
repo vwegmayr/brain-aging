@@ -285,9 +285,16 @@ class Estimator(TensorflowBaseEstimator):
                 'y': np.array(values).tolist(),
             }
 
-        if 'accuracy' in v and len(v['accuracy']) > 3:
+        if 'accuracy' in v and len(v['accuracy']) >= 8:
+            accuracy = v['accuracy']
+            last_n = int(len(accuracy)*0.25)
+            accuracy = accuracy[len(accuracy)-last_n:]
             self.sumatra_outcome['text_outcome'] = \
-                'Final accuracy %s' % (v['accuracy'][-1])
+                'Final mean accuracy %s (std=%s) on the last %s steps)' % (
+                    np.mean(accuracy),
+                    np.std(accuracy),
+                    last_n,
+                )
         else:
             self.sumatra_outcome['text_outcome'] = 'TODO'
 
