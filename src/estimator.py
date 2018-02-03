@@ -6,7 +6,7 @@ import json
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
 from preprocessing import preprocess_all_if_needed
-from input import train_input, test_input
+from input import input_iterator
 from model import Model
 
 
@@ -36,27 +36,41 @@ class Estimator(TensorflowBaseEstimator):
         """
         Trains and runs validation regularly at the same time
         """
-        train_fn = self.gen_input_fn(X, y, True, self.input_fn_config)
-        evaluate_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
-        num_epochs = self.run_config['num_epochs']
-        validations_per_epoch = self.run_config['validations_per_epoch']
-        assert(evaluate_fn is not None)
-        # TODO: Support more validations per epoch
-        assert(validations_per_epoch <= 1)
-
-        validation_counter = 0
         self.evaluations = []
-        for i in range(num_epochs):
-            self.estimator.train(input_fn=train_fn)
-
-            # Check if we need to run validation
-            validation_counter += validations_per_epoch
-            if validation_counter >= 1:
-                validation_counter -= 1
-                self.evaluations.append(
+        def do_evaluate():
+            evaluate_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
+            assert(evaluate_fn is not None)
+            self.evaluations.append(
                     self.estimator.evaluate(input_fn=evaluate_fn)
                 )
-                self.export_evaluation_stats()
+            self.export_evaluation_stats()
+
+        num_epochs = self.run_config['num_epochs']
+        validations_per_epoch = self.run_config['validations_per_epoch']
+
+        # 1st case, evaluation every few epochs
+        if validations_per_epoch <= 1:
+            validation_counter = 0
+            train_fn = self.gen_input_fn(X, y, True, self.input_fn_config)
+            for i in range(num_epochs):
+                self.estimator.train(input_fn=train_fn)
+
+                # Check if we need to run validation
+                validation_counter += validations_per_epoch
+                if validation_counter >= 1:
+                    validation_counter -= 1
+                    do_evaluate()
+
+        # 2nd case, several evaluations per epoch (should be an int then!)
+        else:
+            iters = num_epochs * validations_per_epoch
+            for i in range(iters):
+                train_fn = self.gen_input_fn(
+                    X, y, True, self.input_fn_config,
+                    shard=(i % validations_per_epoch, validations_per_epoch),
+                )
+                self.estimator.train(input_fn=train_fn)
+                do_evaluate()
 
 
     def score(self, X, y):
@@ -208,21 +222,16 @@ class Estimator(TensorflowBaseEstimator):
     def compute_loss(self, labels, predictions):
         return tf.losses.mean_squared_error(labels, predictions)
 
-    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        # TODO: Return "test_input" for testing
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}, shard=None):
         preprocess_all_if_needed(input_fn_config['data_generation'])
 
         def _input_fn():
-            if train:
-                return train_input(
-                    input_fn_config['data_generation'],
-                    input_fn_config['data_streaming'],
-                )
-            else:
-                return test_input(
-                    input_fn_config['data_generation'],
-                    input_fn_config['data_streaming'],
-                )
+            return input_iterator(
+                input_fn_config['data_generation'],
+                input_fn_config['data_streaming'],
+                shard=shard,
+                type='train' if train else 'test'
+            )
         return _input_fn
 
     def export_evaluation_stats(self):
