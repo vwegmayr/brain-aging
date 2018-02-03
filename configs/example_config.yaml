@@ -64,8 +64,8 @@ params:
       - feature: healthy
         average: 0
   run_config:
-    num_epochs: 10
-    validations_per_epoch: 3
+    num_epochs: 20
+    validations_per_epoch: 2
     # Tensorflow RunConfig
     # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
     tf_run_config:
