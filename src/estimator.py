@@ -282,6 +282,7 @@ class Estimator(TensorflowBaseEstimator):
             self.sumatra_outcome['numeric_outcome'][label] = {
                 'type': 'numeric',
                 'x': x_values[1:].tolist(),
+                'x_label': 'Training epoch',
                 'y': np.array(values).tolist(),
             }
 
