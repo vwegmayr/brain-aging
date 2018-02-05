@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import pickle as pkl
 import json
+import copy
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
@@ -17,8 +18,21 @@ class Estimator(TensorflowBaseEstimator):
         import features
         self.run_config = run_config
         self.sumatra_outcome = {}
+
+        tf_run_config = copy.deepcopy(run_config['tf_estimator_run_config'])
+        if 'session_config' in tf_run_config:
+            session_config = tf_run_config['session_config']
+            gpu_config = session_config.get('gpu_options')
+            if gpu_config is not None:
+                del session_config['gpu_options']
+            session_config_obj = tf.ConfigProto(**session_config)
+            if gpu_config is not None:
+                for conf_key, conf_val in gpu_config.items():
+                    setattr(session_config_obj.gpu_options, conf_key, conf_val)
+            tf_run_config['session_config'] = session_config_obj
+
         super(Estimator, self).__init__(
-            config=run_config['tf_run_config'],
+            config=tf_run_config,
             *args,
             **kwargs
         )

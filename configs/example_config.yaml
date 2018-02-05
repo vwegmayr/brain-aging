@@ -68,10 +68,15 @@ params:
     validations_per_epoch: 2
     # Tensorflow RunConfig
     # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
-    tf_run_config:
+    tf_estimator_run_config:
       save_summary_steps: 1
       tf_random_seed: 40
       save_checkpoints_steps: 500
       #save_checkpoints_secs:
       keep_checkpoint_max: 5
       log_step_count_steps: 100
+      keep_checkpoint_max: 2
+      session_config:
+        gpu_options:
+          per_process_gpu_memory_fraction: 0.49
+          allow_growth: False
