@@ -53,7 +53,7 @@ params:
           map_func: src.input.distort
           num_parallel_calls: 8
         - call: batch
-          batch_size: 16
+          batch_size: 8
   params: # Params for model (model_fn)
     log_loss_every_n_iter: 1
     # Predict only one feature -> Regression mode

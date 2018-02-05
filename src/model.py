@@ -15,12 +15,12 @@ class Model(DeepNN):
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
         mri = self.batch_norm(mri, scope="norm_input")
 
-        def conv_wrap(conv, filters, size, scope):
+        def conv_wrap(conv, filters, size, scope, pool=True):
             return self.conv3d_layer(
                 conv,
                 filters,
                 size,
-                pool=True,
+                pool=pool,
                 bn=True,
                 scope=scope,
                 mpadding='SAME',
@@ -34,14 +34,12 @@ class Model(DeepNN):
         conv = conv_wrap(conv, 100, [3, 3, 3], scope="c4")
         conv = conv_wrap(conv, 100, [3, 3, 3], scope="c5")
 
-        conv = tf.reduce_max(conv, axis=[1, 2, 3], keep_dims=True)
+        conv = tf.reduce_max(conv, axis=[1, 2, 3])
 
-        num_features = np.prod(conv.get_shape().as_list()[1:])
-        custom_print('%d fc features' % (num_features))
-        fc = tf.reshape(conv, [-1, num_features])
+        custom_print('%d fc features' % (conv.get_shape().as_list()[1]))
         fc = tf.concat([
             # Features from convet
-            tf.reshape(conv, [-1, num_features]),
+            conv,
             # Additionnal features:
             #    shape [batch_size, feature_count]
             #    type float32
@@ -53,7 +51,6 @@ class Model(DeepNN):
             256,
             name="fc_features",
         )
-        self.dropout(fc, 0.3)
         output = self.batch_norm(fc, scope='ft_norm')
 
         # Summaries:
