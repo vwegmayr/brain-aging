@@ -29,10 +29,10 @@ class Model(DeepNN):
 
         conv = mri
         conv = self.conv2d_shared_all_dims_layer(conv, 'b1')
-        conv = conv_wrap(conv, 60, [5, 5, 5], scope="c2")
-        conv = conv_wrap(conv, 60, [5, 5, 5], scope="c3")
-        conv = conv_wrap(conv, 100, [3, 3, 3], scope="c4")
-        conv = conv_wrap(conv, 100, [3, 3, 3], scope="c5")
+        conv = conv_wrap(conv, 60, [5, 5, 5], "c2")
+        conv = conv_wrap(conv, 60, [5, 5, 5], "c3")
+        conv = conv_wrap(conv, 100, [3, 3, 3], "c4")
+        conv = conv_wrap(conv, 100, [3, 3, 3], "c5")
 
         conv = tf.reduce_max(conv, axis=[1, 2, 3])
 
