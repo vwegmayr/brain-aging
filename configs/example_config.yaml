@@ -55,7 +55,7 @@ params:
         - call: batch
           batch_size: 8
   params: # Params for model (model_fn)
-    log_loss_every_n_iter: 1
+    train_log_every_n_iter: 5
     # Predict only one feature -> Regression mode
     # Predict two or more categorical features -> Classifier mode
     predicted:
@@ -63,6 +63,7 @@ params:
         average: 0
       - feature: healthy
         average: 0
+    # regularization_weight: 0.00001
   run_config:
     num_epochs: 15
     validations_per_epoch: 2

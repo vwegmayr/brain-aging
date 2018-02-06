@@ -113,6 +113,7 @@ class DeepNN(object):
                 shape=[np.prod(filter_weights)] +
                 [input_channels, num_filters],
                 initializer=tf.contrib.layers.xavier_initializer(),
+                regularizer=tf.contrib.layers.l1_regularizer(1.0),
             )
             W = tf.reshape(W, W_shape)
             b = tf.get_variable(
@@ -152,12 +153,13 @@ class DeepNN(object):
             W_fc = tf.get_variable(
                 "w",
                 shape=[num_inputs, num_outputs],
-                initializer=tf.contrib.layers.xavier_initializer()
+                initializer=tf.contrib.layers.xavier_initializer(),
+                regularizer=tf.contrib.layers.l1_regularizer(1.0),
             )
             b_fc = tf.get_variable(
                 "b",
                 [num_outputs],
-                initializer=tf.constant_initializer(0.1)
+                initializer=tf.constant_initializer(0.1),
             )
             out = nl(tf.matmul(x, W_fc) + b_fc)
             if self.debug_summaries:

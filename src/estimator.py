@@ -9,6 +9,7 @@ from modules.models.utils import parse_hooks, custom_print
 from preprocessing import preprocess_all_if_needed
 from input import input_iterator
 from model import Model
+from train_hooks import PrintAndLogTensorHook
 
 
 class Estimator(TensorflowBaseEstimator):
@@ -51,6 +52,7 @@ class Estimator(TensorflowBaseEstimator):
         Trains and runs validation regularly at the same time
         """
         self.evaluations = []
+        self.training_metrics = []
         def do_evaluate():
             evaluate_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
             assert(evaluate_fn is not None)
@@ -139,8 +141,10 @@ class Estimator(TensorflowBaseEstimator):
                 }
             )
 
+        # Compute loss
         labels = [features[ft_name] for ft_name in predicted_features]
         labels = tf.concat(labels, 1)
+        batch_size = tf.shape(labels)[0]
 
         if regression:
             eval_metric_ops = {
@@ -179,35 +183,51 @@ class Estimator(TensorflowBaseEstimator):
             tf.float32,
         ))
 
-        log_variables = {
-            "loss": loss,
+        # Regularization
+        reg_weight = params['regularization_weight'] if 'regularization_weight' in params else None
+        if reg_weight is None:
+            reg_loss_weighted = 0
+        else:
+            reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+            reg_loss_weighted = reg_weight * tf.reduce_sum(reg_losses)
+        opt_loss = loss + reg_loss_weighted
+
+        # Variables logged during training
+        train_log_variables = {
+            "optimizer_loss": opt_loss,
+            "prediction_loss": loss,
             "loss_v_avg": loss_v_avg,
             "accuracy": accuracy,
         }
         if not regression:
-            log_variables.update({
-                'count_predicted_%s' % predicted_features[i]:
+            train_log_variables.update({
+                'predicted_%s_ratio' % predicted_features[i]:
                 tf.reduce_sum(tf.cast(
                     tf.equal(tf.argmax(predictions, 1), i),
                     tf.float32,
-                ))
+                )) / tf.cast(batch_size, tf.float32)
                 for i in range(num_classes)
             })
+        if reg_weight is not None:
+            train_log_variables.update({
+                'regularization_loss_weighted': reg_loss_weighted,
+            })
 
+        # Optimizer
         optimizer = tf.train.AdamOptimizer()
         train_op = optimizer.minimize(
-            loss=loss,
+            loss=opt_loss,
             global_step=tf.train.get_global_step(),
         )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=loss,
+            loss=opt_loss,
             train_op=train_op,
             eval_metric_ops=eval_metric_ops,
             training_hooks=self.get_training_hooks(
                 params,
-                log_variables=log_variables,
+                log_variables=train_log_variables,
             ),
         )
 
@@ -220,15 +240,16 @@ class Estimator(TensorflowBaseEstimator):
         else:
             training_hooks = []
 
-        if "log_loss_every_n_iter" in params:
+        if "train_log_every_n_iter" in params:
             hook_logged = log_variables.copy()
             hook_logged.update({
                 "global_step": tf.train.get_global_step(),
             })
             training_hooks.append(
-                tf.train.LoggingTensorHook(
+                PrintAndLogTensorHook(
+                    self,
                     hook_logged,
-                    every_n_iter=params["log_loss_every_n_iter"],
+                    every_n_iter=params["train_log_every_n_iter"],
                 )
             )
         return training_hooks
@@ -248,60 +269,52 @@ class Estimator(TensorflowBaseEstimator):
             )
         return _input_fn
 
+    def training_log_values(self, values):
+        self.training_metrics.append(values)
+
     def export_evaluation_stats(self):
         """
         @values is a list of return values of tf.Estimator.evaluate
         """
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
 
         if self.evaluations == []:
             return
-        output_dir = self.config["model_dir"]
         validations_per_epoch = self.run_config['validations_per_epoch']
-        custom_print('[INFO] Exporting evaluations to "%s"' % output_dir)
-
+        self.sumatra_outcome['numeric_outcome'] = {}
+        output_dir = self.config["model_dir"]
+        last_epoch = len(self.evaluations) / float(validations_per_epoch)
+        custom_print('[INFO] Exporting metrics to "%s"' % output_dir)
         # List of dicts to dict of lists
-        v = dict(zip(
+        v_eval = dict(zip(
             self.evaluations[0],
             zip(*[d.values() for d in self.evaluations])
         ))
+        v_train = dict(zip(
+            self.training_metrics[0],
+            zip(*[d.values() for d in self.training_metrics])
+        ))
 
-        self.sumatra_outcome['numeric_outcome'] = {}
+        for v, prefix in [[v_eval, ''], [v_train, 'train/']]:
+            for label, values in v.items():
+                # Need to skip first value, because loss is not evaluated
+                # at the beginning
+                x_values = np.linspace(
+                    0,
+                    last_epoch,
+                    len(values)+1,
+                )
 
-        for label, values in v.items():
-            # Need to skip first value, because loss is not evaluated
-            # at the beginning
-            x_values = np.linspace(
-                0,
-                len(values) / validations_per_epoch,
-                len(values)+1,
-            )
-            plt.plot(
-                x_values[1:],
-                values,
-            )
-            plt.title(label)
-            plt.xlabel('Training iteration')
-            plt.ylabel('%s on validation set' % label)
-            plt.savefig(
-                '%s/eval_%s.png' % (output_dir, label),
-                bbox_inches='tight',
-            )
-            plt.close()
+                # All this data needs to be serializable, so get rid of
+                # numpy arrays, np.float32 etc..
+                self.sumatra_outcome['numeric_outcome'][prefix + label] = {
+                    'type': 'numeric',
+                    'x': x_values[1:].tolist(),
+                    'x_label': 'Training epoch',
+                    'y': np.array(values).tolist(),
+                }
 
-            # All this data needs to be serializable, so get rid of
-            # numpy arrays, np.float32 etc..
-            self.sumatra_outcome['numeric_outcome'][label] = {
-                'type': 'numeric',
-                'x': x_values[1:].tolist(),
-                'x_label': 'Training epoch',
-                'y': np.array(values).tolist(),
-            }
-
-        if 'accuracy' in v and len(v['accuracy']) >= 8:
-            accuracy = v['accuracy']
+        if 'accuracy' in v_eval and len(v_eval['accuracy']) >= 8:
+            accuracy = v_eval['accuracy']
             last_n = int(len(accuracy)*0.25)
             accuracy = accuracy[len(accuracy)-last_n:]
             self.sumatra_outcome['text_outcome'] = \
@@ -318,6 +331,7 @@ class Estimator(TensorflowBaseEstimator):
                 'version': 1,
                 'validations_per_epoch': validations_per_epoch,
                 'evaluate': self.evaluations,
+                'train': self.training_metrics,
             }, f, pkl.HIGHEST_PROTOCOL)
 
         with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
