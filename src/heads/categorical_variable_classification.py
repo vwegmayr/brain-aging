@@ -21,20 +21,20 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             num_buckets,
             key_dtype=tf.int64,
         )
-        labels = hash_table.lookup(features[predict])
-        labels = tf.reshape(tf.one_hot(
-                labels,
+        self.labels_ids = hash_table.lookup(features[predict])
+        self.labels = tf.reshape(tf.one_hot(
+                self.labels_ids,
                 depth=num_buckets,
             ),
             [-1, num_buckets],
         )
-        predictions = model.gen_head(
+        self.predictions = model.gen_head(
             last_layer,
             num_buckets,
         )
         self.loss = tf.losses.softmax_cross_entropy(
-            labels,
-            predictions,
+            self.labels,
+            self.predictions,
         )
         super(CategoricalVariableClassificationHead, self).__init__(
             name=name,
@@ -43,3 +43,18 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             features=features,
             **kwargs
         )
+
+    def get_logged_training_variables(self):
+        training_variables = super(
+            CategoricalVariableClassificationHead,
+            self
+        ).get_logged_training_variables()
+        training_variables.update({
+            'in_top_%s' % k: tf.reduce_mean(tf.cast(tf.nn.in_top_k(
+                predictions=self.predictions,
+                targets=tf.reshape(self.labels_ids, [-1]),
+                k=k,
+            ), tf.float32))
+            for k in [1, 5, 10, 20, 50]
+        })
+        return training_variables
