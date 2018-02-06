@@ -74,6 +74,8 @@ def replace_obj_from_module(strings, dict):
             for full_key in full_keys:
                 if isinstance(dict[full_key], str):
                     module_string = ".".join(dict[full_key].split(".")[:-1])
+                    if module_string == '':
+                        continue
                     module = importlib.import_module(module_string)
                     obj_key = dict[full_key].split(".")[-1]
                     dict[full_key] = getattr(module, obj_key)
