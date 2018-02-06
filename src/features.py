@@ -5,7 +5,7 @@ class FeaturesMgr:
     def __init__(self):
         self.feature_info = {}
 
-    def add(self, s, t=tf.int64, shape=[], doc=None):
+    def add(self, s, t=tf.int64, shape=[1], doc=None):
         self.feature_info[s] = {
             'type': t,
             'shape': shape,

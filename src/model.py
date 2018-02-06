@@ -2,7 +2,6 @@ import tensorflow as tf
 from modules.models.utils import custom_print
 import features as features_def
 from deepnn import DeepNN
-import numpy as np
 
 
 class Model(DeepNN):
@@ -64,17 +63,10 @@ class Model(DeepNN):
             )
         return output
 
-    def gen_head_regressor(self, last_layer, predicted_avg):
-        return predicted_avg + self.fc_layer(
-            last_layer,
-            len(predicted_avg),
-            nl=tf.identity,
-            name="fc_regressor",
-        )
-
-    def gen_head_classifier(self, last_layer, num_classes):
+    def gen_head(self, last_layer, num_classes, **kwargs):
         return self.fc_layer(
             last_layer,
             num_classes,
-            name="fc_classifier",
+            name="fc_generic_head",
+            **kwargs
         )

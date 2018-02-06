@@ -104,128 +104,92 @@ class Estimator(TensorflowBaseEstimator):
         - params: parameters from yaml config file
         - config: tensorflow.python.estimator.run_config.RunConfig
         """
+        NETWORK_BODY_SCOPE = 'network_body'
+        network_heads = params['network_heads']
 
-        prediction_info = params['predicted']
-        num_classes = len(prediction_info)
-        regression = num_classes == 1
-        predicted_features = [i['feature'] for i in prediction_info]
-        predicted_features_avg = [i['average'] for i in prediction_info]
+        with tf.variable_scope(NETWORK_BODY_SCOPE):
+            m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
+            last_layer = m.gen_last_layer(features)
 
-        m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
-        last_layer = m.gen_last_layer(features)
-        if regression:
-            predictions = m.gen_head_regressor(
-                last_layer,
-                predicted_features_avg,
-            )
-            compute_loss_fn = tf.losses.mean_squared_error
-        else:
-            predictions = m.gen_head_classifier(
-                last_layer,
-                num_classes,
-            )
-            compute_loss_fn = tf.losses.softmax_cross_entropy
+        heads = []
+        for head_name, _h in network_heads.items():
+            h = copy.deepcopy(_h)
+            _class = h['class']
+            del h['class']
+            with tf.variable_scope(head_name):
+                heads.append(_class(
+                    name=head_name,
+                    model=m,
+                    last_layer=last_layer,
+                    features=features,
+                    **h
+                ))
 
+        # TODO: Not sure what I'm doing here
         if mode == tf.estimator.ModeKeys.PREDICT:
+            predictions = {}
+            for head in heads:
+                predictions.update(head.get_predictions())
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 predictions={
-                    ft_name: predictions[:, i]
-                    for i, ft_name in enumerate(predicted_features)
+                    ft_name: ft_val
+                    for ft_name, ft_val in predictions.items()
                 },
                 export_outputs={
                     'outputs': tf.estimator.export.PredictOutput({
-                        ft_name: predictions[:, i]
-                        for i, ft_name in enumerate(predicted_features)
+                        ft_name: ft_val
+                        for ft_name, ft_val in predictions.items()
                     })
                 }
             )
 
         # Compute loss
-        labels = [features[ft_name] for ft_name in predicted_features]
-        labels = tf.concat(labels, 1)
-        batch_size = tf.shape(labels)[0]
+        global_loss = 0
+        for head in heads:
+            global_loss += head.get_global_loss_contribution()
 
-        if regression:
-            eval_metric_ops = {
-                'rmse': tf.metrics.root_mean_squared_error(
-                    tf.cast(labels, tf.float32),
-                    predictions,
-                ),
-                'rmse_vs_avg': tf.metrics.root_mean_squared_error(
-                    tf.cast(labels, tf.float32),
-                    predictions*0.0 + predicted_features_avg,
-                ),
-            }
-        else:
-            eval_metric_ops = {
-                'accuracy': tf.metrics.accuracy(
-                    tf.argmax(predictions, 1),
-                    tf.argmax(labels, 1)
-                ),
-                'false_negatives': tf.metrics.false_negatives(
-                    tf.argmax(predictions, 1),
-                    tf.argmax(labels, 1)
-                ),
-                'false_positives': tf.metrics.false_positives(
-                    tf.argmax(predictions, 1),
-                    tf.argmax(labels, 1)
-                ),
-            }
-
-        loss = compute_loss_fn(labels, predictions)
-        loss_v_avg = compute_loss_fn(
-            tf.cast(labels, tf.float32),
-            tf.cast(labels, tf.float32)*0.0 + predicted_features_avg,
-        )
-        accuracy = tf.reduce_mean(tf.cast(
-            tf.equal(tf.argmax(predictions, 1), tf.argmax(labels, 1)),
-            tf.float32,
-        ))
-
-        # Regularization
-        reg_weight = None
-        if 'regularization_weight' in params:
-            reg_weight = params['regularization_weight']
-        if reg_weight is None:
-            reg_loss_weighted = 0
-        else:
-            reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-            reg_loss_weighted = reg_weight * tf.reduce_sum(reg_losses)
-        opt_loss = loss + reg_loss_weighted
-
-        # Variables logged during training
+        # Variables logged during training (append head name as prefix)
         train_log_variables = {
-            "optimizer_loss": opt_loss,
-            "prediction_loss": loss,
-            "loss_v_avg": loss_v_avg,
-            "accuracy": accuracy,
+            "global_optimizer_loss": global_loss,
         }
-        if not regression:
+        for head in heads:
+            variables = head.get_logged_training_variables()
             train_log_variables.update({
-                'predicted_%s_ratio' % predicted_features[i]:
-                tf.reduce_sum(tf.cast(
-                    tf.equal(tf.argmax(predictions, 1), i),
-                    tf.float32,
-                )) / tf.cast(batch_size, tf.float32)
-                for i in range(num_classes)
+                head.name + '/' + var_name: var_value
+                for var_name, var_value in variables.items()
             })
-        if reg_weight is not None:
-            train_log_variables.update({
-                'regularization_loss_weighted': reg_loss_weighted,
+
+        # Metrics for evaluation
+        eval_metric_ops = {}
+        for head in heads:
+            variables = head.get_evaluated_metrics()
+            eval_metric_ops.update({
+                head.name + '/' + var_name: var_value
+                for var_name, var_value in variables.items()
             })
 
         # Optimizer
         optimizer = tf.train.AdamOptimizer()
-        train_op = optimizer.minimize(
-            loss=opt_loss,
-            global_step=tf.train.get_global_step(),
+        train_vars = tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES,
+            scope=NETWORK_BODY_SCOPE,
         )
+        for head in heads:
+            head.register_globally_trained_variables(train_vars)
+
+        train_ops = [optimizer.minimize(
+            loss=global_loss,
+            global_step=tf.train.get_global_step(),
+            var_list=train_vars,
+        )]
+        for head in heads:
+            train_ops.append(head.get_head_train_op(optimizer))
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=opt_loss,
-            train_op=train_op,
+            loss=global_loss,
+            train_op=tf.group(*train_ops),
             eval_metric_ops=eval_metric_ops,
             training_hooks=self.get_training_hooks(
                 params,
@@ -259,7 +223,14 @@ class Estimator(TensorflowBaseEstimator):
     def compute_loss(self, labels, predictions):
         return tf.losses.mean_squared_error(labels, predictions)
 
-    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}, shard=None):
+    def gen_input_fn(
+        self,
+        X,
+        y=None,
+        train=True,
+        input_fn_config={},
+        shard=None,
+    ):
         preprocess_all_if_needed(input_fn_config['data_generation'])
 
         def _input_fn():
@@ -296,7 +267,7 @@ class Estimator(TensorflowBaseEstimator):
             zip(*[d.values() for d in self.training_metrics])
         ))
 
-        for v, prefix in [[v_eval, ''], [v_train, 'train/']]:
+        for v, prefix in [[v_eval, 'eval/'], [v_train, 'train/']]:
             for label, values in v.items():
                 # Need to skip first value, because loss is not evaluated
                 # at the beginning

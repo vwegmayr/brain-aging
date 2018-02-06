@@ -17,8 +17,6 @@ def parser(record):
     parsed = parse_record(record)
 
     def process_feature(ft, ft_info):
-        if ft_info['shape'] == []:
-            return tf.reshape(ft, [1])
         return tf.reshape(ft, ft_info['shape'])
 
     return {
