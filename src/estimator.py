@@ -53,6 +53,7 @@ class Estimator(TensorflowBaseEstimator):
         """
         self.evaluations = []
         self.training_metrics = []
+
         def do_evaluate():
             evaluate_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
             assert(evaluate_fn is not None)
@@ -87,7 +88,6 @@ class Estimator(TensorflowBaseEstimator):
                 )
                 self.estimator.train(input_fn=train_fn)
                 do_evaluate()
-
 
     def score(self, X, y):
         """
@@ -184,7 +184,9 @@ class Estimator(TensorflowBaseEstimator):
         ))
 
         # Regularization
-        reg_weight = params['regularization_weight'] if 'regularization_weight' in params else None
+        reg_weight = None
+        if 'regularization_weight' in params:
+            reg_weight = params['regularization_weight']
         if reg_weight is None:
             reg_loss_weighted = 0
         else:
