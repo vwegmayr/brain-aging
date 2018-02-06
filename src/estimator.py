@@ -253,7 +253,8 @@ class Estimator(TensorflowBaseEstimator):
         if self.evaluations == []:
             return
         validations_per_epoch = self.run_config['validations_per_epoch']
-        self.sumatra_outcome['numeric_outcome'] = {}
+        sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}
+
         output_dir = self.config["model_dir"]
         last_epoch = len(self.evaluations) / float(validations_per_epoch)
         custom_print('[INFO] Exporting metrics to "%s"' % output_dir)
@@ -279,7 +280,7 @@ class Estimator(TensorflowBaseEstimator):
 
                 # All this data needs to be serializable, so get rid of
                 # numpy arrays, np.float32 etc..
-                self.sumatra_outcome['numeric_outcome'][prefix + label] = {
+                sumatra_metrics[prefix + label] = {
                     'type': 'numeric',
                     'x': x_values[1:].tolist(),
                     'x_label': 'Training epoch',
@@ -306,6 +307,14 @@ class Estimator(TensorflowBaseEstimator):
                 'evaluate': self.evaluations,
                 'train': self.training_metrics,
             }, f, pkl.HIGHEST_PROTOCOL)
+
+        # Backward compatibility for sumatra format and metric names
+        old_new_stats = self.run_config['stats_backward_compatibility']
+        for new_name, old_name in old_new_stats.items():
+            if new_name in sumatra_metrics and old_name not in sumatra_metrics:
+                cpy = copy.deepcopy(sumatra_metrics[new_name])
+                cpy['_deprecated'] = True
+                sumatra_metrics[old_name] = cpy
 
         with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
             json.dump(self.sumatra_outcome, outfile)
