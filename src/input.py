@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 import features
 
@@ -60,12 +61,18 @@ def gen_dataset_iterator(config, dataset):
     return iterator.get_next()
 
 
-def input_iterator(config_data_generation, config_data_streaming, shard=None, type='train'):
+def input_iterator(
+    config_data_generation,
+    config_data_streaming,
+    data_path,
+    shard=None,
+    type='train',
+):
     assert(type in ['train', 'test'])
-    dataset = tf.data.TFRecordDataset([
-            config_data_generation['data_converted_directory'] +
-            config_data_generation[type + '_database_file']
-        ],
+    dataset = tf.data.TFRecordDataset([os.path.join(
+            data_path,
+            config_data_generation[type + '_database_file'],
+        )],
         compression_type=config_data_generation['dataset_compression'],
     )
     if shard is not None:

@@ -231,14 +231,15 @@ class Estimator(TensorflowBaseEstimator):
         input_fn_config={},
         shard=None,
     ):
-        preprocess_all_if_needed(input_fn_config['data_generation'])
+        path = preprocess_all_if_needed(input_fn_config['data_generation'])
 
         def _input_fn():
             return input_iterator(
                 input_fn_config['data_generation'],
                 input_fn_config['data_streaming'],
+                data_path=path,
                 shard=shard,
-                type='train' if train else 'test'
+                type='train' if train else 'test',
             )
         return _input_fn
 

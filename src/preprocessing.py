@@ -11,6 +11,9 @@ import random
 import json
 import sys
 import inspect
+import hashlib
+import pickle
+import os
 from modules.models.utils import custom_print
 
 
@@ -24,9 +27,7 @@ def get_data_preprocessing_values(config):
         'sources': [
             json.dumps(s.__dict__) for s in get_all_data_sources(config)
         ],
-        'extractor_source': {
-           inspect.getsource(sys.modules[__name__]),
-        },
+        'extractor_source': inspect.getsource(sys.modules[__name__]),
         'config': config,
         'modules': {
             'tf': tf.__version__,
@@ -35,21 +36,20 @@ def get_data_preprocessing_values(config):
 
 
 class DataAggregator:
-    def __init__(self, config):
+    def __init__(self, config, converted_dir):
         self.config = config
         self.study_to_id = {}
         compression = getattr(
             tf.python_io.TFRecordCompressionType,
             config['dataset_compression'],
         )
-        output_dir = config['data_converted_directory']
         self.writers = {
             'train': tf.python_io.TFRecordWriter(
-                output_dir + config['train_database_file'],
+                os.path.join(converted_dir, config['train_database_file']),
                 tf.python_io.TFRecordOptions(compression),
             ),
             'test': tf.python_io.TFRecordWriter(
-                output_dir + config['test_database_file'],
+                os.path.join(converted_dir, config['test_database_file']),
                 tf.python_io.TFRecordOptions(compression),
             ),
         }
@@ -240,11 +240,11 @@ def get_all_data_sources(config):
     ]
 
 
-def preprocess_all(config):
+def preprocess_all(config, converted_dir):
     custom_print('[INFO] Extracting/preprocessing data...')
     random_state = random.getstate()
     random.seed(config['test_set_random_seed'])
-    dataset = DataAggregator(config)
+    dataset = DataAggregator(config, converted_dir)
     data_sources = get_all_data_sources(config)
     for e in data_sources:
         e.preprocess(dataset)
@@ -253,9 +253,15 @@ def preprocess_all(config):
 
 
 def preprocess_all_if_needed(config):
-    import pickle
-    pkl_file = config['data_converted_directory'] + "extractor_values.pkl"
+    """
+    Saves data to
+    $data_converted_directory/{hash}/...
+    And return this directory
+    """
     current_extractor_values = get_data_preprocessing_values(config)
+    h = hashlib.sha1(json.dumps(current_extractor_values)).hexdigest()[:8]
+    converted_dir = os.path.join(config['data_converted_directory'], h)
+    pkl_file = os.path.join(converted_dir, "extractor_values.pkl")
     try:
         extracted_data_values = pickle.load(open(pkl_file, "rb"))
     except IOError:
@@ -265,7 +271,12 @@ def preprocess_all_if_needed(config):
         custom_print(
             '[INFO] Extracted data is up-to-date. Skipping preprocessing :)'
         )
-        return
-    custom_print('[INFO] Extracted data is outdated.')
-    preprocess_all(config)
+        return converted_dir
+    custom_print(
+        '[INFO] Extracted data (`%s`) is inexistant or outdated.' %
+        converted_dir
+    )
+    os.mkdir(converted_dir)
+    preprocess_all(config, converted_dir)
     pickle.dump(current_extractor_values, open(pkl_file, "wb"))
+    return converted_dir

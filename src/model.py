@@ -50,7 +50,6 @@ class Model(DeepNN):
             256,
             name="fc_features",
         )
-        output = self.batch_norm(fc, scope='ft_norm')
 
         # Summaries:
         with tf.variable_scope("b1/conv", reuse=True):
@@ -61,12 +60,20 @@ class Model(DeepNN):
                 ),
                 "Conv2D"
             )
-        return output
+        return fc
 
-    def gen_head(self, last_layer, num_classes, **kwargs):
-        return self.fc_layer(
-            last_layer,
+    def gen_head(self, fc, num_classes, **kwargs):
+        fc = self.batch_norm(fc, scope='ft_norm')
+        fc = self.fc_layer(
+            fc,
+            256,
+            name="fc_head1",
+        )
+        fc = self.batch_norm(fc, scope='ft_norm2')
+        fc = self.fc_layer(
+            fc,
             num_classes,
-            name="fc_generic_head",
+            name="fc_head2",
             **kwargs
         )
+        return fc
