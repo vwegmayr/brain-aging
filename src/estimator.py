@@ -287,8 +287,9 @@ class Estimator(TensorflowBaseEstimator):
                     'y': np.array(values).tolist(),
                 }
 
-        if 'accuracy' in v_eval and len(v_eval['accuracy']) >= 8:
-            accuracy = v_eval['accuracy']
+        accuracy_key = 'classifier/accuracy'
+        if accuracy_key in v_eval and len(v_eval[accuracy_key]) >= 8:
+            accuracy = v_eval[accuracy_key]
             last_n = int(len(accuracy)*0.25)
             accuracy = accuracy[len(accuracy)-last_n:]
             self.sumatra_outcome['text_outcome'] = \
