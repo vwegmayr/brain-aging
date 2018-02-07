@@ -26,6 +26,13 @@ params:
             features_group:
               study_image_id: 1
           patients_features: data/raw/csv/adni_aibl.csv
+        # - name: PPMI
+        #   glob: /local/PPMI/mni_registered/I*.nii.gz
+        #   features_from_filename:
+        #     regexp: .*/I(\d+)\.nii\.gz
+        #     features_group:
+        #       study_image_id: 1
+        #   patients_features: data/raw/csv/ppmi.csv
         # - name: KOLN_T1
         #   glob: data/raw/KOLN_T1/*/*/*.nii.gz
         #   features_from_filename:

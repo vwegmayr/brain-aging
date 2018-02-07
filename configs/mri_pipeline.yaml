@@ -1,0 +1,20 @@
+# smt run -r "PPMI conversion" --config configs/mri_pipeline.yaml -S /local/dhaziza/data -a transform
+# Preprocess PPMI data
+class: src.data.mri_pipeline.MriPreprocessingPipeline
+params:
+  path: /local/PPMI
+  files_glob: /local/PPMI/raw/*/*/*/*/*.nii
+  extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
+  params:
+    brain_extraction:
+      frac_intens_thres: 0.35
+      bias: True
+      overwrite: False
+    template_registration:
+      cost: normcorr
+      searchcost: normcorr
+      overwrite: False
+      mri_template: /local/fsl/data/standard/MNI152lin_T1_1mm.nii.gz
+  shard:
+    num_workers: 1
+    worker_index: 0

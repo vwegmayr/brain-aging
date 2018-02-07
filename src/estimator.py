@@ -6,7 +6,7 @@ import copy
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
-from preprocessing import preprocess_all_if_needed
+from data.data_to_tf import generate_tf_dataset
 from input import input_iterator
 from model import Model
 from train_hooks import PrintAndLogTensorHook
@@ -231,7 +231,7 @@ class Estimator(TensorflowBaseEstimator):
         input_fn_config={},
         shard=None,
     ):
-        path = preprocess_all_if_needed(input_fn_config['data_generation'])
+        path = generate_tf_dataset(input_fn_config['data_generation'])
 
         def _input_fn():
             return input_iterator(

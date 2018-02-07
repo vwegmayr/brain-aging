@@ -14,7 +14,12 @@ import inspect
 import hashlib
 import pickle
 import os
+import glob
+import csv
+import re
+import nibabel as nib
 from modules.models.utils import custom_print
+import src.features as ft_def
 
 
 def get_data_preprocessing_values(config):
@@ -80,8 +85,6 @@ class DataAggregator:
         return self.patient_to_writer[patient_id]
 
     def add_image(self, image_path, int64_features):
-        import nibabel as nib
-        import features
         Features = tf.train.Features
         Feature = tf.train.Feature
         Int64List = tf.train.Int64List
@@ -109,15 +112,15 @@ class DataAggregator:
             k: _int64_to_feature(v)
             for k, v in int64_features.items()
         }
-        img_features[features.STUDY_ID] = _int64_to_feature(self.curr_study_id)
-        img_features[features.MRI] = Feature(
+        img_features[ft_def.STUDY_ID] = _int64_to_feature(self.curr_study_id)
+        img_features[ft_def.MRI] = Feature(
             int64_list=Int64List(
                 value=img_data.reshape([-1]).astype(np.int64)
             ),
         )
 
         # Check we have all features set
-        for ft_name in features.all_features.feature_info.keys():
+        for ft_name in ft_def.all_features.feature_info.keys():
             if ft_name not in img_features:
                 custom_print('[FATAL] Feature `%s` missing for %s' % (
                     ft_name, image_path))
@@ -125,7 +128,7 @@ class DataAggregator:
 
         example = Example(features=Features(feature=img_features))
         self.get_writer_for_image(
-            int64_features[features.STUDY_PATIENT_ID]
+            int64_features[ft_def.STUDY_PATIENT_ID]
         ).write(example.SerializeToString())
         self.stats[self.curr_study_name]['success'] += 1
 
@@ -147,7 +150,6 @@ class DataAggregator:
 
 class DataSource(object):
     def __init__(self, config):
-        import glob
         self.config = config
         self.load_patients_features(config['patients_features'])
         self.all_files = glob.glob(config['glob'])
@@ -160,8 +162,6 @@ class DataSource(object):
         - One column per feature from features.py file, excluding the ones
           extracted from the file name (typically study id and image id)
         """
-        import features
-        import csv
 
         self.patients_ft = {}
         self.images_ft = {}
@@ -172,19 +172,17 @@ class DataSource(object):
                 ft = {
                     col_name: int(col_value)
                     for col_name, col_value in row.items()
-                    if col_name in features.all_features.feature_info
+                    if col_name in ft_def.all_features.feature_info
                 }
                 # Register them for later access
-                if features.STUDY_IMAGE_ID in ft:
-                    image_id = ft[features.STUDY_IMAGE_ID]
+                if ft_def.STUDY_IMAGE_ID in ft:
+                    image_id = ft[ft_def.STUDY_IMAGE_ID]
                     self.images_ft[image_id] = ft
-                if features.STUDY_PATIENT_ID in ft:
-                    patient_id = ft[features.STUDY_PATIENT_ID]
+                if ft_def.STUDY_PATIENT_ID in ft:
+                    patient_id = ft[ft_def.STUDY_PATIENT_ID]
                     self.patients_ft[patient_id] = ft
 
     def preprocess(self, dataset):
-        import re
-        import features
         dataset.begin_study(self.config['name'], len(self.all_files))
 
         random.shuffle(self.all_files)
@@ -193,7 +191,7 @@ class DataSource(object):
         features_from_filename = self.config['features_from_filename']
         features_in_regexp = features_from_filename['features_group']
         assert(all([
-            n in features.all_features.feature_info
+            n in ft_def.all_features.feature_info
             for n in features_in_regexp
         ]))
         extract_from_path = re.compile(features_from_filename['regexp'])
@@ -206,24 +204,24 @@ class DataSource(object):
                 continue
             for ft_name, ft_group in features_in_regexp.items():
                 ft[ft_name] = int(match.group(ft_group))
-            if features.STUDY_PATIENT_ID not in ft and \
-                    features.STUDY_IMAGE_ID not in ft:
+            if ft_def.STUDY_PATIENT_ID not in ft and \
+                    ft_def.STUDY_IMAGE_ID not in ft:
                 dataset.add_error(
                     f,
                     'Regexp should provide ft `%s` or `%s`' % (
-                        features.STUDY_IMAGE_ID, features.STUDY_PATIENT_ID
+                        ft_def.STUDY_IMAGE_ID, ft_def.STUDY_PATIENT_ID
                     ))
                 continue
             # Add features from CSV - by image ID
             found_csv_entry = False
-            if features.STUDY_IMAGE_ID in ft:
-                image_id = ft[features.STUDY_IMAGE_ID]
+            if ft_def.STUDY_IMAGE_ID in ft:
+                image_id = ft[ft_def.STUDY_IMAGE_ID]
                 if image_id in self.images_ft:
                     ft.update(self.images_ft[image_id])
                     found_csv_entry = True
             # Or by patient ID
-            if features.STUDY_PATIENT_ID in ft:
-                patient_id = ft[features.STUDY_PATIENT_ID]
+            if ft_def.STUDY_PATIENT_ID in ft:
+                patient_id = ft[ft_def.STUDY_PATIENT_ID]
                 if patient_id in self.patients_ft:
                     ft.update(self.patients_ft[patient_id])
                     found_csv_entry = True
@@ -252,7 +250,7 @@ def preprocess_all(config, converted_dir):
     random.setstate(random_state)
 
 
-def preprocess_all_if_needed(config):
+def generate_tf_dataset(config):
     """
     Saves data to
     $data_converted_directory/{hash}/...
@@ -269,11 +267,12 @@ def preprocess_all_if_needed(config):
 
     if extracted_data_values == current_extractor_values:
         custom_print(
-            '[INFO] Extracted data is up-to-date. Skipping preprocessing :)'
+            '[INFO] Extracted TF Dataset is up-to-date. ' +
+            'Skipping dataset generation :)'
         )
         return converted_dir
     custom_print(
-        '[INFO] Extracted data (`%s`) is inexistant or outdated.' %
+        '[INFO] Extracted TF Dataset (`%s`) is inexistant or outdated.' %
         converted_dir
     )
     os.mkdir(converted_dir)
