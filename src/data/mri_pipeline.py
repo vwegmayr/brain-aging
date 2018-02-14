@@ -20,6 +20,7 @@ class MriPreprocessingPipeline(object):
         path,
         files_glob,
         extract_image_id_regexp,
+        regexp_image_id_group,
         shard=None,
         params={},
     ):
@@ -28,6 +29,7 @@ class MriPreprocessingPipeline(object):
         self.all_files = sorted(glob.glob(files_glob))
         self.files = self.all_files
         self.extract_image_id_regexp = re.compile(extract_image_id_regexp)
+        self.regexp_image_id_group = regexp_image_id_group
         if shard is not None:
             self.shard(**shard)
 
@@ -45,7 +47,7 @@ class MriPreprocessingPipeline(object):
         self._mkdir('02_registered')
         custom_print('Applying MRI pipeline to %s files' % (len(self.files)))
         for i, mri_raw in enumerate(self.files):
-            image_id = self.extract_image_id_regexp.match(mri_raw).group(1)
+            image_id = self.extract_image_id_regexp.match(mri_raw).group(self.regexp_image_id_group)
             custom_print('Image %s/%s [image_id = %s]' % (
                 i, len(self.files), image_id))
 

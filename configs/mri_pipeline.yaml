@@ -5,6 +5,7 @@ params:
   path: /local/PPMI
   files_glob: /local/PPMI/raw/*/*/*/*/*.nii
   extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
+  regexp_image_id_group: 2
   params:
     brain_extraction:
       frac_intens_thres: 0.35
@@ -16,5 +17,5 @@ params:
       overwrite: False
       mri_template: /local/fsl/data/standard/MNI152lin_T1_1mm.nii.gz
   shard:
-    num_workers: 1
-    worker_index: 0
+    num_workers: 5
+    worker_index: 4
