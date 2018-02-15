@@ -16,6 +16,19 @@ params:
       searchcost: normcorr
       overwrite: False
       mri_template: /local/fsl/data/standard/MNI152lin_T1_1mm.nii.gz
+  filter_xml:
+    files: /local/PPMI/raw/*_I*.xml
+    xml_image_id: ./project/subject/study/imagingProtocol/imageUID
+    filters:
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
+        value:
+            eq: T1
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
+        value:
+            lt: 50
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix X']
+        value:
+            st: 600
   shard:
-    num_workers: 5
-    worker_index: 4
+    num_workers: 1
+    worker_index: 0
