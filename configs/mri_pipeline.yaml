@@ -15,7 +15,7 @@ params:
       cost: normcorr
       searchcost: normcorr
       overwrite: False
-      mri_template: /local/fsl/data/standard/MNI152lin_T1_1mm.nii.gz
+      mri_template: /local/fsl/data/standard/MNI152_T1_1mm_brain.nii.gz
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
