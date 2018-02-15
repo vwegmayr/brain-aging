@@ -30,6 +30,7 @@ class NetworkHeadBase(object):
             - head_l1_regularization:
                 If not null, a L1 regularization term is added to loss
                     (either local loss, or global loss)
+                Regularization only affects head variables (not network body)
         """
         # Sanity checks
         assert(hasattr(self, 'loss'))
@@ -52,6 +53,7 @@ class NetworkHeadBase(object):
         self.head_training_loss = self._get_head_training_loss()
         self.global_loss_contribution = self._get_global_loss_contribution()
 
+    # -------------------------- Evaluation/training metrics
     def get_logged_training_variables(self):
         train_variables = {'loss': self.loss}
         if self.l1_regularization_loss_raw is not None:
@@ -71,6 +73,13 @@ class NetworkHeadBase(object):
     def get_evaluated_metrics(self):
         return {}
 
+    def get_predictions(self):
+        """
+        Returns a dict {name: tensor} of predictions
+        """
+        return {}
+
+    # -------------------------- Basic getters
     def get_global_loss_contribution(self):
         """
         Returns contribution to global loss
@@ -91,12 +100,7 @@ class NetworkHeadBase(object):
             var_list=self.trainable_variables,
         )
 
-    def get_predictions(self):
-        """
-        Returns a dict {name: tensor} of predictions
-        """
-        return {}
-
+    # -------------------------- Local and Global training distinction
     def register_globally_trained_variables(self, l):
         if not self.train_only_globally:
             return
@@ -104,6 +108,9 @@ class NetworkHeadBase(object):
             l.append(v)
 
     def _set_regularization_loss(self):
+        """
+        L1 Regularization of the head variables
+        """
         self.l1_regularization_loss_raw = None
         self.l1_regularization_loss = None
         if self.head_l1_regularization is None:
@@ -121,22 +128,19 @@ class NetworkHeadBase(object):
         if self.train_only_globally:
             return None
 
-        # Handle regularization
-        head_loss = self.loss
-        if self.l1_regularization_loss is not None:
-            head_loss += self.l1_regularization_loss
-        return head_loss
+        if self.l1_regularization_loss is None:
+            return self.loss
+        else:
+            return self.loss + self.l1_regularization_loss
 
     def _get_global_loss_contribution(self):
         if self.loss_weight_in_global_loss is None:
             return None
 
-        loss = 0
+        loss_reg = self.l1_regularization_loss
+        loss_weighted = self.loss * self.loss_weight_in_global_loss
 
         # Handle regularization if no head-only training is done
-        if self.train_only_globally and \
-                self.l1_regularization_loss is not None:
-            loss = self.l1_regularization_loss
-
-        loss += self.loss * self.loss_weight_in_global_loss
-        return loss
+        if self.train_only_globally and loss_reg is not None:
+            return loss_weighted + loss_reg
+        return loss_weighted

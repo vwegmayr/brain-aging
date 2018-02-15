@@ -75,7 +75,7 @@ class MriPreprocessingPipeline(object):
             else:
                 discarded_count += 1
         custom_print('[filter_xml] %s images discarded' % (discarded_count))
-        
+
     def shard(self, worker_index, num_workers):
         custom_print('SHARDS: Worker %s/%s' % (worker_index+1, num_workers))
         assert(worker_index < num_workers)
