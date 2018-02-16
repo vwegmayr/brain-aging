@@ -87,7 +87,8 @@ params:
         loss_weight_in_global_loss: null  # <= 0 for adv network
         head_l1_regularization: null
         train_only_globally: False
-
+    network_train_ops_settings:
+      alternative_training_steps: 0  # 1280
   run_config:
     num_epochs: 15
     validations_per_epoch: 2

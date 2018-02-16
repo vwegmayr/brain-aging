@@ -170,7 +170,6 @@ class Estimator(TensorflowBaseEstimator):
             })
 
         # Optimizer
-        optimizer = tf.train.AdamOptimizer()
         train_vars = tf.get_collection(
             tf.GraphKeys.TRAINABLE_VARIABLES,
             scope=NETWORK_BODY_SCOPE,
@@ -178,13 +177,13 @@ class Estimator(TensorflowBaseEstimator):
         for head in heads:
             head.register_globally_trained_variables(train_vars)
 
-        train_ops = [optimizer.minimize(
-            loss=global_loss,
-            global_step=tf.train.get_global_step(),
-            var_list=train_vars,
-        )]
-        for head in heads:
-            train_ops.append(head.get_head_train_op(optimizer))
+        train_ops = self.generate_train_ops(
+            train_log_variables,
+            global_loss,
+            train_vars,
+            heads,
+            **params['network_train_ops_settings']
+        )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
@@ -196,6 +195,61 @@ class Estimator(TensorflowBaseEstimator):
                 log_variables=train_log_variables,
             ),
         )
+
+    def generate_train_ops(
+        self,
+        train_log_variables,
+        global_loss,
+        train_vars,
+        heads,
+        # Arguments from Config
+        alternative_training_steps=0,
+    ):
+        """
+        Generates training operations for the network.
+        Basically it is `global_train_op` and `heads_train_op`, but it's
+        possible to train alternatively (with `alternative_training_steps` > 0)
+        """
+        optimizer = tf.train.AdamOptimizer()
+
+        def global_train_op():
+            return optimizer.minimize(loss=global_loss, var_list=train_vars)
+
+        def heads_train_op():
+            ops = []
+            for head in heads:
+                with tf.variable_scope(head.get_name()):
+                    ops.append(head.get_head_train_op(optimizer))
+            return tf.group(*ops)
+
+        global_step = tf.train.get_global_step()
+        global_step_incr = tf.assign(global_step, global_step+1)
+
+        if alternative_training_steps == 0:
+            return [global_step_incr, global_train_op(), heads_train_op()]
+
+        # Rounds based training
+        _round = tf.cast(
+            tf.mod(tf.floordiv(global_step, alternative_training_steps), 2),
+            tf.int32,
+        )
+        train_log_variables['_round'] = _round
+
+        return [
+            global_step_incr,
+            tf.cond(
+                tf.equal(_round, 0),
+                global_train_op,
+                lambda: tf.no_op(),
+                name="condRoundEq0",
+            ),
+            tf.cond(
+                tf.equal(_round, 1),
+                heads_train_op,
+                lambda: tf.no_op(),
+                name="condRoundEq1",
+            ),
+        ]
 
     def get_training_hooks(self, params, log_variables):
         if "hooks" in params:

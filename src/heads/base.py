@@ -100,6 +100,9 @@ class NetworkHeadBase(object):
             var_list=self.trainable_variables,
         )
 
+    def get_name(self):
+        return self.name
+
     # -------------------------- Local and Global training distinction
     def register_globally_trained_variables(self, l):
         if not self.train_only_globally:
