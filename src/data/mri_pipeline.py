@@ -86,8 +86,9 @@ class MriPreprocessingPipeline(object):
         ]
 
     def transform(self, X=None):
-        self._mkdir('01_brain_extracted')
-        self._mkdir('02_registered')
+        folders = ['01_brain_extracted', '02_registered']
+        for f in folders:
+            self._mkdir(f)
         custom_print('Applying MRI pipeline to %s files' % (len(self.files)))
         for i, mri_raw in enumerate(self.files):
             image_id = self.extract_image_id_regexp.match(
@@ -101,19 +102,17 @@ class MriPreprocessingPipeline(object):
                     custom_print('... Skipped')
                     continue
 
-            mri_brain_extracted = os.path.join(
-                self.path,
-                '01_brain_extracted',
-                'I{image_id}.nii.gz'.format(image_id=image_id),
-            )
-            mri_registered = os.path.join(
-                self.path,
-                '02_registered',
-                'I{image_id}.nii.gz'.format(image_id=image_id),
-            )
-            self.brain_extraction(mri_raw, mri_brain_extracted)
-            self.template_registration(mri_brain_extracted, mri_registered)
+            paths = [mri_raw] + [os.path.join(
+                    self.path,
+                    folder,
+                    'I{image_id}.nii.gz'.format(image_id=image_id),
+                )
+                for folder in folders
+            ]
+            self.brain_extraction(paths[0], paths[1])
+            self.template_registration(paths[1], paths[2])
 
+    # ------------------------- Pipeline main steps
     def brain_extraction(self, mri_image, mri_output):
         params = self.params['brain_extraction']
         if os.path.exists(mri_output) and not params['overwrite']:
@@ -150,6 +149,7 @@ class MriPreprocessingPipeline(object):
         )
         self._exec(cmd)
 
+    # ------------------------- Utils and wrappers
     def _exec(self, cmd):
         custom_print('[Exec] ' + cmd)
         os.environ['FSLOUTPUTTYPE'] = 'NIFTI_GZ'
