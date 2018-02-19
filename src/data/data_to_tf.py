@@ -96,7 +96,10 @@ class DataAggregator:
         self.count += 1
 
         img = nib.load(image_path)
-        img_data = img.get_data()
+        img_data = self._norm(
+            img.get_data(),
+            **self.config['image_normalization']
+        )
         if list(img_data.shape) != list(self.config['image_shape']):
             self.add_error(
                 image_path,
@@ -146,6 +149,16 @@ class DataAggregator:
             if len(v['errors']) > 0:
                 custom_print('    First error:')
                 custom_print('    %s' % v['errors'][0])
+
+    def _norm(self, mri, enable, outlier_percentile):
+        if not enable:
+            return mri
+        max_value = np.percentile(mri, outlier_percentile)
+        mri_for_stats = np.copy(mri)
+        mri_for_stats[mri > max_value] = max_value
+        m = np.mean(mri_for_stats)
+        std = np.std(mri_for_stats)
+        return (mri - m) / std
 
 
 class DataSource(object):

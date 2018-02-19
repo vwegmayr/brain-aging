@@ -17,6 +17,9 @@ params:
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
       test_set_random_seed: 0
+      image_normalization:
+        enable: True
+        outlier_percentile: 99
       data_sources:
         - name: ADNI_AIBL
           # Skip augmented data. Example file '273666_normalized.nii.gz'
