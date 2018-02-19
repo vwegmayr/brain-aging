@@ -12,11 +12,11 @@ import json
 import sys
 import inspect
 import hashlib
-import pickle
 import os
 import glob
 import csv
 import re
+import datetime
 import nibabel as nib
 from modules.models.utils import custom_print
 import src.features as ft_def
@@ -269,26 +269,53 @@ def generate_tf_dataset(config):
     $data_converted_directory/{hash}/...
     And return this directory
     """
+    def obj_hash(obj):
+        return hashlib.sha1(json.dumps(
+            obj,
+            ensure_ascii=False,
+            sort_keys=True,
+        )).hexdigest()[:8]
     current_extractor_values = get_data_preprocessing_values(config)
-    h = hashlib.sha1(json.dumps(current_extractor_values)).hexdigest()[:8]
+    h = obj_hash(current_extractor_values)
     converted_dir = os.path.join(config['data_converted_directory'], h)
-    pkl_file = os.path.join(converted_dir, "extractor_values.pkl")
-    try:
-        extracted_data_values = pickle.load(open(pkl_file, "rb"))
-    except IOError:
-        extracted_data_values = {}
-
-    if extracted_data_values == current_extractor_values:
+    extraction_finished_file = os.path.join(converted_dir, "done.json")
+    if os.path.isfile(extraction_finished_file):
         custom_print(
-            '[INFO] Extracted TF Dataset is up-to-date. ' +
-            'Skipping dataset generation :)'
+            '[INFO] Extracted TF Dataset `' + converted_dir +
+            '` is up-to-date. Skipping dataset generation :)'
         )
         return converted_dir
     custom_print(
-        '[INFO] Extracted TF Dataset (`%s`) is inexistant or outdated.' %
+        '[INFO] TF Dataset in `%s` is inexistant.' %
         converted_dir
     )
-    os.mkdir(converted_dir)
+    try:
+        os.mkdir(converted_dir)
+    except OSError:
+        custom_print(
+            '[FATAL] Directory already exists. Maybe another process ' +
+            'is currently generating data? If not, rm folder and try again.'
+        )
+        sys.exit(42)
+    json.dump(
+        current_extractor_values,
+        open(os.path.join(converted_dir, "extractor_values.json"), "wb"),
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=4,
+    )
+
+    extract_start = datetime.datetime.now()
     preprocess_all(config, converted_dir)
-    pickle.dump(current_extractor_values, open(pkl_file, "wb"))
+    extract_end = datetime.datetime.now()
+    json.dump({
+            'start_time': str(extract_start),
+            'end_time': str(extract_end),
+            'elapsed': str(extract_end - extract_start),
+        },
+        open(extraction_finished_file, "wb"),
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=4,
+    )
     return converted_dir
