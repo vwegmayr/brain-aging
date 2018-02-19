@@ -8,6 +8,15 @@ class DeepNN(object):
     def __init__(self):
         self.is_training = True
         self.debug_summaries = False
+        self.cnn_layers_shapes = []
+
+    def on_cnn_layer(self, layer, name=None):
+        if name is None:
+            name = layer.name.split('/')[1]
+        self.cnn_layers_shapes.append({
+            'shape': layer.get_shape().as_list(),
+            'name': name,
+        })
 
     def variable_summaries(self, var, name, fullcontent=True):
         """Attach a lot of summaries to a Tensor."""
@@ -102,7 +111,7 @@ class DeepNN(object):
                      pool=True,
                      padding='VALID',
                      mpadding='VALID',
-                     scope="unnamed_conv",
+                     scope="conv3d_layer",
                      bn=True):
         with tf.variable_scope(scope):
             conv_input_shape = x.get_shape()[1:].as_list()
@@ -147,6 +156,59 @@ class DeepNN(object):
             ))
         return out
 
+    def conv3d_layer_transpose(self,
+        x,
+        num_filters,
+        output_shape,
+        filter_weights=[3, 3, 3],
+        nl=tf.nn.relu,
+        strides=[2, 2, 2],
+        padding='SAME',
+        scope="conv3d_layer_transpose",
+        bn=True,
+    ):
+        """
+        Wrapper for tf.nn.conv3d_transpose, that can be used for "Deconvolution Networks"
+        """
+        assert(len(output_shape) == 5)
+        output_shape = [tf.shape(x)[0]] + output_shape[1:]  # Dynamic batch_size
+        with tf.variable_scope(scope):
+            conv_input_shape = x.get_shape()[1:].as_list()
+            input_channels = conv_input_shape[3]
+            W_shape = filter_weights + [num_filters, input_channels]
+            W = tf.get_variable(
+                "w",
+                shape=W_shape,
+                initializer=tf.contrib.layers.xavier_initializer(),
+                regularizer=tf.contrib.layers.l1_regularizer(1.0),
+            )
+            out = tf.nn.conv3d_transpose(
+                value=x,
+                filter=W,
+                output_shape=output_shape,
+                strides=[1] + strides + [1],
+                padding=padding,
+            )
+            if bn:
+                out = self.batch_norm(out)
+            else:
+                b = tf.get_variable(
+                    "b",
+                    [num_filters],
+                    initializer=tf.constant_initializer(0.1),
+                )
+                out += b
+            out = nl(out)
+            if self.debug_summaries:
+                self.variable_summaries(W, "w")
+                self.variable_summaries(out, "output")
+            custom_print('%s -> [%s] -> %s' % (
+                conv_input_shape,
+                tf.contrib.framework.get_name_scope(),
+                out.get_shape()[1:].as_list()
+            ))
+        return out
+
     def fc_layer(self, x, num_outputs, nl=tf.nn.relu, name="unnamedfc"):
         with tf.variable_scope(name):
             num_inputs = x.get_shape()[1:].as_list()[0]
@@ -166,6 +228,11 @@ class DeepNN(object):
                 self.variable_summaries(W_fc, "W")
                 self.variable_summaries(b_fc, "b")
                 self.variable_summaries(out, "output")
+            custom_print('%s -> [%s] -> %s' % (
+                x.get_shape().as_list()[1:],
+                tf.contrib.framework.get_name_scope(),
+                out.get_shape().as_list()[1:],
+            ))
         return out
 
     def batch_norm(self, x, **kwargs):

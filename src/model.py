@@ -1,3 +1,4 @@
+import copy
 import tensorflow as tf
 from modules.models.utils import custom_print
 import features as features_def
@@ -15,7 +16,7 @@ class Model(DeepNN):
         mri = self.batch_norm(mri, scope="norm_input")
 
         def conv_wrap(conv, filters, size, scope, pool=True):
-            return self.conv3d_layer(
+            out = self.conv3d_layer(
                 conv,
                 filters,
                 size,
@@ -25,9 +26,13 @@ class Model(DeepNN):
                 mpadding='SAME',
                 padding='SAME',
             )
+            self.on_cnn_layer(out)
+            return out
 
         conv = mri
+        self.on_cnn_layer(conv, "input")
         conv = self.conv2d_shared_all_dims_layer(conv, 'b1')
+        self.on_cnn_layer(conv)
         conv = conv_wrap(conv, 60, [5, 5, 5], "c2")
         conv = conv_wrap(conv, 60, [5, 5, 5], "c3")
         conv = conv_wrap(conv, 100, [3, 3, 3], "c4")
@@ -77,3 +82,37 @@ class Model(DeepNN):
             **kwargs
         )
         return fc
+
+    def gen_deconv_head(self, fc):
+        assert(len(self.cnn_layers_shapes) > 0)
+        assert(len(fc.get_shape()) == 2)
+        fc = self.batch_norm(fc, scope='ft_norm')
+        in_ft = fc.get_shape().as_list()[1]
+        conv = tf.reshape(fc, [tf.shape(fc)[0], 1, 1, 1, in_ft])
+        ft_count = [256, 256, 64, 64, 24, 1]
+
+        # Handle first layer manually - manual broadcast
+        first_shape = copy.copy(self.cnn_layers_shapes[-1]['shape'])
+        first_shape[-1] = ft_count[0]
+        first_shape[0] = tf.shape(fc)[0]
+        conv = tf.ones(first_shape) * conv
+
+        non_linearities = [tf.nn.relu] * len(self.cnn_layers_shapes)
+        non_linearities[-1] = tf.identity
+        non_linearities[-2] = tf.nn.elu
+
+        for layer, num_filters, nl in zip(
+            reversed(self.cnn_layers_shapes),
+            ft_count,
+            non_linearities,
+        )[1:]:
+            output_shape = copy.copy(layer['shape'])
+            output_shape[-1] = num_filters
+            conv = self.conv3d_layer_transpose(
+                conv,
+                num_filters=num_filters,
+                output_shape=output_shape,
+                scope=layer['name'],
+                nl=nl,
+            )
+        return conv
