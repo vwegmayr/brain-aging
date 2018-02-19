@@ -71,7 +71,9 @@ class NetworkHeadBase(object):
         return train_variables
 
     def get_evaluated_metrics(self):
-        return {}
+        return {
+            'loss': tf.metrics.mean(self.loss),
+        }
 
     def get_predictions(self):
         """
