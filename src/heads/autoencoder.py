@@ -17,10 +17,22 @@ class AutoencoderHead(NetworkHeadBase):
         **kwargs
     ):
         self.labels = features[ft_def.MRI]
-        self.predictions = tf.reshape(
+        mri_shape = self.labels.get_shape().as_list()[1:]
+        predictions = tf.reshape(
             model.gen_deconv_head(last_layer),
-            [-1] + self.labels.get_shape().as_list()[1:],
+            [-1] + mri_shape,
         )
+        mri_avg = tf.get_variable(
+            "mri_avg",
+            shape=mri_shape,
+            initializer=tf.zeros_initializer(),
+        )
+        mri_mult_factor = tf.get_variable(
+            "mri_mult_factor",
+            shape=mri_shape,
+            initializer=tf.zeros_initializer(),
+        )
+        self.predictions = mri_avg + tf.multiply(predictions, mri_mult_factor)
         self.loss = tf.losses.mean_squared_error(
             self.labels,
             self.predictions,
@@ -33,7 +45,34 @@ class AutoencoderHead(NetworkHeadBase):
             **kwargs
         )
 
-    def get_logged_training_variables(self):
-        training_variables = \
-            super(AutoencoderHead, self).get_logged_training_variables()
-        return training_variables
+        self.image_summary()
+
+    def image_summary(self):
+        mid_shape = [0] + [
+            self.labels.get_shape().as_list()[i] / 2
+            for i in [1, 2, 3]
+        ]
+        tf.summary.image(
+            "GroundTruthXY",
+            self.labels[0, :, :, mid_shape[3]],
+        )
+        tf.summary.image(
+            "PredictionXY",
+            self.predictions[0, :, :, mid_shape[3]],
+        )
+        tf.summary.image(
+            "GroundTruthXZ",
+            self.labels[0, :, mid_shape[2], :],
+        )
+        tf.summary.image(
+            "PredictionXZ",
+            self.predictions[0, :, mid_shape[2], :],
+        )
+        tf.summary.image(
+            "GroundTruthYZ",
+            self.labels[0, mid_shape[1], :, :],
+        )
+        tf.summary.image(
+            "PredictionYZ",
+            self.predictions[0, mid_shape[1], :, :],
+        )
