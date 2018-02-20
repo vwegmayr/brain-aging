@@ -1,14 +1,14 @@
 import os
 import tensorflow as tf
-import features
+import features as ft_def
 
 
 def parse_record(record):
     # MRI image shape should be set at this point (taken from generator config)
-    assert(features.all_features.feature_info[features.MRI]['shape'] != [])
+    assert(ft_def.all_features.feature_info[ft_def.MRI]['shape'] != [])
     keys_to_features = {
         name: tf.FixedLenFeature(shape=info['shape'], dtype=info['type'])
-        for (name, info) in features.all_features.feature_info.items()}
+        for (name, info) in ft_def.all_features.feature_info.items()}
 
     parsed = tf.parse_single_example(record, features=keys_to_features)
     return parsed
@@ -22,13 +22,23 @@ def parser(record):
 
     return {
         name: process_feature(parsed[name], info)
-        for (name, info) in features.all_features.feature_info.items()
+        for (name, info) in ft_def.all_features.feature_info.items()
     }
 
 
-def distort(record):
-    record[features.MRI] = tf.random_crop(record[features.MRI], [85, 95, 85])
-    return record
+def distort(records):
+    mri_shape = records[ft_def.MRI].get_shape().as_list()
+    if len(mri_shape) == 4:
+        # TODO: Predict mode, then batch_size = ?
+        mri_shape[0] = 1
+    mri_shape[-3] = 85
+    mri_shape[-2] = 95
+    mri_shape[-1] = 85
+    records[ft_def.MRI] = tf.random_crop(
+        records[ft_def.MRI],
+        mri_shape,
+    )
+    return records
 
 
 def dataset_filter(record, keep_when_any_is_true=None):

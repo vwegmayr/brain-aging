@@ -7,7 +7,8 @@ import copy
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
 from data.data_to_tf import generate_tf_dataset
-from input import input_iterator
+import features as ft_def
+from input import input_iterator, distort
 from model import Model
 from train_hooks import PrintAndLogTensorHook
 
@@ -16,7 +17,6 @@ class Estimator(TensorflowBaseEstimator):
     """docstring for Estimator"""
 
     def __init__(self, run_config, *args, **kwargs):
-        import features
         self.run_config = run_config
         self.sumatra_outcome = {}
 
@@ -37,14 +37,15 @@ class Estimator(TensorflowBaseEstimator):
             *args,
             **kwargs
         )
-        features.all_features.feature_info[features.MRI]['shape'] = \
+        ft_def.all_features.feature_info[ft_def.MRI]['shape'] = \
             self.input_fn_config['data_generation']['image_shape']
+
         self.feature_spec = {
             name: tf.placeholder(
-                    shape=[None] + ft_info['shape'],
+                    shape=[1] + ft_info['shape'],
                     dtype=ft_info['type']
                 )
-            for name, ft_info in features.all_features.feature_info.items()
+            for name, ft_info in ft_def.all_features.feature_info.items()
         }
 
     def fit_main_training_loop(self, X, y):
@@ -106,6 +107,9 @@ class Estimator(TensorflowBaseEstimator):
         """
         NETWORK_BODY_SCOPE = 'network_body'
         network_heads = params['network_heads']
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            features = distort(features)
 
         with tf.variable_scope(NETWORK_BODY_SCOPE):
             m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
