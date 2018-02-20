@@ -41,30 +41,11 @@ def distort(records):
     return records
 
 
-def dataset_filter(record, keep_when_any_is_true=None):
-    if keep_when_any_is_true is not None:
-        cond = tf.constant(False)
-        for field in keep_when_any_is_true:
-            cond = tf.logical_or(
-                cond,
-                tf.equal(tf.reshape(record[field], []), 1),
-            )
-        return cond
-    return True
-
-
 def gen_dataset_iterator(config, dataset):
     for func_call in config:
         func_call = func_call.copy()
         f = func_call['call']
         del func_call['call']
-        # Special cases
-        if f == 'filter':
-            # Forward all arguments to predicate
-            kwargs = func_call.copy()
-            func_call = {
-                'predicate': lambda r: dataset_filter(r, **kwargs)
-            }
         dataset = getattr(dataset, f)(**func_call)
 
     iterator = dataset.make_one_shot_iterator()
