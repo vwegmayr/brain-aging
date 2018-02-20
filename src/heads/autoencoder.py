@@ -48,31 +48,40 @@ class AutoencoderHead(NetworkHeadBase):
         self.image_summary()
 
     def image_summary(self):
+        labels_shape = self.labels.get_shape().as_list()
         mid_shape = [0] + [
             self.labels.get_shape().as_list()[i] / 2
             for i in [1, 2, 3]
         ]
+        labels_for_summary = tf.reshape(
+            tf.cast(self.labels[0], tf.float32),
+            [1] + labels_shape[1:] + [1],
+        )
+        predictions_for_summary = tf.reshape(
+            tf.cast(self.predictions[0], tf.float32),
+            [1] + labels_shape[1:] + [1],
+        )
         tf.summary.image(
             "GroundTruthXY",
-            self.labels[0, :, :, mid_shape[3]],
+            labels_for_summary[:, :, :, mid_shape[3]],
         )
         tf.summary.image(
             "PredictionXY",
-            self.predictions[0, :, :, mid_shape[3]],
+            predictions_for_summary[:, :, :, mid_shape[3]],
         )
         tf.summary.image(
             "GroundTruthXZ",
-            self.labels[0, :, mid_shape[2], :],
+            labels_for_summary[:, :, mid_shape[2], :],
         )
         tf.summary.image(
             "PredictionXZ",
-            self.predictions[0, :, mid_shape[2], :],
+            predictions_for_summary[:, :, mid_shape[2], :],
         )
         tf.summary.image(
             "GroundTruthYZ",
-            self.labels[0, mid_shape[1], :, :],
+            labels_for_summary[:, mid_shape[1], :, :],
         )
         tf.summary.image(
             "PredictionYZ",
-            self.predictions[0, mid_shape[1], :, :],
+            predictions_for_summary[:, mid_shape[1], :, :],
         )
