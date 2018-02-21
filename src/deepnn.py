@@ -5,10 +5,15 @@ from modules.models.utils import custom_print
 
 
 class DeepNN(object):
-    def __init__(self):
+    def __init__(self, print_shapes=True):
         self.is_training = True
         self.debug_summaries = False
         self.cnn_layers_shapes = []
+        self.enable_print_shapes = print_shapes
+
+    def print_shape(self, text):
+        if self.enable_print_shapes:
+            custom_print(text)
 
     def on_cnn_layer(self, layer, name=None):
         if name is None:
@@ -149,7 +154,7 @@ class DeepNN(object):
             if self.debug_summaries:
                 self.variable_summaries(W, "w")
                 self.variable_summaries(out, "output")
-            custom_print('%s -> [%s] -> %s' % (
+            self.print_shape('%s -> [%s] -> %s' % (
                 conv_input_shape,
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape()[1:].as_list()
@@ -202,7 +207,7 @@ class DeepNN(object):
             if self.debug_summaries:
                 self.variable_summaries(W, "w")
                 self.variable_summaries(out, "output")
-            custom_print('%s -> [%s] -> %s' % (
+            self.print_shape('%s -> [%s] -> %s' % (
                 conv_input_shape,
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape()[1:].as_list()
@@ -228,7 +233,7 @@ class DeepNN(object):
                 self.variable_summaries(W_fc, "W")
                 self.variable_summaries(b_fc, "b")
                 self.variable_summaries(out, "output")
-            custom_print('%s -> [%s] -> %s' % (
+            self.print_shape('%s -> [%s] -> %s' % (
                 x.get_shape().as_list()[1:],
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape().as_list()[1:],

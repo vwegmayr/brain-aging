@@ -3,6 +3,7 @@ import numpy as np
 import pickle as pkl
 import json
 import copy
+import sys
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import parse_hooks, custom_print
@@ -16,8 +17,10 @@ from train_hooks import PrintAndLogTensorHook
 class Estimator(TensorflowBaseEstimator):
     """docstring for Estimator"""
 
-    def __init__(self, run_config, *args, **kwargs):
+    def __init__(self, run_config, sumatra_outcome_config, *args, **kwargs):
+        self.is_model_first_run = True
         self.run_config = run_config
+        self.sumatra_outcome_config = sumatra_outcome_config
         self.sumatra_outcome = {}
 
         tf_run_config = copy.deepcopy(run_config['tf_estimator_run_config'])
@@ -55,23 +58,38 @@ class Estimator(TensorflowBaseEstimator):
         self.evaluations = []
         self.training_metrics = []
 
+        custom_print('[INFO] Main training loop. Model dir is %s' % (
+            self.config["model_dir"]))
+
+        printed_count = [0]  # Workaround to modify variable inside nested func
+
+        def one_run_finished(t='.'):
+            sys.stdout.write(t)
+            printed_count[0] += 1
+            if printed_count[0] % 10 == 0:
+                sys.stdout.write('\n')
+            sys.stdout.flush()
+            self.write_outcome()
+
         def do_evaluate():
             evaluate_fn = self.gen_input_fn(X, y, False, self.input_fn_config)
             assert(evaluate_fn is not None)
             self.evaluations.append(
                     self.estimator.evaluate(input_fn=evaluate_fn)
                 )
-            self.export_evaluation_stats()
+            one_run_finished('V')
 
         num_epochs = self.run_config['num_epochs']
         validations_per_epoch = self.run_config['validations_per_epoch']
 
+        one_run_finished('\n')
         # 1st case, evaluation every few epochs
         if validations_per_epoch <= 1:
             validation_counter = 0
             train_fn = self.gen_input_fn(X, y, True, self.input_fn_config)
             for i in range(num_epochs):
                 self.estimator.train(input_fn=train_fn)
+                one_run_finished()
 
                 # Check if we need to run validation
                 validation_counter += validations_per_epoch
@@ -88,6 +106,7 @@ class Estimator(TensorflowBaseEstimator):
                     shard=(i % validations_per_epoch, validations_per_epoch),
                 )
                 self.estimator.train(input_fn=train_fn)
+                one_run_finished()
                 do_evaluate()
 
     def score(self, X, y):
@@ -112,7 +131,11 @@ class Estimator(TensorflowBaseEstimator):
             features = distort(features)
 
         with tf.variable_scope(NETWORK_BODY_SCOPE):
-            m = Model(is_training=(mode == tf.estimator.ModeKeys.TRAIN))
+            m = Model(
+                is_training=(mode == tf.estimator.ModeKeys.TRAIN),
+                print_shapes=self.is_model_first_run,
+            )
+            self.is_model_first_run = False
             last_layer = m.gen_last_layer(features)
 
         heads = []
@@ -304,19 +327,51 @@ class Estimator(TensorflowBaseEstimator):
     def training_log_values(self, values):
         self.training_metrics.append(values)
 
-    def export_evaluation_stats(self):
+    def write_outcome(self):
         """
-        @values is a list of return values of tf.Estimator.evaluate
+        Creates sumatra output file where the values of evaluation/train
+        metrics are reported. Also provides sumatra run reason/outcome/tags.
         """
+        validations_per_epoch = self.run_config['validations_per_epoch']
+        sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}
+        output_dir = self.config["model_dir"]
 
+        self.generate_numeric_outcome()
+
+        config_sumatra = self.sumatra_outcome_config
+        if ('reason' in config_sumatra and
+                config_sumatra['reason'] is not None):
+            self.sumatra_outcome['run_reason'] = config_sumatra['reason']
+        if ('tags' in config_sumatra and
+                config_sumatra['tags'] is not None):
+            self.sumatra_outcome['run_tags'] = config_sumatra['tags']
+
+        with open('%s/eval_values.pkl' % (output_dir), 'wb') as f:
+            pkl.dump({
+                'version': 1,
+                'validations_per_epoch': validations_per_epoch,
+                'evaluate': self.evaluations,
+                'train': self.training_metrics,
+            }, f, pkl.HIGHEST_PROTOCOL)
+
+        # Backward compatibility for sumatra format and metric names
+        old_new_stats = self.run_config['stats_backward_compatibility']
+        for new_name, old_name in old_new_stats.items():
+            if new_name in sumatra_metrics and old_name not in sumatra_metrics:
+                cpy = copy.deepcopy(sumatra_metrics[new_name])
+                cpy['_deprecated'] = True
+                sumatra_metrics[old_name] = cpy
+
+        with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
+            json.dump(self.sumatra_outcome, outfile)
+
+    def generate_numeric_outcome(self):
+        sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}
         if self.evaluations == []:
             return
         validations_per_epoch = self.run_config['validations_per_epoch']
-        sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}
-
-        output_dir = self.config["model_dir"]
         last_epoch = len(self.evaluations) / float(validations_per_epoch)
-        custom_print('[INFO] Exporting metrics to "%s"' % output_dir)
+
         # List of dicts to dict of lists
         v_eval = dict(zip(
             self.evaluations[0],
@@ -359,22 +414,3 @@ class Estimator(TensorflowBaseEstimator):
                 )
         else:
             self.sumatra_outcome['text_outcome'] = 'TODO'
-
-        with open('%s/eval_values.pkl' % (output_dir), 'wb') as f:
-            pkl.dump({
-                'version': 1,
-                'validations_per_epoch': validations_per_epoch,
-                'evaluate': self.evaluations,
-                'train': self.training_metrics,
-            }, f, pkl.HIGHEST_PROTOCOL)
-
-        # Backward compatibility for sumatra format and metric names
-        old_new_stats = self.run_config['stats_backward_compatibility']
-        for new_name, old_name in old_new_stats.items():
-            if new_name in sumatra_metrics and old_name not in sumatra_metrics:
-                cpy = copy.deepcopy(sumatra_metrics[new_name])
-                cpy['_deprecated'] = True
-                sumatra_metrics[old_name] = cpy
-
-        with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
-            json.dump(self.sumatra_outcome, outfile)

@@ -79,7 +79,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
         if self.feature_spec is None:
             self.feature_spec = feature_spec_from(X)
 
-        tf.logging.set_verbosity(tf.logging.INFO)
+        tf.logging.set_verbosity(tf.logging.ERROR)
         try:
             self.fit_main_training_loop(X, y)
         except KeyboardInterrupt:

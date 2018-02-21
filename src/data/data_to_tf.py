@@ -22,6 +22,17 @@ from modules.models.utils import custom_print
 import src.features as ft_def
 
 
+class UniqueLogger:
+    printed = set()
+
+    @staticmethod
+    def log(text):
+        if text in UniqueLogger.printed:
+            return
+        UniqueLogger.printed.add(text)
+        custom_print(text)
+
+
 def get_data_preprocessing_values(config):
     """
     Returns a dictionnary with serializable values.
@@ -90,9 +101,10 @@ class DataAggregator:
         Int64List = tf.train.Int64List
         Example = tf.train.Example
 
-        if self.count % 10 == 1:
-            custom_print('[%s] Processing image #%d/%d...' % (
-                self.curr_study_name, self.count, self.total_files))
+        if self.count % (self.total_files / 10) == 1:
+            UniqueLogger.log('%s: [%s] Processing image #%d/%d...' % (
+                str(datetime.datetime.now()), self.curr_study_name,
+                self.count, self.total_files))
         self.count += 1
 
         img = nib.load(image_path)
@@ -125,7 +137,7 @@ class DataAggregator:
         # Check we have all features set
         for ft_name in ft_def.all_features.feature_info.keys():
             if ft_name not in img_features:
-                custom_print('[FATAL] Feature `%s` missing for %s' % (
+                UniqueLogger.log('[FATAL] Feature `%s` missing for %s' % (
                     ft_name, image_path))
                 assert(False)
 
@@ -137,18 +149,17 @@ class DataAggregator:
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
-        custom_print('[ERROR] %s (%s)' % (message, path))
 
     def finish(self):
         for w in self.writers.values():
             w.close()
-        custom_print('---- DATA CONVERSION STATS ----')
+        UniqueLogger.log('---- DATA CONVERSION STATS ----')
         for k, v in self.stats.items():
-            custom_print('%s: %d ok / %d errors' % (
+            UniqueLogger.log('%s: %d ok / %d errors' % (
                 k, v['success'], len(v['errors'])))
             if len(v['errors']) > 0:
-                custom_print('    First error:')
-                custom_print('    %s' % v['errors'][0])
+                UniqueLogger.log('    First error:')
+                UniqueLogger.log('    %s' % v['errors'][0])
 
     def _norm(self, mri, enable, outlier_percentile):
         if not enable:
@@ -252,7 +263,6 @@ def get_all_data_sources(config):
 
 
 def preprocess_all(config, converted_dir):
-    custom_print('[INFO] Extracting/preprocessing data...')
     random_state = random.getstate()
     random.seed(config['test_set_random_seed'])
     dataset = DataAggregator(config, converted_dir)
@@ -280,19 +290,19 @@ def generate_tf_dataset(config):
     converted_dir = os.path.join(config['data_converted_directory'], h)
     extraction_finished_file = os.path.join(converted_dir, "done.json")
     if os.path.isfile(extraction_finished_file):
-        custom_print(
+        UniqueLogger.log(
             '[INFO] Extracted TF Dataset `' + converted_dir +
             '` is up-to-date. Skipping dataset generation :)'
         )
         return converted_dir
-    custom_print(
-        '[INFO] TF Dataset in `%s` is inexistant.' %
-        converted_dir
+    UniqueLogger.log(
+        '[INFO] TF Dataset in `' + converted_dir + '` is inexistant. ' +
+        'Will generate from scratch.'
     )
     try:
         os.mkdir(converted_dir)
     except OSError:
-        custom_print(
+        UniqueLogger.log(
             '[FATAL] Directory already exists. Maybe another process ' +
             'is currently generating data? If not, rm folder and try again.'
         )

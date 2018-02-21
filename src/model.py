@@ -1,13 +1,12 @@
 import copy
 import tensorflow as tf
-from modules.models.utils import custom_print
 import features as features_def
 from deepnn import DeepNN
 
 
 class Model(DeepNN):
-    def __init__(self, is_training):
-        super(Model, self).__init__()
+    def __init__(self, is_training, **kwargs):
+        super(Model, self).__init__(**kwargs)
         self.is_training = is_training
 
     def gen_last_layer(self, ft):
@@ -40,7 +39,7 @@ class Model(DeepNN):
 
         conv = tf.reduce_max(conv, axis=[1, 2, 3])
 
-        custom_print('%d fc features' % (conv.get_shape().as_list()[1]))
+        self.print_shape('%d fc features' % (conv.get_shape().as_list()[1]))
         fc = tf.concat([
             # Features from convet
             conv,

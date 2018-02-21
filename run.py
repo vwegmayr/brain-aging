@@ -142,10 +142,11 @@ class ConfigAction(Action):
 
     """
     def __init__(self, args, config, more_args=None):
+        global config_root
         super(ConfigAction, self).__init__(args, more_args)
         self.raw_config = ConfigParser().parse_raw(config)
         self.config = ConfigParser().parse(config)
-        self.pprint_config(self.raw_config)
+        #self.pprint_config(self.raw_config)
         self.act()
 
     def fit(self):
@@ -270,7 +271,6 @@ class ModelAction(Action):
 
 
 if __name__ == '__main__':
-
     arg_parser = argparse.ArgumentParser(description="Scikit runner.")
 
     arg_parser.add_argument(
