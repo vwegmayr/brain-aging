@@ -18,21 +18,11 @@ class AutoencoderHead(NetworkHeadBase):
     ):
         self.labels = features[ft_def.MRI]
         mri_shape = self.labels.get_shape().as_list()[1:]
-        predictions = tf.reshape(
-            model.gen_deconv_head(last_layer),
+        self.predictions = model.gen_deconv_head(last_layer)
+        self.predictions = tf.reshape(
+            self.predictions,
             [-1] + mri_shape,
         )
-        mri_avg = tf.get_variable(
-            "mri_avg",
-            shape=mri_shape,
-            initializer=tf.zeros_initializer(),
-        )
-        mri_mult_factor = tf.get_variable(
-            "mri_mult_factor",
-            shape=mri_shape,
-            initializer=tf.zeros_initializer(),
-        )
-        self.predictions = mri_avg + tf.multiply(predictions, mri_mult_factor)
         self.loss = tf.losses.mean_squared_error(
             self.labels,
             self.predictions,
@@ -54,11 +44,11 @@ class AutoencoderHead(NetworkHeadBase):
             for i in [1, 2, 3]
         ]
         labels_for_summary = tf.reshape(
-            tf.cast(self.labels[0], tf.float32),
+            self.labels[0],
             [1] + labels_shape[1:] + [1],
         )
         predictions_for_summary = tf.reshape(
-            tf.cast(self.predictions[0], tf.float32),
+            self.predictions[0],
             [1] + labels_shape[1:] + [1],
         )
         tf.summary.image(

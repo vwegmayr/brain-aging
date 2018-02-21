@@ -35,8 +35,8 @@ class RegressionHead(NetworkHeadBase):
 
         self.loss = tf.losses.mean_squared_error(self.labels, self.predictions)
         self.loss_v_avg = tf.losses.mean_squared_error(
-            tf.cast(self.labels, tf.float32),
-            tf.cast(self.labels, tf.float32)*0.0 + self.predicted_features_avg,
+            self.labels,
+            self.labels*0.0 + self.predicted_features_avg,
         )
 
         super(RegressionHead, self).__init__(
@@ -60,11 +60,11 @@ class RegressionHead(NetworkHeadBase):
             super(RegressionHead, self).get_evaluated_metrics()
         evaluation_metrics.update({
             'rmse': tf.metrics.root_mean_squared_error(
-                tf.cast(self.labels, tf.float32),
+                self.labels,
                 self.predictions,
             ),
             'rmse_vs_avg': tf.metrics.root_mean_squared_error(
-                tf.cast(self.labels, tf.float32),
+                self.labels,
                 self.predictions*0.0 + self.predicted_features_avg,
             ),
         })

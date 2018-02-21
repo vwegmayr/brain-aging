@@ -117,8 +117,8 @@ class DataAggregator:
         }
         img_features[ft_def.STUDY_ID] = _int64_to_feature(self.curr_study_id)
         img_features[ft_def.MRI] = Feature(
-            int64_list=Int64List(
-                value=img_data.reshape([-1]).astype(np.int64)
+            float_list=tf.train.FloatList(
+                value=img_data.reshape([-1])
             ),
         )
 
