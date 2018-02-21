@@ -4,10 +4,10 @@
 #CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
 
 class: src.estimator.Estimator
-sumatra:
-  reason: null
-  tags: null
 params:
+  sumatra_outcome_config:
+    reason: null
+    tags: null
   input_fn_config: # Parameters for input generation (gen_input_fn)
     data_generation:
       data_converted_directory: data/ready/
