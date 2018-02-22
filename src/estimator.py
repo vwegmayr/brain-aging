@@ -336,7 +336,6 @@ class Estimator(TensorflowBaseEstimator):
         metrics are reported. Also provides sumatra run reason/outcome/tags.
         """
         validations_per_epoch = self.run_config['validations_per_epoch']
-        sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}
         output_dir = self.config["model_dir"]
 
         self.generate_numeric_outcome()
@@ -358,6 +357,7 @@ class Estimator(TensorflowBaseEstimator):
             }, f, pkl.HIGHEST_PROTOCOL)
 
         # Backward compatibility for sumatra format and metric names
+        sumatra_metrics = self.sumatra_outcome['numeric_outcome']
         old_new_stats = self.run_config['stats_backward_compatibility']
         for new_name, old_name in old_new_stats.items():
             if new_name in sumatra_metrics and old_name not in sumatra_metrics:
