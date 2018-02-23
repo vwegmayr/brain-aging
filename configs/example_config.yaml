@@ -16,6 +16,7 @@ params:
       image_shape: [91, 109, 91]
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
+      train_test_split_on_feature: study_patient_id
       test_set_random_seed: 0
       image_normalization:
         enable: True

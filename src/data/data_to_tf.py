@@ -69,7 +69,7 @@ class DataAggregator:
                 tf.python_io.TFRecordOptions(compression),
             ),
         }
-        self.patient_to_writer = {}
+        self.value_to_writer = {}
         self.curr_study_id = -1
         self.curr_study_name = ''
         self.count = 0
@@ -84,16 +84,17 @@ class DataAggregator:
             'errors': []
         }
         self.count = 1
-        self.patient_to_writer = {}
+        self.value_to_writer = {}
         self.total_files = total_files
 
-    def get_writer_for_image(self, patient_id):
-        if patient_id not in self.patient_to_writer:
+    def get_writer_for_image(self, features):
+        ft_value = features[self.config['train_test_split_on_feature']]
+        if ft_value not in self.value_to_writer:
             if random.random() < self.config['test_set_size_ratio']:
-                self.patient_to_writer[patient_id] = self.writers['test']
+                self.value_to_writer[ft_value] = self.writers['test']
             else:
-                self.patient_to_writer[patient_id] = self.writers['train']
-        return self.patient_to_writer[patient_id]
+                self.value_to_writer[ft_value] = self.writers['train']
+        return self.value_to_writer[ft_value]
 
     def add_image(self, image_path, int64_features):
         Features = tf.train.Features
@@ -121,13 +122,13 @@ class DataAggregator:
             return
 
         # Transform features and write
+        int64_features[ft_def.STUDY_ID] = self.curr_study_id
         def _int64_to_feature(v):
             return Feature(int64_list=Int64List(value=[v]))
         img_features = {
             k: _int64_to_feature(v)
             for k, v in int64_features.items()
         }
-        img_features[ft_def.STUDY_ID] = _int64_to_feature(self.curr_study_id)
         img_features[ft_def.MRI] = Feature(
             float_list=tf.train.FloatList(
                 value=img_data.reshape([-1])
@@ -143,7 +144,7 @@ class DataAggregator:
 
         example = Example(features=Features(feature=img_features))
         self.get_writer_for_image(
-            int64_features[ft_def.STUDY_PATIENT_ID]
+            int64_features
         ).write(example.SerializeToString())
         self.stats[self.curr_study_name]['success'] += 1
 
