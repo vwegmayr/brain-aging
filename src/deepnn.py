@@ -161,7 +161,8 @@ class DeepNN(object):
             ))
         return out
 
-    def conv3d_layer_transpose(self,
+    def conv3d_layer_transpose(
+        self,
         x,
         num_filters,
         output_shape,

@@ -88,7 +88,8 @@ class Model(DeepNN):
         fc = self.batch_norm(fc, scope='ft_norm')
         in_ft = fc.get_shape().as_list()[1]
         conv = tf.reshape(fc, [tf.shape(fc)[0], 1, 1, 1, in_ft])
-        ft_count = [256, 256, 64, 64, 24, 1]
+        ft_count = [512, 256, 256, 128, 128, 64, 1]
+        assert(len(ft_count) == len(self.cnn_layers_shapes))
 
         # Handle first layer manually - manual broadcast
         first_shape = copy.copy(self.cnn_layers_shapes[-1]['shape'])
@@ -107,11 +108,15 @@ class Model(DeepNN):
         )[1:]:
             output_shape = copy.copy(layer['shape'])
             output_shape[-1] = num_filters
+            # Compute strides
+            prev_shape = conv.get_shape().as_list()
+            strides = int(round(float(output_shape[1]) / prev_shape[1]))
             conv = self.conv3d_layer_transpose(
                 conv,
                 num_filters=num_filters,
                 output_shape=output_shape,
                 scope=layer['name'],
+                strides=[strides] * 3,
                 nl=nl,
             )
         return conv
