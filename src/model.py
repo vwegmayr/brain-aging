@@ -84,22 +84,24 @@ class Model(DeepNN):
 
     def gen_deconv_head(self, fc):
         assert(len(self.cnn_layers_shapes) > 0)
-        assert(len(fc.get_shape()) == 2)
         fc = self.batch_norm(fc, scope='ft_norm')
-        in_ft = fc.get_shape().as_list()[1]
-        conv = tf.reshape(fc, [tf.shape(fc)[0], 1, 1, 1, in_ft])
-        ft_count = [512, 256, 256, 128, 128, 64, 1]
+        in_ft = fc.get_shape().as_list()[-1]
+        ft_count = [2048, 1024, 512, 256, 128, 32]
         assert(len(ft_count) == len(self.cnn_layers_shapes))
 
-        # Handle first layer manually - manual broadcast
-        first_shape = copy.copy(self.cnn_layers_shapes[-1]['shape'])
-        first_shape[-1] = ft_count[0]
-        first_shape[0] = tf.shape(fc)[0]
-        conv = tf.ones(first_shape) * conv
+        # Handle first layer manually - manual broadcast if needed
+        conv = fc
+        if len(conv.get_shape()) == 2:
+            conv = tf.reshape(conv, [tf.shape(conv)[0], 1, 1, 1, in_ft])
+            first_shape = copy.copy(self.cnn_layers_shapes[-1]['shape'])
+            first_shape[-1] = ft_count[0]
+            first_shape[0] = tf.shape(fc)[0]
+            conv = tf.ones(first_shape) * conv
+
+        assert(len(conv.get_shape()) == 5)
 
         non_linearities = [tf.nn.relu] * len(self.cnn_layers_shapes)
         non_linearities[-1] = tf.identity
-        non_linearities[-2] = tf.nn.elu
 
         for layer, num_filters, nl in zip(
             reversed(self.cnn_layers_shapes),
@@ -118,5 +120,17 @@ class Model(DeepNN):
                 scope=layer['name'],
                 strides=[strides] * 3,
                 nl=nl,
+                filter_weights=[3, 3, 3],
             )
+        conv = self.conv3d_layer(
+            conv,
+            1,
+            [1, 1, 1],
+            pool=False,
+            bn=False,
+            scope='reconstructed',
+            mpadding='SAME',
+            padding='SAME',
+            nl=tf.identity,
+        )
         return conv
