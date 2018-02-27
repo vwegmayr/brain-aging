@@ -63,6 +63,7 @@ params:
           batch_size: 8
   params: # Params for model (model_fn)
     train_log_every_n_iter: 5
+    network_body: {}
     network_heads:
       # autoencoder:
       #   class: src.heads.autoencoder.AutoencoderHead

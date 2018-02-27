@@ -95,13 +95,12 @@ class Model(DeepNN):
             conv = tf.reshape(conv, [tf.shape(conv)[0], 1, 1, 1, in_ft])
             first_shape = copy.copy(self.cnn_layers_shapes[-1]['shape'])
             first_shape[-1] = ft_count[0]
-            first_shape[0] = tf.shape(fc)[0]
-            conv = tf.ones(first_shape) * conv
+            first_shape[0] = tf.shape(fc)[0]  # batch size
+            conv = tf.multiply(tf.ones(first_shape), conv)
 
         assert(len(conv.get_shape()) == 5)
 
         non_linearities = [tf.nn.relu] * len(self.cnn_layers_shapes)
-        non_linearities[-1] = tf.identity
 
         for layer, num_filters, nl in zip(
             reversed(self.cnn_layers_shapes),

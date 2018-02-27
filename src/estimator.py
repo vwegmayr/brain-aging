@@ -139,7 +139,7 @@ class Estimator(TensorflowBaseEstimator):
                 print_shapes=self.is_model_first_run,
             )
             self.is_model_first_run = False
-            last_layer = m.gen_last_layer(features)
+            last_layer = m.gen_last_layer(features, **params['network_body'])
 
         heads = []
         for head_name, _h in network_heads.items():
