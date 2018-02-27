@@ -43,7 +43,7 @@ class DeepNN(object):
             - @of number of filters
         """
         w_shape = w.get_shape().as_list()
-        assert(w_shape[2] == 1)
+        assert(w_shape[2] in [1, 3])
         with tf.name_scope(name):
             output_filters = w_shape[3]
             num_rows = int(math.ceil(math.sqrt(output_filters)))
