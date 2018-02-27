@@ -130,12 +130,7 @@ class DeepNN(object):
                 regularizer=tf.contrib.layers.l1_regularizer(1.0),
             )
             W = tf.reshape(W, W_shape)
-            b = tf.get_variable(
-                "b",
-                [num_filters],
-                initializer=tf.constant_initializer(0.1),
-            )
-            out = b + self.conv3d(
+            out = self.conv3d(
                 x,
                 W,
                 strides=[1] + strides + [1],
@@ -150,6 +145,13 @@ class DeepNN(object):
                 )
             if bn:
                 out = self.batch_norm(out)
+            else:
+                b = tf.get_variable(
+                    "b",
+                    [num_filters],
+                    initializer=tf.constant_initializer(0.1),
+                )
+                out += b
             out = nl(out)
             if self.debug_summaries:
                 self.variable_summaries(W, "w")
