@@ -63,6 +63,12 @@ params:
           batch_size: 8
   params: # Params for model (model_fn)
     train_log_every_n_iter: 5
+    hooks:
+      - class: src.train_hooks.SessionHookFullTrace
+        params:
+            ckptdir: null
+            every_step: null
+            first_step: True
     network_body: {}
     network_heads:
       # autoencoder:

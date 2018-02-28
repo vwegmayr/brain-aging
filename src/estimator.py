@@ -6,12 +6,12 @@ import copy
 import sys
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
-from modules.models.utils import parse_hooks, custom_print
+from modules.models.utils import custom_print
 from data.data_to_tf import generate_tf_dataset
 import features as ft_def
 from input import input_iterator, distort
 from model import Model
-from train_hooks import PrintAndLogTensorHook
+from train_hooks import PrintAndLogTensorHook, SessionHookFullTrace
 
 
 class Estimator(TensorflowBaseEstimator):
@@ -282,13 +282,7 @@ class Estimator(TensorflowBaseEstimator):
         ]
 
     def get_training_hooks(self, params, log_variables):
-        if "hooks" in params:
-            training_hooks = parse_hooks(
-                params["hooks"],
-                locals(),
-                self.save_path)
-        else:
-            training_hooks = []
+        training_hooks = []
 
         if "train_log_every_n_iter" in params:
             hook_logged = log_variables.copy()
@@ -302,6 +296,12 @@ class Estimator(TensorflowBaseEstimator):
                     every_n_iter=params["train_log_every_n_iter"],
                 )
             )
+        if "hooks" in params:
+            for h in params["hooks"]:
+                args = copy.copy(h["params"])
+                if "ckptdir" in args:
+                    args["ckptdir"] = self.save_path
+                training_hooks.append(h["class"](**args))
         return training_hooks
 
     def compute_loss(self, labels, predictions):
