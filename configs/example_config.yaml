@@ -133,6 +133,7 @@ params:
       log_step_count_steps: 100
       keep_checkpoint_max: 2
       session_config:
+        allow_soft_placement: True
         gpu_options:
           per_process_gpu_memory_fraction: 0.9
           allow_growth: False
