@@ -14,7 +14,7 @@ class Model(DeepNN):
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
         mri = self.batch_norm(mri, scope="norm_input")
 
-        def conv_wrap(conv, filters, size, scope, pool=True):
+        def conv_wrap(conv, filters, size, scope, pool=False):
             out = self.conv3d_layer(
                 conv,
                 filters,
@@ -86,7 +86,7 @@ class Model(DeepNN):
         assert(len(self.cnn_layers_shapes) > 0)
         fc = self.batch_norm(fc, scope='ft_norm')
         in_ft = fc.get_shape().as_list()[-1]
-        ft_count = [2048, 1024, 512, 256, 128, 32]
+        ft_count = [256, 100, 64, 64, 64, 32]
         assert(len(ft_count) == len(self.cnn_layers_shapes))
 
         # Handle first layer manually - manual broadcast if needed
@@ -127,6 +127,7 @@ class Model(DeepNN):
             [1, 1, 1],
             pool=False,
             bn=False,
+            strides=[1, 1, 1],
             scope='reconstructed',
             mpadding='SAME',
             padding='SAME',
