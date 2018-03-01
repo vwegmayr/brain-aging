@@ -37,17 +37,7 @@ class ClassificationHead(NetworkHeadBase):
             self.predictions,
         )
 
-        super(ClassificationHead, self).__init__(
-            name=name,
-            model=model,
-            last_layer=last_layer,
-            features=features,
-            **kwargs
-        )
-
-    def get_logged_training_variables(self):
-        training_variables = \
-            super(ClassificationHead, self).get_logged_training_variables()
+        # Metrics for training/eval
         batch_size = tf.shape(self.labels)[0]
         accuracy = tf.reduce_mean(tf.cast(
             tf.equal(
@@ -56,11 +46,10 @@ class ClassificationHead(NetworkHeadBase):
             ),
             tf.float32,
         ))
-        training_variables.update({
+        self.metrics = {
             'accuracy': accuracy
-        })
-
-        training_variables.update({
+        }
+        self.metrics.update({
             'predicted_%s_ratio' % ft_name:
             tf.reduce_sum(tf.cast(
                 tf.equal(tf.argmax(self.predictions, 1), i),
@@ -68,7 +57,14 @@ class ClassificationHead(NetworkHeadBase):
             )) / tf.cast(batch_size, tf.float32)
             for i, ft_name in enumerate(self.predict_feature_names)
         })
-        return training_variables
+
+        super(ClassificationHead, self).__init__(
+            name=name,
+            model=model,
+            last_layer=last_layer,
+            features=features,
+            **kwargs
+        )
 
     def get_evaluated_metrics(self):
         evaluation_metrics = \
@@ -77,7 +73,6 @@ class ClassificationHead(NetworkHeadBase):
         predicted = tf.argmax(self.predictions, 1)
         actual_class = tf.argmax(self.labels, 1)
         evaluation_metrics.update({
-            'accuracy': tf.metrics.accuracy(predicted, actual_class),
             'false_negatives': tf.metrics.false_negatives(
                 predicted, actual_class),
             'false_positives': tf.metrics.false_positives(

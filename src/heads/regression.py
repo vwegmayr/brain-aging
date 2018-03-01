@@ -40,6 +40,11 @@ class RegressionHead(NetworkHeadBase):
             tf.zeros_like(self.labels, tf.float32) + self.predict_feature_avg,
         )
 
+        # Metrics
+        self.metrics = {
+            'loss_v_avg': self.loss_v_avg,
+        }
+
         super(RegressionHead, self).__init__(
             name=name,
             model=model,
@@ -47,14 +52,6 @@ class RegressionHead(NetworkHeadBase):
             features=features,
             **kwargs
         )
-
-    def get_logged_training_variables(self):
-        training_variables = \
-            super(RegressionHead, self).get_logged_training_variables()
-        training_variables.update({
-            'loss_v_avg': self.loss_v_avg
-        })
-        return training_variables
 
     def get_evaluated_metrics(self):
         evaluation_metrics = \

@@ -162,7 +162,8 @@ class Estimator(TensorflowBaseEstimator):
         if mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {}
             for head in heads:
-                predictions.update(head.get_predictions())
+                with tf.variable_scope(head.get_name()):
+                    predictions.update(head.get_predictions())
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 predictions={
@@ -187,20 +188,22 @@ class Estimator(TensorflowBaseEstimator):
             "global_optimizer_loss": global_loss,
         }
         for head in heads:
-            variables = head.get_logged_training_variables()
-            train_log_variables.update({
-                head.name + '/' + var_name: var_value
-                for var_name, var_value in variables.items()
-            })
+            with tf.variable_scope(head.get_name()):
+                variables = head.get_logged_training_variables()
+                train_log_variables.update({
+                    head.name + '/' + var_name: var_value
+                    for var_name, var_value in variables.items()
+                })
 
         # Metrics for evaluation
         eval_metric_ops = {}
         for head in heads:
-            variables = head.get_evaluated_metrics()
-            eval_metric_ops.update({
-                head.name + '/' + var_name: var_value
-                for var_name, var_value in variables.items()
-            })
+            with tf.variable_scope(head.get_name()):
+                variables = head.get_evaluated_metrics()
+                eval_metric_ops.update({
+                    head.name + '/' + var_name: var_value
+                    for var_name, var_value in variables.items()
+                })
 
         # Optimizer
         train_vars = tf.get_collection(

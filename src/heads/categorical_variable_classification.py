@@ -38,6 +38,14 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             self.predictions,
         )
         self.predict = predict
+        self.metrics = {
+            'in_top_%s' % k: tf.reduce_mean(tf.cast(tf.nn.in_top_k(
+                predictions=self.predictions,
+                targets=tf.reshape(self.labels_ids, [-1]),
+                k=k,
+            ), tf.float32))
+            for k in [1, 5, 10, 20, 50]
+        }
         super(CategoricalVariableClassificationHead, self).__init__(
             name=name,
             model=model,
@@ -45,21 +53,6 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             features=features,
             **kwargs
         )
-
-    def get_logged_training_variables(self):
-        training_variables = super(
-            CategoricalVariableClassificationHead,
-            self
-        ).get_logged_training_variables()
-        training_variables.update({
-            'in_top_%s' % k: tf.reduce_mean(tf.cast(tf.nn.in_top_k(
-                predictions=self.predictions,
-                targets=tf.reshape(self.labels_ids, [-1]),
-                k=k,
-            ), tf.float32))
-            for k in [1, 5, 10, 20, 50]
-        })
-        return training_variables
 
     def get_tags(self):
         tags = super(CategoricalVariableClassificationHead, self).get_tags()

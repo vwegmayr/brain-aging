@@ -34,6 +34,7 @@ class NetworkHeadBase(object):
         """
         # Sanity checks
         assert(hasattr(self, 'loss'))
+        assert(hasattr(self, 'metrics'))
         # This would mean no training at all
         assert(not (
             loss_weight_in_global_loss is None and
@@ -53,9 +54,14 @@ class NetworkHeadBase(object):
         self.head_training_loss = self._get_head_training_loss()
         self.global_loss_contribution = self._get_global_loss_contribution()
 
+        # Setup summary for metrics
+        self.metrics.update({'loss': self.loss})
+        for name, value in self.metrics.items():
+            tf.summary.scalar(name, value)
+
     # -------------------------- Evaluation/training metrics
     def get_logged_training_variables(self):
-        train_variables = {'loss': self.loss}
+        train_variables = {}
         if self.l1_regularization_loss_raw is not None:
             train_variables.update({
                 'loss_l1_regularization_loss': self.loss,
@@ -68,12 +74,15 @@ class NetworkHeadBase(object):
             train_variables.update({
                 'global_loss_contribution': self.global_loss_contribution,
             })
+        train_variables.update(self.metrics)
         return train_variables
 
     def get_evaluated_metrics(self):
-        return {
-            'loss': tf.metrics.mean(self.loss),
+        metric_ops = {
+            name: tf.metrics.mean(value, name=name)
+            for name, value in self.metrics.items()
         }
+        return metric_ops
 
     def get_predictions(self):
         """
