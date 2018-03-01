@@ -101,6 +101,7 @@ params:
       #   train_only_globally: False
     network_train_ops_settings:
       alternative_training_steps: 0  # 1280
+      adam_aggregation_method: EXPERIMENTAL_ACCUMULATE_N
   run_config:
     num_epochs: 15
     validations_per_epoch: 2

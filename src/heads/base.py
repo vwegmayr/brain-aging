@@ -90,7 +90,7 @@ class NetworkHeadBase(object):
             return 0
         return self.global_loss_contribution
 
-    def get_head_train_op(self, optimizer):
+    def get_head_train_op(self, optimizer, **kwargs):
         """
         Operation for training the head only
         """
@@ -100,6 +100,7 @@ class NetworkHeadBase(object):
         return optimizer.minimize(
             loss=self.head_training_loss,
             var_list=self.trainable_variables,
+            **kwargs
         )
 
     def get_name(self):

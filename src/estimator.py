@@ -234,22 +234,34 @@ class Estimator(TensorflowBaseEstimator):
         heads,
         # Arguments from Config
         alternative_training_steps=0,
+        adam_aggregation_method='DEFAULT',
     ):
         """
         Generates training operations for the network.
         Basically it is `global_train_op` and `heads_train_op`, but it's
         possible to train alternatively (with `alternative_training_steps` > 0)
         """
+        adam_aggregation_method = getattr(
+            tf.AggregationMethod,
+            adam_aggregation_method,
+        )
         optimizer = tf.train.AdamOptimizer()
 
         def global_train_op():
-            return optimizer.minimize(loss=global_loss, var_list=train_vars)
+            return optimizer.minimize(
+                loss=global_loss,
+                var_list=train_vars,
+                aggregation_method=adam_aggregation_method,
+            )
 
         def heads_train_op():
             ops = []
             for head in heads:
                 with tf.variable_scope(head.get_name()):
-                    ops.append(head.get_head_train_op(optimizer))
+                    ops.append(head.get_head_train_op(
+                        optimizer,
+                        aggregation_method=adam_aggregation_method,
+                    ))
             return tf.group(*ops)
 
         global_step = tf.train.get_global_step()
