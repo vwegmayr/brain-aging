@@ -32,8 +32,8 @@ class Model(DeepNN):
         self.on_cnn_layer(conv, "input")
         conv = self.conv2d_shared_all_dims_layer(conv, 'b1')
         self.on_cnn_layer(conv)
-        conv = conv_wrap(conv, 60, [5, 5, 5], "c2")
-        conv = conv_wrap(conv, 60, [5, 5, 5], "c3")
+        conv = conv_wrap(conv, 60, [3, 3, 3], "c2")
+        conv = conv_wrap(conv, 60, [3, 3, 3], "c3")
         conv = conv_wrap(conv, 100, [3, 3, 3], "c4")
         conv = conv_wrap(conv, 100, [3, 3, 3], "c5")
 
