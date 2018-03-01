@@ -15,14 +15,14 @@ params:
       cost: normcorr
       searchcost: normcorr
       overwrite: False
-      mri_template: /local/fsl/data/standard/MNI152_T1_1mm_brain.nii.gz
+      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
     filters:
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
         value:
-            eq: T1
+            eq: T2
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
         value:
             lt: 50
