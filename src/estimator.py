@@ -22,6 +22,7 @@ class Estimator(TensorflowBaseEstimator):
         self.run_config = run_config
         self.sumatra_outcome_config = sumatra_outcome_config
         self.sumatra_outcome = {}
+        self.sumatra_outcome['run_tags'] = []
 
         tf_run_config = copy.deepcopy(run_config['tf_estimator_run_config'])
         if 'session_config' in tf_run_config:
@@ -147,13 +148,15 @@ class Estimator(TensorflowBaseEstimator):
             _class = h['class']
             del h['class']
             with tf.variable_scope(head_name):
-                heads.append(_class(
+                head = _class(
                     name=head_name,
                     model=m,
                     last_layer=last_layer,
                     features=features,
                     **h
-                ))
+                )
+                self.sumatra_add_tags(head.get_tags())
+                heads.append(head)
 
         # TODO: Not sure what I'm doing here
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -358,7 +361,7 @@ class Estimator(TensorflowBaseEstimator):
             self.sumatra_outcome['run_reason'] = config_sumatra['reason']
         if ('tags' in config_sumatra and
                 config_sumatra['tags'] is not None):
-            self.sumatra_outcome['run_tags'] = config_sumatra['tags']
+            self.sumatra_add_tags(config_sumatra['tags'])
 
         with open('%s/eval_values.pkl' % (output_dir), 'wb') as f:
             pkl.dump({
@@ -379,6 +382,11 @@ class Estimator(TensorflowBaseEstimator):
 
         with open('%s/sumatra_outcome.json' % (output_dir), 'w') as outfile:
             json.dump(self.sumatra_outcome, outfile)
+
+    def sumatra_add_tags(self, tags_list):
+        self.sumatra_outcome['run_tags'] = list(set(
+            self.sumatra_outcome['run_tags'] + tags_list
+        ))
 
     def generate_numeric_outcome(self):
         sumatra_metrics = self.sumatra_outcome['numeric_outcome'] = {}

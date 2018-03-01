@@ -1,5 +1,6 @@
 import tensorflow as tf
 from base import NetworkHeadBase
+from src.features import all_features
 
 
 class RegressionHead(NetworkHeadBase):
@@ -21,13 +22,13 @@ class RegressionHead(NetworkHeadBase):
           List of features to predict, with a guess of their average
           Example: [{'feature': 'age', 'average': 50}]
         """
-        self.predicted_features_names = [i['feature'] for i in predict]
-        self.predicted_features_avg = [i['average'] for i in predict]
+        self.predict_feature_names = [i['feature'] for i in predict]
+        self.predict_feature_avg = [i['average'] for i in predict]
         self.predictions = model.gen_head(
             last_layer,
             len(predict),
             nl=tf.identity,
-        ) + self.predicted_features_avg
+        ) + self.predict_feature_avg
 
         # Compute loss
         self.labels = [features[p['feature']] for p in predict]
@@ -36,7 +37,7 @@ class RegressionHead(NetworkHeadBase):
         self.loss = tf.losses.mean_squared_error(self.labels, self.predictions)
         self.loss_v_avg = tf.losses.mean_squared_error(
             self.labels,
-            self.labels*0.0 + self.predicted_features_avg,
+            tf.zeros_like(self.labels, tf.float32) + self.predict_feature_avg,
         )
 
         super(RegressionHead, self).__init__(
@@ -60,12 +61,15 @@ class RegressionHead(NetworkHeadBase):
             super(RegressionHead, self).get_evaluated_metrics()
         evaluation_metrics.update({
             'rmse': tf.metrics.root_mean_squared_error(
-                self.labels,
+                tf.cast(self.labels, tf.float32),
                 self.predictions,
             ),
             'rmse_vs_avg': tf.metrics.root_mean_squared_error(
-                self.labels,
-                self.predictions*0.0 + self.predicted_features_avg,
+                tf.cast(self.labels, tf.float32),
+                tf.zeros_like(
+                    self.labels,
+                    tf.float32,
+                ) + self.predict_feature_avg,
             ),
         })
         return evaluation_metrics
@@ -74,6 +78,14 @@ class RegressionHead(NetworkHeadBase):
         predictions = super(RegressionHead, self).get_predictions()
         predictions.update({
             ft_name: self.predictions[:, i]
-            for i, ft_name in enumerate(self.predicted_features_names)
+            for i, ft_name in enumerate(self.predict_feature_names)
         })
         return predictions
+
+    def get_tags(self):
+        tags = super(RegressionHead, self).get_tags()
+        tags.append('regression')
+        feature_info = all_features.feature_info
+        for n in sorted(self.predict_feature_names):
+            tags.append('reg_%s' % feature_info[n]['shortname'])
+        return tags

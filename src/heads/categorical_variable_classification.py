@@ -1,5 +1,6 @@
 import tensorflow as tf
 from base import NetworkHeadBase
+from src.features import all_features
 
 
 class CategoricalVariableClassificationHead(NetworkHeadBase):
@@ -36,6 +37,7 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             self.labels,
             self.predictions,
         )
+        self.predict = predict
         super(CategoricalVariableClassificationHead, self).__init__(
             name=name,
             model=model,
@@ -58,3 +60,9 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             for k in [1, 5, 10, 20, 50]
         })
         return training_variables
+
+    def get_tags(self):
+        tags = super(CategoricalVariableClassificationHead, self).get_tags()
+        feature_info = all_features.feature_info
+        tags.append('predict_%s' % feature_info[self.predict]['shortname'])
+        return tags

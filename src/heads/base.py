@@ -106,6 +106,9 @@ class NetworkHeadBase(object):
     def get_name(self):
         return self.name
 
+    def get_tags(self):
+        return []
+
     # -------------------------- Local and Global training distinction
     def register_globally_trained_variables(self, l):
         if not self.train_only_globally:

@@ -1,5 +1,7 @@
+import copy
 import tensorflow as tf
 from base import NetworkHeadBase
+from src.features import all_features
 
 
 class ClassificationHead(NetworkHeadBase):
@@ -90,3 +92,15 @@ class ClassificationHead(NetworkHeadBase):
             for i, ft_name in enumerate(self.predict_feature_names)
         })
         return predictions
+
+    def get_tags(self):
+        tags = super(ClassificationHead, self).get_tags()
+        tags.append('classification')
+        feature_info = all_features.feature_info
+        ft_names = [
+            feature_info[n]['shortname']
+            for n in self.predict_feature_names
+        ]
+        ft_names.sort()
+        tags.append('_'.join(ft_names))
+        return tags

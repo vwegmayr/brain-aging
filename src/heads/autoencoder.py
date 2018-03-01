@@ -75,3 +75,8 @@ class AutoencoderHead(NetworkHeadBase):
             "PredictionYZ",
             predictions_for_summary[:, mid_shape[1], :, :],
         )
+
+    def get_tags(self):
+        tags = super(AutoencoderHead, self).get_tags()
+        tags.append('autoencoder')
+        return tags
