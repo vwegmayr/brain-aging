@@ -51,8 +51,7 @@ params:
         - call: prefetch
           buffer_size: 400
         - call: shuffle
-          buffer_size: 100
-          seed: 0
+          buffer_size: 500
         - call: map
           map_func: src.input.parser
           num_parallel_calls: 8
