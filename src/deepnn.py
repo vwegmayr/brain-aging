@@ -210,9 +210,10 @@ class DeepNN(object):
             if self.debug_summaries:
                 self.variable_summaries(W, "w")
                 self.variable_summaries(out, "output")
-            self.print_shape('%s -> [%s] -> %s' % (
+            self.print_shape('%s -> [%s|s=%d] -> %s' % (
                 conv_input_shape,
                 tf.contrib.framework.get_name_scope(),
+                strides[0],
                 out.get_shape()[1:].as_list()
             ))
         return out
