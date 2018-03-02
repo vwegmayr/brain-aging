@@ -137,11 +137,11 @@ params:
     # Tensorflow RunConfig
     # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
     tf_estimator_run_config:
-      save_summary_steps: 20
+      save_summary_steps: 5
       tf_random_seed: 40
       save_checkpoints_steps: 500
       #save_checkpoints_secs:
-      log_step_count_steps: 100
+      log_step_count_steps: 20
       keep_checkpoint_max: 2
       session_config:
         allow_soft_placement: True
