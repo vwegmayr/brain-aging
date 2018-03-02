@@ -321,7 +321,7 @@ class Estimator(TensorflowBaseEstimator):
             training_hooks.append(
                 PrintAndLogTensorHook(
                     self,
-                    hook_logged,
+                    tensors=hook_logged,
                     every_n_iter=params["train_log_every_n_iter"],
                 )
             )

@@ -8,13 +8,9 @@ class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
         estimator,
         print_summary_init_value=0.5,
         print_summary_tensor=None,
-        *args,
         **kwargs
     ):
-        super(PrintAndLogTensorHook, self).__init__(
-            *args,
-            **kwargs
-        )
+        super(PrintAndLogTensorHook, self).__init__(**kwargs)
         self.estimator = estimator
         self.print_summary_tensor = print_summary_tensor
         self.print_aggregated_history = [print_summary_init_value] * 30
