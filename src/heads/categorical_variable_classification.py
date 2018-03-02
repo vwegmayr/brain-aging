@@ -38,6 +38,7 @@ class CategoricalVariableClassificationHead(NetworkHeadBase):
             self.predictions,
         )
         self.predict = predict
+        # TODO: Handling of ties!!
         self.metrics = {
             'in_top_%s' % k: tf.reduce_mean(tf.cast(tf.nn.in_top_k(
                 predictions=self.predictions,
