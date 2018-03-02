@@ -145,36 +145,33 @@ class Estimator(TensorflowBaseEstimator):
         if mode == tf.estimator.ModeKeys.PREDICT:
             features = self.data_provider.predict_features(features)
 
-        with tf.variable_scope(NETWORK_BODY_SCOPE):
-            m = Model(
-                is_training=(mode == tf.estimator.ModeKeys.TRAIN),
-                print_shapes=self.is_model_first_run,
-            )
-            self.is_model_first_run = False
-            last_layer = m.gen_last_layer(features, **params['network_body'])
+        m = Model(
+            is_training=(mode == tf.estimator.ModeKeys.TRAIN),
+            print_shapes=self.is_model_first_run,
+        )
+        self.is_model_first_run = False
+        last_layer = m.gen_last_layer(features, **params['network_body'])
 
         heads = []
         for head_name, _h in network_heads.items():
             h = copy.deepcopy(_h)
             _class = h['class']
             del h['class']
-            with tf.variable_scope(head_name):
-                head = _class(
-                    name=head_name,
-                    model=m,
-                    last_layer=last_layer,
-                    features=features,
-                    **h
-                )
-                self.sumatra_add_tags(head.get_tags())
-                heads.append(head)
+            head = _class(
+                name=head_name,
+                model=m,
+                last_layer=last_layer,
+                features=features,
+                **h
+            )
+            self.sumatra_add_tags(head.get_tags())
+            heads.append(head)
 
         # TODO: Not sure what I'm doing here
         if mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {}
             for head in heads:
-                with tf.variable_scope(head.get_name()):
-                    predictions.update(head.get_predictions())
+                predictions.update(head.get_predictions())
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 predictions={
@@ -198,22 +195,20 @@ class Estimator(TensorflowBaseEstimator):
             "global_optimizer_loss": global_loss,
         }
         for head in heads:
-            with tf.variable_scope(head.get_name()):
-                variables = head.get_logged_training_variables()
-                train_log_variables.update({
-                    head.name + '/' + var_name: var_value
-                    for var_name, var_value in variables.items()
-                })
+            variables = head.get_logged_training_variables()
+            train_log_variables.update({
+                head.name + '/' + var_name: var_value
+                for var_name, var_value in variables.items()
+            })
 
         # Metrics for evaluation
         eval_metric_ops = {}
         for head in heads:
-            with tf.variable_scope(head.get_name()):
-                variables = head.get_evaluated_metrics()
-                eval_metric_ops.update({
-                    head.name + '/' + var_name: var_value
-                    for var_name, var_value in variables.items()
-                })
+            variables = head.get_evaluated_metrics()
+            eval_metric_ops.update({
+                head.name + '/' + var_name: var_value
+                for var_name, var_value in variables.items()
+            })
 
         # Optimizer
         optimizer = tf.train.AdamOptimizer(0.00005)
@@ -236,73 +231,6 @@ class Estimator(TensorflowBaseEstimator):
                 log_variables=train_log_variables,
             ),
         )
-
-    def generate_train_ops(
-        self,
-        train_log_variables,
-        global_loss,
-        train_vars,
-        heads,
-        # Arguments from Config
-        alternative_training_steps=0,
-        adam_aggregation_method='DEFAULT',
-    ):
-        """
-        Generates training operations for the network.
-        Basically it is `global_train_op` and `heads_train_op`, but it's
-        possible to train alternatively (with `alternative_training_steps` > 0)
-        """
-        adam_aggregation_method = getattr(
-            tf.AggregationMethod,
-            adam_aggregation_method,
-        )
-        optimizer = tf.train.AdamOptimizer(0.00005)
-
-        def global_train_op():
-            return optimizer.minimize(
-                loss=global_loss,
-                var_list=train_vars,
-                aggregation_method=adam_aggregation_method,
-            )
-
-        def heads_train_op():
-            ops = []
-            for head in heads:
-                with tf.variable_scope(head.get_name()):
-                    ops.append(head.get_head_train_op(
-                        optimizer,
-                        aggregation_method=adam_aggregation_method,
-                    ))
-            return tf.group(*ops)
-
-        global_step = tf.train.get_global_step()
-        global_step_incr = tf.assign(global_step, global_step+1)
-
-        if alternative_training_steps == 0:
-            return [global_step_incr, global_train_op(), heads_train_op()]
-
-        # Rounds based training
-        _round = tf.cast(
-            tf.mod(tf.floordiv(global_step, alternative_training_steps), 2),
-            tf.int32,
-        )
-        train_log_variables['_round'] = _round
-
-        return [
-            global_step_incr,
-            tf.cond(
-                tf.equal(_round, 0),
-                global_train_op,
-                lambda: tf.no_op(),
-                name="condRoundEq0",
-            ),
-            tf.cond(
-                tf.equal(_round, 1),
-                heads_train_op,
-                lambda: tf.no_op(),
-                name="condRoundEq1",
-            ),
-        ]
 
     def get_training_hooks(self, params, log_variables):
         training_hooks = []
