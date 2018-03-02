@@ -10,7 +10,6 @@ import tensorflow as tf
 import random
 import json
 import sys
-import inspect
 import hashlib
 import os
 import glob
@@ -43,10 +42,10 @@ def get_data_preprocessing_values(config):
         'sources': [
             json.dumps(s.__dict__) for s in get_all_data_sources(config)
         ],
-        'extractor_source': inspect.getsource(sys.modules[__name__]),
         'config': config,
         'modules': {
-            'tf': tf.__version__,
+            'tf_major_version': tf.__version__.split('.')[0],
+            'extractor_version': 1,
         }
     }
 
