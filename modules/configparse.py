@@ -76,9 +76,12 @@ def replace_obj_from_module(strings, dict):
                     module_string = ".".join(dict[full_key].split(".")[:-1])
                     if module_string == '':
                         continue
-                    module = importlib.import_module(module_string)
-                    obj_key = dict[full_key].split(".")[-1]
-                    dict[full_key] = getattr(module, obj_key)
+                    try:
+                        module = importlib.import_module(module_string)
+                        obj_key = dict[full_key].split(".")[-1]
+                        dict[full_key] = getattr(module, obj_key)
+                    except ImportError:
+                        pass
 
 
 def any_key_contains(string, dict):
