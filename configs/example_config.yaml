@@ -9,6 +9,7 @@ params:
     reason: null
     tags: null
   input_fn_config: # Parameters for input generation (gen_input_fn)
+    data_provider: tf_streaming
     data_generation:
       data_converted_directory: data/ready/
       train_database_file: train.tfrecord
@@ -53,10 +54,10 @@ params:
         - call: shuffle
           buffer_size: 500
         - call: map
-          map_func: src.input.parser
+          map_func: src.data.providers.tf_streaming.parser
           num_parallel_calls: 8
         - call: map
-          map_func: src.input.distort
+          map_func: src.data.providers.tf_streaming.random_crop
           num_parallel_calls: 8
         - call: batch
           batch_size: 8

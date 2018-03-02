@@ -1,6 +1,28 @@
 import os
 import tensorflow as tf
-import features as ft_def
+import src.features as ft_def
+from src.data.data_to_tf import generate_tf_dataset
+
+
+# Functions for Data Provider interface
+class DataProvider(object):
+    def __init__(self, input_fn_config):
+        self.path = generate_tf_dataset(input_fn_config['data_generation'])
+
+    def get_input_fn(train, shard):
+        def _input_fn():
+            return input_iterator(
+                self.input_fn_config['data_generation'],
+                self.input_fn_config['data_streaming'],
+                data_path=self.path,
+                shard=shard,
+                type='train' if train else 'test',
+            )
+        return _input_fn
+
+    def predict_features(features):
+        return random_crop(features)
+# End of interface functions
 
 
 def parse_record(record):
@@ -26,7 +48,7 @@ def parser(record):
     }
 
 
-def distort(records):
+def random_crop(records):
     mri_shape = records[ft_def.MRI].get_shape().as_list()
     if len(mri_shape) == 4:
         # TODO: Predict mode, then batch_size = ?

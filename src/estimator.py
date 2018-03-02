@@ -7,9 +7,8 @@ import sys
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import custom_print
-from data.data_to_tf import generate_tf_dataset
 import features as ft_def
-from input import input_iterator, distort
+import src.data.providers
 from model import Model
 from train_hooks import PrintAndLogTensorHook, SessionHookFullTrace
 
@@ -51,6 +50,18 @@ class Estimator(TensorflowBaseEstimator):
                 )
             for name, ft_info in ft_def.all_features.feature_info.items()
         }
+
+        # Data provider
+        provider = self.input_fn_config['data_provider']
+        module = getattr(src.data.providers, provider)
+        if module is None:
+            custom_print(
+                'FATAL: Data provider ' +
+                self.input_fn_config['data_provider'] +
+                ' not found'
+            )
+        assert(data_provider is not None)
+        self.data_provider = module.DataProvider(self.input_fn_config)
 
     def fit_main_training_loop(self, X, y):
         """
@@ -132,7 +143,7 @@ class Estimator(TensorflowBaseEstimator):
         network_heads = params['network_heads']
 
         if mode == tf.estimator.ModeKeys.PREDICT:
-            features = distort(features)
+            features = self.data_provider.predict_features(features)
 
         with tf.variable_scope(NETWORK_BODY_SCOPE):
             m = Model(
@@ -333,17 +344,7 @@ class Estimator(TensorflowBaseEstimator):
         input_fn_config={},
         shard=None,
     ):
-        path = generate_tf_dataset(input_fn_config['data_generation'])
-
-        def _input_fn():
-            return input_iterator(
-                input_fn_config['data_generation'],
-                input_fn_config['data_streaming'],
-                data_path=path,
-                shard=shard,
-                type='train' if train else 'test',
-            )
-        return _input_fn
+        return self.data_provider.get_input_fn(train, shard)
 
     def training_log_values(self, values):
         self.training_metrics.append(values)
