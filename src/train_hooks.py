@@ -1,20 +1,42 @@
 import tensorflow as tf
+import numpy as np
 
 
 class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
-    def __init__(self, estimator, *args, **kwargs):
+    def __init__(
+        self,
+        estimator,
+        print_summary_init_value=0.5,
+        print_summary_tensor=None,
+        *args,
+        **kwargs
+    ):
         super(PrintAndLogTensorHook, self).__init__(
             *args,
             **kwargs
         )
         self.estimator = estimator
+        self.print_summary_tensor = print_summary_tensor
+        self.print_aggregated_history = [print_summary_init_value] * 30
 
     def _log_tensors(self, tensor_values):
         """
         tensor_values is a dict {string => tensor_value }
         """
         self.estimator.training_log_values(tensor_values)
-
+        # super(PrintAndLogTensorHook, self)._log_tensors(tensor_values)
+        if self.print_summary_tensor is not None:
+            self.print_aggregated_history.append(
+                tensor_values[self.print_summary_tensor]
+            )
+            print(
+                'Entrack',
+                'Step:', tensor_values['global_step'],
+                'Loss:', tensor_values['global_optimizer_loss'],
+                self.print_summary_tensor, np.mean(
+                    self.print_aggregated_history[-20:-1]
+                )
+            )
 
 
 class SessionHookFullTrace(tf.train.SessionRunHook):
