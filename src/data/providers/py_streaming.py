@@ -67,10 +67,13 @@ class DataProvider(object):
                 _read_files,
                 [filename, label],
                 [tf.float16, tf.int64, tf.int64],
+                stateful=False,
                 name='read_files',
-            ))
+            )),
+            num_parallel_calls=12,
         )
         dataset = dataset.map(_parser)
+        dataset = dataset.prefetch(10 * self.config['batch_size'])
         dataset = dataset.batch(batch_size=self.config['batch_size'])
 
         def _input_fn():
