@@ -32,9 +32,9 @@ class ClassificationHead(NetworkHeadBase):
         # Compute loss
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
-        self.loss = self.inference_loss(
-            labels=self.labels,
-            logits=self.predictions,
+        self.loss = tf.losses.softmax_cross_entropy(
+            self.labels,
+            self.predictions,
         )
 
         # Metrics for training/eval
@@ -65,29 +65,6 @@ class ClassificationHead(NetworkHeadBase):
             features=features,
             **kwargs
         )
-
-    @classmethod
-    def inference_loss(cls, logits, labels):
-        """
-        This function calculates the average cross entropy loss of the input
-        batch and adds it to the 'loss' collections
-        Args:
-            logits: the output of 3D CNN
-            labels: the actual class labels of the batch
-        Returns:
-
-        """
-
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-            labels=labels, logits=logits, name='cross_entropy_loss')
-        tf.summary.tensor_summary('logits', logits)
-        tf.summary.histogram('logits', tf.argmax(logits, 1))
-        tf.summary.histogram('labels', tf.argmax(labels, 1))
-        cross_entropy_mean = tf.reduce_mean(cross_entropy,
-                                            name='batch_cross_entropy_loss')
-        tf.add_to_collection('losses', cross_entropy_mean)
-        tf.add_to_collection('crossloss', cross_entropy_mean)
-        return cross_entropy_mean
 
     def get_evaluated_metrics(self):
         evaluation_metrics = \

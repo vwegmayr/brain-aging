@@ -190,8 +190,9 @@ class Estimator(TensorflowBaseEstimator):
             )
 
         # Compute loss
-        losses = tf.get_collection('losses')
-        global_loss = tf.add_n(losses, name='total_loss')
+        global_loss = 0
+        for head in heads:
+            global_loss += head.get_global_loss_contribution()
 
         # Variables logged during training (append head name as prefix)
         train_log_variables = {
@@ -216,12 +217,25 @@ class Estimator(TensorflowBaseEstimator):
                 })
 
         # Optimizer
-        train_op, global_loss = m.fuscnn.get_train_op(tf.train.get_global_step())
+        train_vars = tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES,
+            scope=NETWORK_BODY_SCOPE,
+        )
+        for head in heads:
+            head.register_globally_trained_variables(train_vars)
+
+        train_ops = self.generate_train_ops(
+            train_log_variables,
+            global_loss,
+            train_vars,
+            heads,
+            **params['network_train_ops_settings']
+        )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=global_loss,
-            train_op=train_op,
+            train_op=tf.group(*train_ops),
             eval_metric_ops=eval_metric_ops,
             training_hooks=self.get_training_hooks(
                 params,
