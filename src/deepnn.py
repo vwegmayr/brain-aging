@@ -149,7 +149,7 @@ class DeepNN(object):
                 b = tf.get_variable(
                     "b",
                     [num_filters],
-                    initializer=tf.constant_initializer(0.1),
+                    initializer=tf.constant_initializer(0.001),
                 )
                 out += b
             out = nl(out)

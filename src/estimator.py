@@ -251,7 +251,7 @@ class Estimator(TensorflowBaseEstimator):
             tf.AggregationMethod,
             adam_aggregation_method,
         )
-        optimizer = tf.train.AdamOptimizer()
+        optimizer = tf.train.AdamOptimizer(0.00005)
 
         def global_train_op():
             return optimizer.minimize(

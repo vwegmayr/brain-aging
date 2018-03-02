@@ -12,75 +12,41 @@ class Model(DeepNN):
     def gen_last_layer(self, ft):
         mri = tf.cast(ft[features_def.MRI], tf.float32)
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
-        mri = self.batch_norm(mri, scope="norm_input")
 
-        def conv_wrap(conv, filters, size, scope, pool=False):
-            out = self.conv3d_layer(
-                conv,
-                filters,
-                size,
-                pool=pool,
-                bn=True,
+        def conv_relu(input_, kernel_shape, scope):
+            return self.conv3d_layer(
+                input_,
+                kernel_shape[4],
+                kernel_shape[0:3],
+                pool=False,
+                strides=[2, 2, 2],
+                bn=False,
                 scope=scope,
-                mpadding='SAME',
                 padding='SAME',
             )
-            self.on_cnn_layer(out)
-            return out
 
         conv = mri
-        self.on_cnn_layer(conv, "input")
-        conv = self.conv2d_shared_all_dims_layer(conv, 'b1')
-        self.on_cnn_layer(conv)
-        conv = conv_wrap(conv, 60, [3, 3, 3], "c2")
-        conv = conv_wrap(conv, 60, [3, 3, 3], "c3")
-        conv = conv_wrap(conv, 100, [3, 3, 3], "c4")
-        conv = conv_wrap(conv, 100, [3, 3, 3], "c5")
-
-        conv = tf.reduce_max(conv, axis=[1, 2, 3])
-
-        self.print_shape('%d fc features' % (conv.get_shape().as_list()[1]))
-        fc = tf.concat([
-            # Features from convet
-            conv,
-            # Additionnal features:
-            #    shape [batch_size, feature_count]
-            #    type float32
-            # tf.reshape(tf.cast(ft[features_def.AGE], tf.float32), [-1, 1]),
-        ], 1)
-
-        fc = self.fc_layer(
-            fc,
-            256,
-            name="fc_features",
-        )
-
-        # Summaries:
-        with tf.variable_scope("b1/conv", reuse=True):
-            self.convet_filters_summary(
-                tf.reshape(
-                    tf.get_variable('w'),
-                    [5, 5, 1, -1],
-                ),
-                "Conv2D"
-            )
-        return fc
+        conv = tf.concat([
+            conv_relu(conv, [5, 5, 5, -1, 15], scope='conv1_a'),
+            conv_relu(conv, [6, 6, 6, -1, 15], scope='conv1_b'),
+            conv_relu(conv, [7, 7, 7, -1, 15], scope='conv1_c'),
+        ], 4)
+        conv = conv_relu(conv, kernel_shape=[5, 5, 5, 45, 60], scope='conv2')
+        conv = conv_relu(conv, kernel_shape=[5, 5, 5, 60, 64], scope='conv3')
+        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 64, 100], scope='conv4')
+        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 100, 128], scope='conv5')
+        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 128, 256], scope='conv6')
+        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 256, 512], scope='conv7')
+        return tf.verify_tensor_all_finite(conv, "gen_last_layer returns non finite values!")
 
     def gen_head(self, fc, num_classes, **kwargs):
-        fc = self.batch_norm(fc, scope='ft_norm')
-        fc = self.fc_layer(
-            fc,
-            256,
-            name="fc_head1",
-        )
-        fc = self.batch_norm(fc, scope='ft_norm2')
-        fc = self.fc_layer(
-            fc,
-            num_classes,
-            name="fc_head2",
-            **kwargs
-        )
-        return fc
+        assert(fc.get_shape().as_list()[1:4] == [1, 1, 1])
+        ft_in = fc.get_shape().as_list()[4]
+        fc = tf.reshape(fc, [tf.shape(fc)[0], ft_in])
+        fc = self.fc_layer(fc, 512, name='fullcn')
+        fc = self.dropout(fc, 0.3)
+        fc = self.fc_layer(fc, num_classes, nl=tf.identity, name='logits')
+        return tf.verify_tensor_all_finite(fc, "gen_head returns non finite values!")
 
     def gen_deconv_head(self, fc):
         assert(len(self.cnn_layers_shapes) > 0)
