@@ -35,6 +35,7 @@ class ClassificationHead(NetworkHeadBase):
         self.loss = tf.losses.softmax_cross_entropy(
             self.labels,
             self.predictions,
+            reduction=tf.losses.Reduction.MEAN,
         )
 
         # Metrics for training/eval
