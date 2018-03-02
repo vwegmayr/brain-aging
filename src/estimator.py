@@ -211,15 +211,7 @@ class Estimator(TensorflowBaseEstimator):
             })
 
         # Optimizer
-        optimizer = tf.train.AdamOptimizer(0.00005)
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        print('losses', len(losses))
-        print('update_ops', len(update_ops))
-        with tf.control_dependencies(update_ops):
-            train_op = optimizer.minimize(
-                loss=global_loss,
-                global_step=tf.train.get_global_step()
-            )
+        train_op, global_loss = m.fuscnn.get_train_op(tf.train.get_global_step())
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
