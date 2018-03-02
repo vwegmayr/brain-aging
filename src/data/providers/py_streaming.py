@@ -51,10 +51,15 @@ class DataProvider(object):
             ]
 
         def _parser(_mri, _healthy, _health_ad):
-            return {
+            ft_info = ft_def.all_features.feature_info
+            ft = {
                 ft_def.MRI: tf.reshape(_mri, self.mri_shape),
                 ft_def.HEALTHY: _healthy,
                 ft_def.HEALTH_AD: _health_ad,
+            }
+            return {
+                ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
+                for ft_name, ft_tensor in ft.items()
             }
         dataset = tf.data.Dataset.from_tensor_slices((all_files, all_labels))
         dataset = dataset.map(
