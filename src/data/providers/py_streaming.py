@@ -15,13 +15,15 @@ import src.features as ft_def
 
 
 class DataProvider(object):
-    def __init__(self, input_fn_config):
+    def __init__(self, input_fn_config=None):
+        if input_fn_config is None:
+            input_fn_config = {'py_streaming': {'classes': 2, 'seed': 0, 'batch_size': 12, 'data_paths': {'regex': '_normalized\\.nii\\.gz', 'split_on': '_normalized.nii.gz', 'class_labels': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl', 'train_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl', 'datadir': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/', 'valid_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'}}, 'data_provider': 'py_streaming', 'image_shape': [91, 109, 91], 'data_generation': {'data_converted_directory': 'data/ready/', 'data_sources': [{'glob': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*', 'name': 'ADNI_AIBL', 'features_from_filename': {'regexp': '.*/(\\d+)_normalized\\.nii\\.gz', 'features_group': {'study_image_id': 1}}, 'patients_features': 'data/raw/csv/adni_aibl__ad_hc.csv'}], 'image_normalization': {'outlier_percentile': 99, 'enable': True}, 'train_database_file': 'train.tfrecord', 'test_set_size_ratio': 0.2, 'test_set_random_seed': 0, 'dataset_compression': 'GZIP', 'test_database_file': 'test.tfrecord', 'train_test_split_on_feature': 'study_patient_id'}, 'data_streaming': {'dataset': [{'buffer_size': 400, 'call': 'prefetch'}, {'buffer_size': 500, 'call': 'shuffle'}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'call': 'batch', 'batch_size': 8}]}}
         self.input_fn_config = input_fn_config
         self.inputs = {True: None, False: None}
 
         self.config = config = input_fn_config['py_streaming']
-        random_state = random.getstate()
-        random.seed(config['seed'])
+        self.random = random.Random()
+        self.random.seed(config['seed'])
         train_files, test_files = get_train_test_filenames(config)
 
         for train, files in [(True, train_files), (False, test_files)]:
@@ -29,25 +31,29 @@ class DataProvider(object):
                 config,
                 train_files if train else test_files,
             )
-            self.inputs[train].shuffle()
-        random.setstate(random_state)
+            self.inputs[train].shuffle(self.random)
         self.mri_shape = nb.load(train_files[0][0]).get_data().shape
 
     def get_input_fn(self, train, shard):
         # Generate batch filenames
-        dataset = self.inputs[train].create_shard_shuffled(shard)
+        dataset = self.inputs[train].create_shard(shard)
+        dataset.shuffle(self.random)
         all_files = []
         all_labels = []
         while not dataset.all_classes_looped():
-            files, labels = dataset.next_batch_filenames()
+            files, labels = dataset.next_batch_filenames(self.random)
             all_files += files
             all_labels += labels
+        all_seeds = [
+            self.random.randint(0, 1000000)
+            for _ in all_labels
+        ]
 
-        def _read_files(f, label):
+        def _read_files(f, label, seed):
             return [
-                DataInput.load_and_augment_file(f),
+                DataInput.load_and_augment_file(f, seed),
                 int(label == 0),
-                int(label == 2),
+                int(label == 1),
             ]
 
         def _parser(_mri, _healthy, _health_ad):
@@ -57,15 +63,19 @@ class DataProvider(object):
                 ft_def.HEALTHY: _healthy,
                 ft_def.HEALTH_AD: _health_ad,
             }
+            ft_info['mri']['shape'] = self.mri_shape
             return {
                 ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
                 for ft_name, ft_tensor in ft.items()
             }
-        dataset = tf.data.Dataset.from_tensor_slices((all_files, all_labels))
+
+        dataset = tf.data.Dataset.from_tensor_slices(
+            (all_files, all_labels, all_seeds)
+        )
         dataset = dataset.map(
-            lambda filename, label: tuple(tf.py_func(
+            lambda filename, label, seed: tuple(tf.py_func(
                 _read_files,
-                [filename, label],
+                [filename, label, seed],
                 [tf.float16, tf.int64, tf.int64],
                 stateful=False,
                 name='read_files',
@@ -117,6 +127,8 @@ def get_train_test_filenames(config):
     for i in range(0, classes):
         print("Train Class ", i, len(train_filenames[i]))
         print("Valid Class ", i, len(valid_filenames[i]))
+        train_filenames[i].sort()
+        valid_filenames[i].sort()
     return train_filenames, valid_filenames
 
 
@@ -139,16 +151,16 @@ class DataInput:
     def all_classes_looped(self):
         return all([l > 0 for l in self.batch_looped])
 
-    def shuffle(self):
+    def shuffle(self, r):
         for class_label in range(0, self.num_classes):
             shuffle_indices = list(range(len(self.files[class_label])))
-            random.shuffle(shuffle_indices)
+            r.shuffle(shuffle_indices)
             self.files[class_label] = [
                 self.files[class_label][i]
                 for i in shuffle_indices
             ]
 
-    def create_shard_shuffled(self, shard):
+    def create_shard(self, shard):
         child = DataInput(self.config, [[] for i in range(self.num_classes)])
         # Shard
         if shard is not None:
@@ -162,10 +174,9 @@ class DataInput:
                 ]
         else:
             child.files = copy.copy(self.files)
-        child.shuffle()
         return child
 
-    def next_batch_filenames(self):
+    def next_batch_filenames(self, r):
         """
         This functions retrieves the next batch of the data.
 
@@ -186,7 +197,7 @@ class DataInput:
                 i
                 for j in range(0, int(self.batch_size / self.num_classes))
             ]
-        random.shuffle(batch_order)
+        r.shuffle(batch_order)
         for class_label in batch_order:
             start = self.batch_index[class_label]
             class_files = []
@@ -205,7 +216,7 @@ class DataInput:
                 ]
                 left_files = end - len(self.files[class_label])
                 shuffle_indices = list(range(len(self.files[class_label])))
-                random.shuffle(shuffle_indices)
+                r.shuffle(shuffle_indices)
                 self.files[class_label] = [
                     self.files[class_label][i]
                     for i in shuffle_indices
@@ -223,8 +234,10 @@ class DataInput:
         return batch_files, batch_labels
 
     @staticmethod
-    def rotate(filename, direction):
-        angle_rot = random.uniform(-3, 3)
+    def rotate(filename, direction, seed):
+        r = random.Random()
+        r.seed(seed)
+        angle_rot = r.uniform(-3, 3)
         mri_image = nb.load(filename).get_data()
         if direction == 'x':
             return sni.rotate(mri_image, angle_rot, (0, 1), reshape=False)
@@ -234,8 +247,10 @@ class DataInput:
             return sni.rotate(mri_image, angle_rot, (1, 2), reshape=False)
 
     @staticmethod
-    def translate(filename, direction):
-        pixels = random.uniform(-4, 4)
+    def translate(filename, direction, seed):
+        r = random.Random()
+        r.seed(seed)
+        pixels = r.uniform(-4, 4)
         mri_image = nb.load(filename).get_data()
         if direction == 'x':
             return sni.shift(mri_image, [pixels, 0, 0], mode='nearest')
@@ -245,7 +260,7 @@ class DataInput:
             return sni.shift(mri_image, [0, 0, pixels], mode='nearest')
 
     @staticmethod
-    def load_and_augment_file(filename):
+    def load_and_augment_file(filename, seed):
         # For augmentation
         mri_image = []
         if 'rot' in filename:
@@ -253,12 +268,14 @@ class DataInput:
             mri_image = DataInput.rotate(
                 split_filename[0],
                 split_filename[1],
+                seed,
             )
         elif 'trans' in filename:
             split_filename = filename.split('trans')
             mri_image = DataInput.translate(
                 split_filename[0],
                 split_filename[1],
+                seed,
             )
 
         else:
