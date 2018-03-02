@@ -7,10 +7,10 @@ from src.data.data_to_tf import generate_tf_dataset
 # Functions for Data Provider interface
 class DataProvider(object):
     def __init__(self, input_fn_config):
+        input_fn_config['data_generation']['image_shape'] = \
+            input_fn_config['image_shape']
         self.path = generate_tf_dataset(input_fn_config['data_generation'])
         self.input_fn_config = input_fn_config
-        self.input_fn_config['data_generation']['image_shape'] = \
-            input_fn_config['image_shape']
 
     def get_input_fn(self, train, shard):
         def _input_fn():
