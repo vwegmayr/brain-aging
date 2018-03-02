@@ -47,7 +47,7 @@ class ClassificationHead(NetworkHeadBase):
             tf.float32,
         ))
         self.metrics = {
-            'accuracy': accuracy
+            'accuracy': accuracy,
         }
         self.metrics.update({
             'predicted_%s_ratio' % ft_name:
