@@ -8,8 +8,11 @@ from src.data.data_to_tf import generate_tf_dataset
 class DataProvider(object):
     def __init__(self, input_fn_config):
         self.path = generate_tf_dataset(input_fn_config['data_generation'])
+        self.input_fn_config = input_fn_config
+        self.input_fn_config['data_generation']['image_shape'] = \
+            input_fn_config['image_shape']
 
-    def get_input_fn(train, shard):
+    def get_input_fn(self, train, shard):
         def _input_fn():
             return input_iterator(
                 self.input_fn_config['data_generation'],
@@ -20,7 +23,7 @@ class DataProvider(object):
             )
         return _input_fn
 
-    def predict_features(features):
+    def predict_features(self, features):
         return random_crop(features)
 # End of interface functions
 

@@ -10,7 +10,7 @@ from modules.models.utils import custom_print
 import features as ft_def
 import src.data.providers
 from model import Model
-from train_hooks import PrintAndLogTensorHook, SessionHookFullTrace
+from train_hooks import PrintAndLogTensorHook
 
 
 class Estimator(TensorflowBaseEstimator):
@@ -41,7 +41,7 @@ class Estimator(TensorflowBaseEstimator):
             **kwargs
         )
         ft_def.all_features.feature_info[ft_def.MRI]['shape'] = \
-            self.input_fn_config['data_generation']['image_shape']
+            self.input_fn_config['image_shape']
 
         self.feature_spec = {
             name: tf.placeholder(
@@ -60,7 +60,7 @@ class Estimator(TensorflowBaseEstimator):
                 self.input_fn_config['data_provider'] +
                 ' not found'
             )
-        assert(data_provider is not None)
+        assert(module is not None)
         self.data_provider = module.DataProvider(self.input_fn_config)
 
     def fit_main_training_loop(self, X, y):
