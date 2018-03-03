@@ -277,7 +277,7 @@ if __name__ == '__main__':
         "-S",
         "--save-folder-prefix",
         help="model file",
-        default="/local/entrack/data",
+        default="/local/dhaziza/data",
     )
     arg_parser.add_argument("-C", "--config", help="config file")
     arg_parser.add_argument("-M", "--model", help="model file")
