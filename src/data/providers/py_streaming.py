@@ -34,8 +34,7 @@ class DataProvider(object):
             self.inputs[train].shuffle(self.random)
         self.mri_shape = nb.load(train_files[0][0]).get_data().shape
 
-    def get_input_fn(self, train, shard):
-        # Generate batch filenames
+    def get_shuffled_filenames(self, train, shard):
         dataset = self.inputs[train].create_shard(shard)
         dataset.shuffle(self.random)
         all_files = []
@@ -48,7 +47,9 @@ class DataProvider(object):
             self.random.randint(0, 1000000)
             for _ in all_labels
         ]
+        return (all_files, all_labels, all_seeds)
 
+    def get_input_fn(self, train, shard):
         def _read_files(f, label, seed):
             return [
                 DataInput.load_and_augment_file(f, seed),
@@ -70,7 +71,7 @@ class DataProvider(object):
             }
 
         dataset = tf.data.Dataset.from_tensor_slices(
-            (all_files, all_labels, all_seeds)
+            tuple(self.get_shuffled_filenames(train, shard))
         )
         dataset = dataset.map(
             lambda filename, label, seed: tuple(tf.py_func(
@@ -234,11 +235,9 @@ class DataInput:
         return batch_files, batch_labels
 
     @staticmethod
-    def rotate(filename, direction, seed):
-        r = random.Random()
-        r.seed(seed)
+    def rotate(mri_image, r):
         angle_rot = r.uniform(-3, 3)
-        mri_image = nb.load(filename).get_data()
+        direction = r.choice(['x', 'y', 'z'])
         if direction == 'x':
             return sni.rotate(mri_image, angle_rot, (0, 1), reshape=False)
         if direction == 'y':
@@ -247,11 +246,9 @@ class DataInput:
             return sni.rotate(mri_image, angle_rot, (1, 2), reshape=False)
 
     @staticmethod
-    def translate(filename, direction, seed):
-        r = random.Random()
-        r.seed(seed)
+    def translate(mri_image, r):
         pixels = r.uniform(-4, 4)
-        mri_image = nb.load(filename).get_data()
+        direction = r.choice(['x', 'y', 'z'])
         if direction == 'x':
             return sni.shift(mri_image, [pixels, 0, 0], mode='nearest')
         if direction == 'y':
@@ -260,25 +257,14 @@ class DataInput:
             return sni.shift(mri_image, [0, 0, pixels], mode='nearest')
 
     @staticmethod
-    def load_and_augment_file(filename, seed):
-        # For augmentation
-        mri_image = []
-        if 'rot' in filename:
-            split_filename = filename.split('rot')
-            mri_image = DataInput.rotate(
-                split_filename[0],
-                split_filename[1],
-                seed,
-            )
-        elif 'trans' in filename:
-            split_filename = filename.split('trans')
-            mri_image = DataInput.translate(
-                split_filename[0],
-                split_filename[1],
-                seed,
-            )
+    def load_and_augment_file(filename, seed, augment=False):
+        mri_image = nb.load(filename)
+        mri_image = mri_image.get_data()
 
-        else:
-            mri_image = nb.load(filename)
-            mri_image = mri_image.get_data()
+        # Data augmentation
+        if augment:
+            r = random.Random()
+            r.seed(seed)
+            mri_image = DataInput.translate(mri_image, r)
+            mri_image = DataInput.rotate(mri_image, r)
         return mri_image.astype(np.float16)
