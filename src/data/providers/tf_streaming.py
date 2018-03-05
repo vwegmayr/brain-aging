@@ -1,7 +1,8 @@
 import os
+import numpy as np
 import tensorflow as tf
 import src.features as ft_def
-from src.data.data_to_tf import generate_tf_dataset
+from src.data.data_to_tf import generate_tf_dataset, iter_slices
 
 
 # Functions for Data Provider interface
@@ -25,6 +26,14 @@ class DataProvider(object):
 
     def predict_features(self, features):
         return random_crop(features)
+
+    def get_mri_shape(self):
+        for s in iter_slices(
+            np.zeros(self.input_fn_config['image_shape']),
+            self.input_fn_config['data_generation'],
+        ):
+            return s.shape
+        assert(False)
 # End of interface functions
 
 

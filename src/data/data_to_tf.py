@@ -50,6 +50,23 @@ def get_data_preprocessing_values(config):
     }
 
 
+def get_3d_array_dim(a, dim, dim_val):
+    assert(dim in [0, 1, 2])
+    if dim == 0:
+        return a[dim_val, :, :]
+    elif dim == 1:
+        return a[:, dim_val, :]
+    return a[:, :, dim_val]
+
+
+def iter_slices(img_data, config):
+    if 'image_slices' in config:
+        for s in config['image_slices']:
+            yield get_3d_array_dim(img_data, s['dimension'], s['value'])
+    else:
+        yield img_data
+
+
 class DataAggregator:
     def __init__(self, config, converted_dir):
         self.config = config
@@ -96,10 +113,8 @@ class DataAggregator:
         return self.value_to_writer[ft_value]
 
     def add_image(self, image_path, int64_features):
-        Features = tf.train.Features
         Feature = tf.train.Feature
         Int64List = tf.train.Int64List
-        Example = tf.train.Example
 
         if self.count % (self.total_files / 10) == 1:
             UniqueLogger.log('%s: [%s] Processing image #%d/%d...' % (
@@ -107,11 +122,7 @@ class DataAggregator:
                 self.count, self.total_files))
         self.count += 1
 
-        img = nib.load(image_path)
-        img_data = self._norm(
-            img.get_data(),
-            **self.config['image_normalization']
-        )
+        img_data = nib.load(image_path).get_data()
         if list(img_data.shape) != list(self.config['image_shape']):
             self.add_error(
                 image_path,
@@ -121,14 +132,31 @@ class DataAggregator:
             return
 
         # Transform features and write
-        int64_features[ft_def.STUDY_ID] = self.curr_study_id
         def _int64_to_feature(v):
             return Feature(int64_list=Int64List(value=[v]))
+        int64_features[ft_def.STUDY_ID] = self.curr_study_id
         img_features = {
             k: _int64_to_feature(v)
             for k, v in int64_features.items()
         }
-        img_features[ft_def.MRI] = Feature(
+
+        for s in iter_slices(img_data, self.config):
+            self._write_image(
+                self.get_writer_for_image(
+                    int64_features
+                ),
+                s,
+                img_features,
+                image_path,
+            )
+        self.stats[self.curr_study_name]['success'] += 1
+
+    def _write_image(self, writer, img_data, img_features, image_path):
+        img_data = self._norm(
+            img_data,
+            **self.config['image_normalization']
+        )
+        img_features[ft_def.MRI] = tf.train.Feature(
             float_list=tf.train.FloatList(
                 value=img_data.reshape([-1])
             ),
@@ -141,11 +169,10 @@ class DataAggregator:
                     ft_name, image_path))
                 assert(False)
 
-        example = Example(features=Features(feature=img_features))
-        self.get_writer_for_image(
-            int64_features
-        ).write(example.SerializeToString())
-        self.stats[self.curr_study_name]['success'] += 1
+        example = tf.train.Example(
+            features=tf.train.Features(feature=img_features),
+        )
+        writer.write(example.SerializeToString())
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)

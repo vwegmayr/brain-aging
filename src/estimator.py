@@ -62,6 +62,8 @@ class Estimator(TensorflowBaseEstimator):
             )
         assert(module is not None)
         self.data_provider = module.DataProvider(self.input_fn_config)
+        ft_def.all_features.feature_info[ft_def.MRI]['shape'] = \
+            self.data_provider.get_mri_shape()
 
     def fit_main_training_loop(self, X, y):
         """

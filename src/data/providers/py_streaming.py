@@ -93,6 +93,9 @@ class DataProvider(object):
 
     def predict_features(self, features):
         return features
+
+    def get_mri_shape(self):
+        return self.mri_shape
 # End of interface functions
 
 
