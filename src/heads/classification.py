@@ -96,9 +96,11 @@ class ClassificationHead(NetworkHeadBase):
         actual_class = tf.argmax(self.labels, 1)
         evaluation_metrics.update({
             'false_negatives': tf.metrics.false_negatives(
-                predicted, actual_class),
+                actual_class, predicted),
             'false_positives': tf.metrics.false_positives(
-                predicted, actual_class),
+                actual_class, predicted),
+            'mean_per_class_accuracy': tf.metrics.mean_per_class_accuracy(
+                actual_class, predicted, len(self.predict_feature_names)),
         })
         evaluation_metrics.update({
             n: tf.metrics.mean(v[0], weights=v[1], name='%s_weighted' % n)
