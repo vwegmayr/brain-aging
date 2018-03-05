@@ -40,15 +40,15 @@ class ClassificationHead(NetworkHeadBase):
 
         # Metrics for training/eval
         batch_size = tf.shape(self.labels)[0]
-        accuracy = tf.reduce_mean(tf.cast(
+        accuracy = tf.cast(
             tf.equal(
                 tf.argmax(self.predictions, 1),
                 tf.argmax(self.labels, 1),
             ),
             tf.float32,
-        ))
+        )
         self.metrics = {
-            'accuracy': accuracy,
+            'accuracy': tf.reduce_mean(accuracy),
         }
         self.metrics.update({
             'predicted_%s_ratio' % ft_name:
@@ -57,6 +57,27 @@ class ClassificationHead(NetworkHeadBase):
                 tf.float32,
             )) / tf.cast(batch_size, tf.float32)
             for i, ft_name in enumerate(self.predict_feature_names)
+        })
+
+        # Accuracy on different classes
+        def accuracy_on_class(i):
+            weights = tf.cast(
+                tf.equal(
+                    tf.argmax(self.labels, 1),
+                    i,
+                ),
+                tf.float32,
+            )
+            class_acc = tf.reduce_sum(weights * accuracy)
+            class_acc /= tf.reduce_sum(weights) + 0.0001
+            return class_acc, tf.reduce_sum(weights)
+        self.classes_accuracy = {
+            'accuracy_on_%s' % c: accuracy_on_class(i)
+            for i, c in enumerate(predict)
+        }
+        self.metrics.update({
+            name: v[0]
+            for name, v in self.classes_accuracy.items()
         })
 
         super(ClassificationHead, self).__init__(
@@ -78,6 +99,10 @@ class ClassificationHead(NetworkHeadBase):
                 predicted, actual_class),
             'false_positives': tf.metrics.false_positives(
                 predicted, actual_class),
+        })
+        evaluation_metrics.update({
+            n: tf.metrics.mean(v[0], weights=v[1], name='%s_weighted' % n)
+            for n, v in self.classes_accuracy.items()
         })
         return evaluation_metrics
 
