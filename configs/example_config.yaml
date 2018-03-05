@@ -73,7 +73,7 @@ params:
         - call: batch
           batch_size: 8
   params: # Params for model (model_fn)
-    train_log_every_n_iter: 20
+    train_log_every_n_iter: 60
     hooks:
       - class: src.train_hooks.SessionHookFullTrace
         params:
@@ -137,7 +137,7 @@ params:
     # Tensorflow RunConfig
     # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
     tf_estimator_run_config:
-      save_summary_steps: 20
+      save_summary_steps: 100
       tf_random_seed: 40
       save_checkpoints_steps: 500
       #save_checkpoints_secs:
