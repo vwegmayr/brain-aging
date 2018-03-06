@@ -27,6 +27,7 @@ class AutoencoderHead(NetworkHeadBase):
             self.labels,
             self.predictions,
         )
+        self.metrics = {}
         super(AutoencoderHead, self).__init__(
             name=name,
             model=model,
