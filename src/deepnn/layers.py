@@ -138,7 +138,36 @@ class DeepNNLayers(object):
 
     # ================= 2D ConvNets =================
     def conv2d_layer(self, *args, **kwargs):
+        # Some default values are for 3d convnets, so fix it
+        if 'filter_weights' not in kwargs:
+            kwargs['filter_weights'] = [3, 3]
+        if 'strides' not in kwargs:
+            kwargs['strides'] = [2, 2]
         return self.conv_layer_wrapper(tf.nn.conv2d, *args, **kwargs)
+
+    def conv2d_layer_transpose(self, output_shape, *args, **kwargs):
+        # Some default values are for 3d convnets, so fix it
+        if 'filter_weights' not in kwargs:
+            kwargs['filter_weights'] = [3, 3]
+        if 'strides' not in kwargs:
+            kwargs['strides'] = [2, 2]
+        kwargs['conv_type'] = 'deconv'
+        assert(len(output_shape) == 4)
+
+        def conv2d_transpose_func(input, **kwargs2):
+            # Dynamic batch_size
+            _output_shape = output_shape[1:]
+            _output_shape = [tf.shape(input)[0]] + _output_shape
+            return tf.nn.conv2d_transpose(
+                input,
+                output_shape=_output_shape,
+                **kwargs2
+            )
+        return self.conv_layer_wrapper(
+            conv2d_transpose_func,
+            *args,
+            **kwargs
+        )
 
     # ================= 3D ConvNets =================
     def conv2d_shared_all_dims_layer(
