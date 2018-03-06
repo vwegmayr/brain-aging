@@ -13,30 +13,34 @@ class Model(DeepNN):
         mri = tf.cast(ft[features_def.MRI], tf.float32)
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
 
-        def conv_relu(input_, kernel_shape, scope):
-            return self.conv3d_layer(
+        def conv_relu(input_, kernel_shape, scope, log=True):
+            out = self.conv3d_layer(
                 input_,
                 kernel_shape[4],
                 kernel_shape[0:3],
-                pool=False,
                 strides=[2, 2, 2],
                 bn=False,
                 scope=scope,
                 padding='SAME',
             )
+            if log:
+                self.on_cnn_layer(out)
+            return out
 
         conv = mri
+        self.on_cnn_layer(conv, 'input')
         conv = tf.concat([
-            conv_relu(conv, [5, 5, 5, -1, 15], scope='conv1_a'),
-            conv_relu(conv, [6, 6, 6, -1, 15], scope='conv1_b'),
-            conv_relu(conv, [7, 7, 7, -1, 15], scope='conv1_c'),
+            conv_relu(conv, [5, 5, 5, -1, 15], 'conv1_a', False),
+            conv_relu(conv, [6, 6, 6, -1, 15], 'conv1_b', False),
+            conv_relu(conv, [7, 7, 7, -1, 15], 'conv1_c', False),
         ], 4)
-        conv = conv_relu(conv, kernel_shape=[5, 5, 5, 45, 60], scope='conv2')
-        conv = conv_relu(conv, kernel_shape=[5, 5, 5, 60, 64], scope='conv3')
-        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 64, 100], scope='conv4')
-        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 100, 128], scope='conv5')
-        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 128, 256], scope='conv6')
-        conv = conv_relu(conv, kernel_shape=[3, 3, 3, 256, 512], scope='conv7')
+        self.on_cnn_layer(conv, 'conv1')
+        conv = conv_relu(conv, [5, 5, 5, 45, 60], 'conv2')
+        conv = conv_relu(conv, [5, 5, 5, 60, 64], 'conv3')
+        conv = conv_relu(conv, [3, 3, 3, 64, 100], 'conv4')
+        conv = conv_relu(conv, [3, 3, 3, 100, 128], 'conv5')
+        conv = conv_relu(conv, [3, 3, 3, 128, 256], 'conv6')
+        conv = conv_relu(conv, [3, 3, 3, 256, 512], 'conv7')
         return tf.verify_tensor_all_finite(conv, "gen_last_layer returns non finite values!")
 
     def gen_head(self, fc, num_classes, **kwargs):
@@ -52,7 +56,7 @@ class Model(DeepNN):
         assert(len(self.cnn_layers_shapes) > 0)
         fc = self.batch_norm(fc, scope='ft_norm')
         in_ft = fc.get_shape().as_list()[-1]
-        ft_count = [256, 100, 64, 64, 64, 32]
+        ft_count = [512, 512, 256, 128, 100, 64, 60, 32]
         assert(len(ft_count) == len(self.cnn_layers_shapes))
 
         # Handle first layer manually - manual broadcast if needed
@@ -79,9 +83,9 @@ class Model(DeepNN):
             prev_shape = conv.get_shape().as_list()
             strides = int(round(float(output_shape[1]) / prev_shape[1]))
             conv = self.conv3d_layer_transpose(
+                output_shape,
                 conv,
                 num_filters=num_filters,
-                output_shape=output_shape,
                 scope=layer['name'],
                 strides=[strides] * 3,
                 nl=nl,
@@ -91,11 +95,9 @@ class Model(DeepNN):
             conv,
             1,
             [1, 1, 1],
-            pool=False,
             bn=False,
             strides=[1, 1, 1],
             scope='reconstructed',
-            mpadding='SAME',
             padding='SAME',
             nl=tf.identity,
         )
