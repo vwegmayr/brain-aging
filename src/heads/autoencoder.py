@@ -36,9 +36,31 @@ class AutoencoderHead(NetworkHeadBase):
             **kwargs
         )
 
-        self.image_summary()
+        if len(mri_shape) == 2:
+            self.image_summary_2d()
+        else:
+            self.image_summary_3d()
 
-    def image_summary(self):
+    def image_summary_2d(self):
+        labels_shape = self.labels.get_shape().as_list()
+        labels_for_summary = tf.reshape(
+            self.labels[0],
+            [1] + labels_shape[1:] + [1],
+        )
+        predictions_for_summary = tf.reshape(
+            self.predictions[0],
+            [1] + labels_shape[1:] + [1],
+        )
+        tf.summary.image(
+            "GroundTruthXY",
+            labels_for_summary,
+        )
+        tf.summary.image(
+            "PredictionXY",
+            predictions_for_summary,
+        )
+
+    def image_summary_3d(self):
         labels_shape = self.labels.get_shape().as_list()
         mid_shape = [0] + [
             self.labels.get_shape().as_list()[i] / 2
