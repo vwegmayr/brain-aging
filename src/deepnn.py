@@ -11,6 +11,7 @@ class DeepNN(object):
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
 
+    # ================= Summaries and utils =================
     def print_shape(self, text):
         if self.enable_print_shapes:
             custom_print(text)
@@ -79,49 +80,28 @@ class DeepNN(object):
                 tf.reshape(img, [1] + img.get_shape().as_list()[0:3]),
             )
 
-    def conv3d(self, x, W, strides=[1, 1, 1, 1, 1], padding='VALID'):
-        return tf.nn.conv3d(x, W, strides=strides, padding=padding)
-
-    def conv2d_shared_all_dims_layer(
+    # ================= Generic ConvNets =================
+    def conv_layer_wrapper(
         self,
-        _input,
-        scope,
-        s=5,
-        num_filters_per_dim=8,
-        *args,
-        **kwargs
+        func,
+        x,
+        num_filters,
+        filter_weights=[3, 3, 3],
+        nl=tf.nn.relu,
+        strides=[2, 2, 2],
+        padding='SAME',
+        scope="conv3d_layer",
+        conv_type='conv',
+        bn=True,
     ):
-        def do_c(filters, *args, **kwargs):
-            return self.conv3d_layer(
-                _input,
-                num_filters=num_filters_per_dim,
-                filter_weights=filters,
-                scope='conv',
-                mpadding='SAME',
-                padding='SAME',
-                *args,
-                **kwargs
-            )
-        with tf.variable_scope(scope) as tf_scope:
-            b1 = do_c([s, s, 1], *args, **kwargs)
-            tf_scope.reuse_variables()
-            b2 = do_c([s, 1, s], *args, **kwargs)
-            b3 = do_c([1, s, s], *args, **kwargs)
-            return tf.concat([b1, b2, b3], 4)
-
-    def conv3d_layer(self, x, num_filters,
-                     filter_weights=[3, 3, 3],
-                     nl=tf.nn.relu,
-                     strides=[2, 2, 2],
-                     pool=False,
-                     padding='VALID',
-                     mpadding='VALID',
-                     scope="conv3d_layer",
-                     bn=True):
+        assert(conv_type in ['conv', 'deconv'])
         with tf.variable_scope(scope):
             conv_input_shape = x.get_shape()[1:].as_list()
-            input_channels = conv_input_shape[3]
-            W_shape = filter_weights + [input_channels, num_filters]
+            input_channels = conv_input_shape[-1]
+            if conv_type == 'conv':
+                W_shape = filter_weights + [input_channels, num_filters]
+            else:
+                W_shape = filter_weights + [num_filters, input_channels]
             W = tf.get_variable(
                 "w",
                 shape=[np.prod(filter_weights)] +
@@ -130,19 +110,12 @@ class DeepNN(object):
                 regularizer=tf.contrib.layers.l1_regularizer(1.0),
             )
             W = tf.reshape(W, W_shape)
-            out = self.conv3d(
+            out = func(
                 x,
-                W,
+                filter=W,
                 strides=[1] + strides + [1],
                 padding=padding,
             )
-            if pool:
-                out = tf.nn.max_pool3d(
-                    out,
-                    ksize=[1, 2, 2, 2, 1],
-                    strides=[1, 2, 2, 2, 1],
-                    padding=mpadding,
-                )
             if bn:
                 out = self.batch_norm(out)
             else:
@@ -163,61 +136,60 @@ class DeepNN(object):
             ))
         return out
 
-    def conv3d_layer_transpose(
-        self,
-        x,
-        num_filters,
-        output_shape,
-        filter_weights=[3, 3, 3],
-        nl=tf.nn.relu,
-        strides=[2, 2, 2],
-        padding='SAME',
-        scope="conv3d_layer_transpose",
-        bn=True,
-    ):
-        """
-        Wrapper for tf.nn.conv3d_transpose, that can be used for "Deconvolution Networks"
-        """
-        assert(len(output_shape) == 5)
-        output_shape = [tf.shape(x)[0]] + output_shape[1:]  # Dynamic batch_size
-        with tf.variable_scope(scope):
-            conv_input_shape = x.get_shape()[1:].as_list()
-            input_channels = conv_input_shape[3]
-            W_shape = filter_weights + [num_filters, input_channels]
-            W = tf.get_variable(
-                "w",
-                shape=W_shape,
-                initializer=tf.contrib.layers.xavier_initializer(),
-                regularizer=tf.contrib.layers.l1_regularizer(1.0),
-            )
-            out = tf.nn.conv3d_transpose(
-                value=x,
-                filter=W,
-                output_shape=output_shape,
-                strides=[1] + strides + [1],
-                padding=padding,
-            )
-            if bn:
-                out = self.batch_norm(out)
-            else:
-                b = tf.get_variable(
-                    "b",
-                    [num_filters],
-                    initializer=tf.constant_initializer(0.1),
-                )
-                out += b
-            out = nl(out)
-            if self.debug_summaries:
-                self.variable_summaries(W, "w")
-                self.variable_summaries(out, "output")
-            self.print_shape('%s -> [%s|s=%d] -> %s' % (
-                conv_input_shape,
-                tf.contrib.framework.get_name_scope(),
-                strides[0],
-                out.get_shape()[1:].as_list()
-            ))
-        return out
+    # ================= 2D ConvNets =================
+    def conv2d_layer(self, *args, **kwargs):
+        return self.conv_layer_wrapper(tf.nn.conv2d, *args, **kwargs)
 
+    # ================= 3D ConvNets =================
+    def conv2d_shared_all_dims_layer(
+        self,
+        _input,
+        scope,
+        s=5,
+        num_filters_per_dim=8,
+        *args,
+        **kwargs
+    ):
+        def do_c(filters, *args, **kwargs):
+            return self.conv3d_layer(
+                _input,
+                num_filters=num_filters_per_dim,
+                filter_weights=filters,
+                scope='conv',
+                padding='SAME',
+                *args,
+                **kwargs
+            )
+        with tf.variable_scope(scope) as tf_scope:
+            b1 = do_c([s, s, 1], *args, **kwargs)
+            tf_scope.reuse_variables()
+            b2 = do_c([s, 1, s], *args, **kwargs)
+            b3 = do_c([1, s, s], *args, **kwargs)
+            return tf.concat([b1, b2, b3], 4)
+
+    def conv3d_layer(self, *args, **kwargs):
+        return self.conv_layer_wrapper(tf.nn.conv3d, *args, **kwargs)
+
+    def conv3d_layer_transpose(self, output_shape, *args, **kwargs):
+
+        def conv3d_transpose_func(input, **kwargs2):
+            # Dynamic batch_size
+            _output_shape = output_shape[1:]
+            _output_shape = [tf.shape(input)[0]] + _output_shape
+            return tf.nn.conv3d_transpose(
+                input,
+                output_shape=_output_shape,
+                **kwargs2
+            )
+        assert(len(output_shape) == 5)
+        kwargs['conv_type'] = 'deconv'
+        return self.conv_layer_wrapper(
+            conv3d_transpose_func,
+            *args,
+            **kwargs
+        )
+
+    # ================= Other layers =================
     def fc_layer(self, x, num_outputs, nl=tf.nn.relu, name="unnamedfc"):
         with tf.variable_scope(name):
             num_inputs = x.get_shape()[1:].as_list()[0]
@@ -244,6 +216,7 @@ class DeepNN(object):
             ))
         return out
 
+    # ================= Regularization =================
     def batch_norm(self, x, **kwargs):
         return tf.contrib.layers.batch_norm(
             x,
