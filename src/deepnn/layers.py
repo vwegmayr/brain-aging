@@ -4,7 +4,7 @@ import numpy as np
 from modules.models.utils import custom_print
 
 
-class DeepNN(object):
+class DeepNNLayers(object):
     def __init__(self, print_shapes=True):
         self.is_training = True
         self.debug_summaries = False

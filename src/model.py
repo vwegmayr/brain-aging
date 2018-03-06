@@ -1,10 +1,10 @@
 import copy
 import tensorflow as tf
 import features as features_def
-from deepnn import DeepNN
+from deepnn.layers import DeepNNLayers
 
 
-class Model(DeepNN):
+class Model(DeepNNLayers):
     def __init__(self, is_training, **kwargs):
         super(Model, self).__init__(**kwargs)
         self.is_training = is_training
