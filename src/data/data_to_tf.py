@@ -13,12 +13,11 @@ import sys
 import hashlib
 import os
 import glob
-import csv
-import re
 import datetime
 import nibabel as nib
 from modules.models.utils import custom_print
 import src.features as ft_def
+from src.data.features_store import FeaturesStore
 
 
 class UniqueLogger:
@@ -202,84 +201,23 @@ class DataAggregator:
 class DataSource(object):
     def __init__(self, config):
         self.config = config
-        self.load_patients_features(config['patients_features'])
         self.all_files = glob.glob(config['glob'])
-
-    def load_patients_features(self, csv_file_path):
-        """
-        Load Patients features from csv
-        This file should contain the following columns:
-        - id
-        - One column per feature from features.py file, excluding the ones
-          extracted from the file name (typically study id and image id)
-        """
-
-        self.patients_ft = {}
-        self.images_ft = {}
-        with open(csv_file_path) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                # Read features
-                ft = {
-                    col_name: int(col_value)
-                    for col_name, col_value in row.items()
-                    if col_name in ft_def.all_features.feature_info
-                }
-                # Register them for later access
-                if ft_def.STUDY_IMAGE_ID in ft:
-                    image_id = ft[ft_def.STUDY_IMAGE_ID]
-                    self.images_ft[image_id] = ft
-                if ft_def.STUDY_PATIENT_ID in ft:
-                    patient_id = ft[ft_def.STUDY_PATIENT_ID]
-                    self.patients_ft[patient_id] = ft
+        self.features_store = FeaturesStore(
+            csv_file_path=config['patients_features'],
+            features_from_filename=config['features_from_filename'],
+        )
 
     def preprocess(self, dataset):
         dataset.begin_study(self.config['name'], len(self.all_files))
-
         random.shuffle(self.all_files)
 
         # MRI scans
-        features_from_filename = self.config['features_from_filename']
-        features_in_regexp = features_from_filename['features_group']
-        assert(all([
-            n in ft_def.all_features.feature_info
-            for n in features_in_regexp
-        ]))
-        extract_from_path = re.compile(features_from_filename['regexp'])
         for f in self.all_files:
-            ft = {}
-            # Add features from filename
-            match = extract_from_path.match(f)
-            if match is None:
-                dataset.add_error(f, 'Regexp doesnt match')
-                continue
-            for ft_name, ft_group in features_in_regexp.items():
-                ft[ft_name] = int(match.group(ft_group))
-            if ft_def.STUDY_PATIENT_ID not in ft and \
-                    ft_def.STUDY_IMAGE_ID not in ft:
-                dataset.add_error(
-                    f,
-                    'Regexp should provide ft `%s` or `%s`' % (
-                        ft_def.STUDY_IMAGE_ID, ft_def.STUDY_PATIENT_ID
-                    ))
-                continue
-            # Add features from CSV - by image ID
-            found_csv_entry = False
-            if ft_def.STUDY_IMAGE_ID in ft:
-                image_id = ft[ft_def.STUDY_IMAGE_ID]
-                if image_id in self.images_ft:
-                    ft.update(self.images_ft[image_id])
-                    found_csv_entry = True
-            # Or by patient ID
-            if ft_def.STUDY_PATIENT_ID in ft:
-                patient_id = ft[ft_def.STUDY_PATIENT_ID]
-                if patient_id in self.patients_ft:
-                    ft.update(self.patients_ft[patient_id])
-                    found_csv_entry = True
-            if not found_csv_entry:
-                dataset.add_error(f, 'No CSV features found')
-                continue
-            dataset.add_image(f, ft)
+            try:
+                ft = self.features_store.get_features_for_file(f)
+                dataset.add_image(f, ft)
+            except LookupError as e:
+                dataset.add_error(f, str(e))
 
 
 def get_all_data_sources(config):
