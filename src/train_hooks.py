@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.python.summary import summary as core_summary
 import numpy as np
 
 
@@ -45,7 +46,7 @@ class SessionHookFullTrace(tf.train.SessionRunHook):
         every_step=50,
         trace_level=tf.RunOptions.FULL_TRACE,
     ):
-        self.writer = tf.summary.FileWriter(ckptdir)
+        self.ckptdir = ckptdir
         self.trace_level = trace_level
         self.every_step = every_step
         self.first_step = first_step
@@ -68,13 +69,15 @@ class SessionHookFullTrace(tf.train.SessionRunHook):
         global_step = run_values.results - 1
         if self._trace:
             self._trace = False
-            self.writer.add_run_metadata(
+            writer = core_summary.FileWriterCache.get(self.ckptdir)
+            writer.add_run_metadata(
                 run_values.run_metadata,
                 '{global_step}'.format(global_step=global_step),
                 global_step,
             )
+            writer.flush()
         if (self.every_step is not None and
-            not (global_step + 1) % self.every_step):
+                not (global_step + 1) % self.every_step):
             self._trace = True
         if self.first_step and global_step == 1:
             self._trace = True
