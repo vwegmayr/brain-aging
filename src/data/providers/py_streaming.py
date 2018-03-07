@@ -64,7 +64,6 @@ class DataProvider(object):
                 ft_def.HEALTHY: _healthy,
                 ft_def.HEALTH_AD: _health_ad,
             }
-            ft_info['mri']['shape'] = self.mri_shape
             return {
                 ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
                 for ft_name, ft_tensor in ft.items()
@@ -95,7 +94,7 @@ class DataProvider(object):
         return features
 
     def get_mri_shape(self):
-        return self.mri_shape
+        return list(self.mri_shape)
 # End of interface functions
 
 

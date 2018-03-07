@@ -32,7 +32,7 @@ class DataProvider(object):
             np.zeros(self.input_fn_config['image_shape']),
             self.input_fn_config['data_generation'],
         ):
-            return s.shape
+            return list(s.shape)
         assert(False)
 # End of interface functions
 
@@ -42,7 +42,9 @@ def parse_record(record):
     assert(ft_def.all_features.feature_info[ft_def.MRI]['shape'] != [])
     keys_to_features = {
         name: tf.FixedLenFeature(shape=info['shape'], dtype=info['type'])
-        for (name, info) in ft_def.all_features.feature_info.items()}
+        for name, info in ft_def.all_features.feature_info.items()
+        if not info['only_for_extractor']
+    }
 
     parsed = tf.parse_single_example(record, features=keys_to_features)
     return parsed
@@ -56,7 +58,8 @@ def parser(record):
 
     return {
         name: process_feature(parsed[name], info)
-        for (name, info) in ft_def.all_features.feature_info.items()
+        for name, info in ft_def.all_features.feature_info.items()
+        if not info['only_for_extractor']
     }
 
 

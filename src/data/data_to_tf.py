@@ -13,6 +13,7 @@ import sys
 import hashlib
 import os
 import glob
+import re
 import datetime
 import nibabel as nib
 from modules.models.utils import custom_print
@@ -37,9 +38,15 @@ def get_data_preprocessing_values(config):
     Whenever the data should be re-generated, the content
     of the returned dictionnary should change.
     """
+    class MyEncoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, re._pattern_type):
+                return {}
+            return o.__dict__
     return {
         'sources': [
-            json.dumps(s.__dict__) for s in get_all_data_sources(config)
+            MyEncoder().encode(s.__dict__)
+            for s in get_all_data_sources(config)
         ],
         'config': config,
         'modules': {
@@ -103,6 +110,10 @@ class DataAggregator:
         self.total_files = total_files
 
     def get_writer_for_image(self, features):
+        # Train/test dataset already defined
+        if ft_def.DATASET in features:
+            return self.writers[features[ft_def.DATASET]]
+
         ft_value = features[self.config['train_test_split_on_feature']]
         if ft_value not in self.value_to_writer:
             if random.random() < self.config['test_set_size_ratio']:
@@ -111,7 +122,7 @@ class DataAggregator:
                 self.value_to_writer[ft_value] = self.writers['train']
         return self.value_to_writer[ft_value]
 
-    def add_image(self, image_path, int64_features):
+    def add_image(self, image_path, features):
         Feature = tf.train.Feature
         Int64List = tf.train.Int64List
 
@@ -130,20 +141,37 @@ class DataAggregator:
             )
             return
 
+        writer = self.get_writer_for_image(features)
         # Transform features and write
+        features = {
+            k: v
+            for k, v in features.items()
+            if not ft_def.all_features.feature_info[k]['only_for_extractor']
+        }
+
         def _int64_to_feature(v):
             return Feature(int64_list=Int64List(value=[v]))
-        int64_features[ft_def.STUDY_ID] = self.curr_study_id
+        features[ft_def.STUDY_ID] = self.curr_study_id
+
+        # Check we have all features set
+        for ft_name, ft_name_def in ft_def.all_features.feature_info.items():
+            if (ft_name != ft_def.MRI and
+                    ft_name not in features and
+                    not ft_name_def['only_for_extractor']):
+                if ft_name_def['default'] is None:
+                    UniqueLogger.log('[FATAL] Feature `%s` missing for %s' % (
+                        ft_name, image_path))
+                    assert(False)
+                features[ft_name] = ft_name_def['default']
+
         img_features = {
             k: _int64_to_feature(v)
-            for k, v in int64_features.items()
+            for k, v in features.items()
         }
 
         for s in iter_slices(img_data, self.config):
             self._write_image(
-                self.get_writer_for_image(
-                    int64_features
-                ),
+                writer,
                 s,
                 img_features,
                 image_path,
@@ -160,13 +188,11 @@ class DataAggregator:
                 value=img_data.reshape([-1])
             ),
         )
-
-        # Check we have all features set
-        for ft_name in ft_def.all_features.feature_info.keys():
-            if ft_name not in img_features:
-                UniqueLogger.log('[FATAL] Feature `%s` missing for %s' % (
-                    ft_name, image_path))
-                assert(False)
+        assert(all([
+            ft_name in img_features
+            for ft_name, ft_info in ft_def.all_features.feature_info.items()
+            if not ft_info['only_for_extractor']
+        ]))
 
         example = tf.train.Example(
             features=tf.train.Features(feature=img_features),

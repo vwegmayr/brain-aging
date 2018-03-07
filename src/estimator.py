@@ -40,16 +40,6 @@ class Estimator(TensorflowBaseEstimator):
             *args,
             **kwargs
         )
-        ft_def.all_features.feature_info[ft_def.MRI]['shape'] = \
-            self.input_fn_config['image_shape']
-
-        self.feature_spec = {
-            name: tf.placeholder(
-                    shape=[1] + ft_info['shape'],
-                    dtype=ft_info['type']
-                )
-            for name, ft_info in ft_def.all_features.feature_info.items()
-        }
 
         # Data provider
         provider = self.input_fn_config['data_provider']
@@ -64,6 +54,15 @@ class Estimator(TensorflowBaseEstimator):
         self.data_provider = module.DataProvider(self.input_fn_config)
         ft_def.all_features.feature_info[ft_def.MRI]['shape'] = \
             self.data_provider.get_mri_shape()
+
+        self.feature_spec = {
+            name: tf.placeholder(
+                    shape=[1] + ft_info['shape'],
+                    dtype=ft_info['type']
+                )
+            for name, ft_info in ft_def.all_features.feature_info.items()
+            if not ft_info['only_for_extractor']
+        }
 
     def fit_main_training_loop(self, X, y):
         """

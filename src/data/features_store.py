@@ -1,6 +1,22 @@
 import csv
 import re
+import tensorflow as tf
 import src.features as ft_def
+
+
+def str_to_ft(ft, s):
+    str_to_ft_funcs = {
+        tf.int8: int,
+        tf.int16: int,
+        tf.int32: int,
+        tf.int64: int,
+        tf.uint8: int,
+        tf.uint16: int,
+        tf.uint32: int,
+        tf.uint64: int,
+        tf.string: str,
+    }
+    return str_to_ft_funcs[ft_def.all_features.feature_info[ft]['type']](s)
 
 
 class FeaturesStore:
@@ -33,12 +49,13 @@ class FeaturesStore:
 
         self.patients_ft = {}
         self.images_ft = {}
+        self.image_label_ft = {}
         with open(csv_file_path) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 # Read features
                 ft = {
-                    col_name: int(col_value)
+                    col_name: str_to_ft(col_name, col_value)
                     for col_name, col_value in row.items()
                     if col_name in ft_def.all_features.feature_info
                 }
@@ -49,6 +66,9 @@ class FeaturesStore:
                 if ft_def.STUDY_PATIENT_ID in ft:
                     patient_id = ft[ft_def.STUDY_PATIENT_ID]
                     self.patients_ft[patient_id] = ft
+                if ft_def.IMAGE_LABEL in ft:
+                    image_label = ft[ft_def.IMAGE_LABEL]
+                    self.image_label_ft[image_label] = ft
 
     def get_features_for_file(self, filename):
         # Add features from filename
@@ -57,13 +77,7 @@ class FeaturesStore:
         if match is None:
             raise LookupError('Regexp doesnt match')
         for ft_name, ft_group in self.features_in_regexp.items():
-            ft[ft_name] = int(match.group(ft_group))
-        if ft_def.STUDY_PATIENT_ID not in ft and \
-                ft_def.STUDY_IMAGE_ID not in ft:
-            raise LookupError(
-                'Regexp should provide ft `%s` or `%s`' % (
-                    ft_def.STUDY_IMAGE_ID, ft_def.STUDY_PATIENT_ID
-                ))
+            ft[ft_name] = str_to_ft(ft_name, match.group(ft_group))
         # Add features from CSV - by image ID
         found_csv_entry = False
         if ft_def.STUDY_IMAGE_ID in ft:
@@ -76,6 +90,12 @@ class FeaturesStore:
             patient_id = ft[ft_def.STUDY_PATIENT_ID]
             if patient_id in self.patients_ft:
                 ft.update(self.patients_ft[patient_id])
+                found_csv_entry = True
+        # Or by image label
+        if ft_def.IMAGE_LABEL in ft:
+            image_label = ft[ft_def.IMAGE_LABEL]
+            if image_label in self.image_label_ft:
+                ft.update(self.image_label_ft[image_label])
                 found_csv_entry = True
         if not found_csv_entry:
             raise LookupError('No CSV features found')
