@@ -112,6 +112,7 @@ import random
 import re
 import sys
 import tarfile
+import json
 
 import numpy as np
 from six.moves import urllib
@@ -1101,6 +1102,7 @@ def main(_):
     sess.run(init)
 
     # Run the training for as many cycles as requested on the command line.
+    all_valid_accuracy = []
     for i in range(FLAGS.how_many_training_steps):
       # Get a batch of input bottleneck values, either calculated fresh every
       # time with distortions applied, or from the cache stored on disk.
@@ -1149,6 +1151,7 @@ def main(_):
             feed_dict={bottleneck_input: validation_bottlenecks,
                        ground_truth_input: validation_ground_truth})
         validation_writer.add_summary(validation_summary, i)
+        all_valid_accuracy.append(validation_accuracy)
         tf.logging.info('%s: Step %d: Validation accuracy = %.1f%% (N=%d)' %
                         (datetime.now(), i, validation_accuracy * 100,
                          len(validation_bottlenecks)))
@@ -1176,8 +1179,12 @@ def main(_):
         [evaluation_step, prediction],
         feed_dict={bottleneck_input: test_bottlenecks,
                    ground_truth_input: test_ground_truth})
-    tf.logging.info('Final test accuracy = %.1f%% (N=%d)' %
+    idx = -int(len(all_valid_accuracy)/2)
+    valid_accuracy = np.mean(all_valid_accuracy[idx:])
+    tf.logging.warning('Final test accuracy = %.1f%% (N=%d)' %
                     (test_accuracy * 100, len(test_bottlenecks)))
+    tf.logging.warning('Train avg validation accuracy = %.1f%%' %
+                    (valid_accuracy * 100))
 
     if FLAGS.print_misclassified_test_images:
       tf.logging.info('=== MISCLASSIFIED TEST IMAGES ===')
@@ -1192,6 +1199,7 @@ def main(_):
     save_graph_to_file(sess, graph, FLAGS.output_graph)
     with gfile.FastGFile(FLAGS.output_labels, 'w') as f:
       f.write('\n'.join(image_lists.keys()) + '\n')
+  return valid_accuracy, test_accuracy
 
 
 if __name__ == '__main__':
@@ -1378,5 +1386,35 @@ if __name__ == '__main__':
       """)
   parser.add_argument("smt_label", nargs="?", default="debug")
   FLAGS, unparsed = parser.parse_known_args()
-  FLAGS.summaries_dir = FLAGS.summaries_dir + FLAGS.smt_label
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  FLAGS.summaries_dir = os.path.join(FLAGS.summaries_dir, FLAGS.smt_label)
+  summaries_dir = FLAGS.summaries_dir
+  image_dir = FLAGS.image_dir
+  sumatra_outcome = {
+    "text_outcome": "",
+    "numeric_outcome": {
+      "valid_accuracy": {
+        "x_label": "Z slice",
+        "y": [],
+        "x": [],
+      },
+      "test_accuracy": {
+        "x_label": "Z slice",
+        "y": [],
+        "x": [],
+      },
+    }
+  }
+  for z in range(20, 70, 2):
+    FLAGS.summaries_dir = os.path.join(summaries_dir, 'z%d' % z)
+    FLAGS.output_labels = os.path.join(summaries_dir, 'labels_z%d.txt' % z)
+    FLAGS.image_dir = os.path.join(image_dir, 'z%d' % z)
+    print('Training z=%d (%s)' % (z, FLAGS.summaries_dir))
+    sys.stdout.flush()
+    valid_accuracy, test_accuracy = main([])
+    sumatra_outcome['text_outcome'] = 'Done z = %d' % z
+    sumatra_outcome['numeric_outcome']['valid_accuracy']['x'].append(z)
+    sumatra_outcome['numeric_outcome']['test_accuracy']['x'].append(z)
+    sumatra_outcome['numeric_outcome']['valid_accuracy']['y'].append(float(valid_accuracy))
+    sumatra_outcome['numeric_outcome']['test_accuracy']['y'].append(float(test_accuracy))
+    with open(os.path.join(summaries_dir, 'sumatra_outcome.json'), 'w+') as f:
+      json.dump(sumatra_outcome, f)
