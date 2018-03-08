@@ -1,5 +1,4 @@
-# smt run -r "PPMI conversion" --config configs/mri_pipeline.yaml -S /local/dhaziza/data -a transform
-# Preprocess PPMI data
+# smt run -r "PPMI T1 conversion" --config configs/mri_pipeline/ppmi_t1.yaml -a transform
 class: src.data.mri_pipeline.MriPreprocessingPipeline
 params:
   path: /local/PPMI
@@ -15,20 +14,21 @@ params:
       cost: normcorr
       searchcost: normcorr
       overwrite: False
-      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
+      mri_template: data/raw/templates/MNI152_T1_1mm_brain.nii.gz
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
     filters:
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
         value:
-            eq: T2
+            eq: T1
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
         value:
-            lt: 50
+            gt: 50
+      # Remove some weirdly bugged images
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix X']
         value:
-            st: 600
+            lt: 600
   shard:
     num_workers: 1
     worker_index: 0

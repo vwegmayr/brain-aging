@@ -1,0 +1,35 @@
+# smt run -r "PPMI T2 conversion" --config configs/mri_pipeline/ppmi_t2.yaml -a transform
+class: src.data.mri_pipeline.MriPreprocessingPipeline
+params:
+  path: /local/PPMI
+  files_glob: /local/PPMI/raw/*/*/*/*/*.nii
+  extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
+  regexp_image_id_group: 2
+  params:
+    brain_extraction:
+      frac_intens_thres: 0.5
+      bias: True
+      overwrite: False
+    template_registration:
+      cost: normcorr
+      searchcost: normcorr
+      overwrite: False
+      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
+  filter_xml:
+    files: /local/PPMI/raw/*_I*.xml
+    xml_image_id: ./project/subject/study/imagingProtocol/imageUID
+    filters:
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
+        value:
+            eq: T2
+      # Only take the 75% images with the highest Z dimension (computed to about 32)
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
+        value:
+            gt: 30
+      # Remove some weirdly bugged images
+      - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix X']
+        value:
+            lt: 600
+  shard:
+    num_workers: 1
+    worker_index: 0

@@ -1,0 +1,21 @@
+# smt run -r "KOLN T2 conversion" --config configs/mri_pipeline/koln_t2.yaml -a transform
+class: src.data.mri_pipeline.MriPreprocessingPipeline
+params:
+  path: /local/KOLN/T2
+  files_glob: /local/KOLN/T2/raw/*/*/*.nii.gz
+  extract_image_id_regexp: .*/(\d+)/(\d+)_t2\.nii\.gz
+  regexp_image_id_group: 1
+  params:
+    brain_extraction:
+      frac_intens_thres: 0.5
+      bias: True
+      overwrite: False
+    template_registration:
+      cost: normcorr
+      searchcost: normcorr
+      overwrite: False
+      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
+  filter_xml: null
+  shard:
+    num_workers: 1
+    worker_index: 0

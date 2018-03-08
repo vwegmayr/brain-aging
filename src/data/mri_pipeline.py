@@ -15,8 +15,8 @@ def xml_elem_unique(root, path):
 def filters_match(value, filters):
     match_type = {
         'eq': lambda eq: eq == value,
-        'lt': lambda f: float(value) > f,
-        'st': lambda f: float(value) < f,
+        'gt': lambda f: float(value) > f,
+        'lt': lambda f: float(value) < f,
     }
     return all([
         match_type[type](type_value)
