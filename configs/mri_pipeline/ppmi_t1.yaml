@@ -7,8 +7,7 @@ params:
   regexp_image_id_group: 2
   params:
     brain_extraction:
-      frac_intens_thres: 0.35
-      bias: True
+      options: '-f 0.35 -B'
       overwrite: False
     template_registration:
       cost: normcorr

@@ -115,17 +115,16 @@ class MriPreprocessingPipeline(object):
     # ------------------------- Pipeline main steps
     def brain_extraction(self, mri_image, mri_output):
         params = self.params['brain_extraction']
+        if 'skip' in params:
+            return
         if os.path.exists(mri_output) and not params['overwrite']:
             return
 
-        bias_option = '-B ' if params['bias'] else ''
-
-        cmd = 'bet {mri_image} {mri_output} {bias_option} -f {f} -m -v'
+        cmd = 'bet {mri_image} {mri_output} {options}'
         cmd = cmd.format(
             mri_image=mri_image,
             mri_output=mri_output,
-            bias_option=bias_option,
-            f=params["frac_intens_thres"],
+            options=params["options"],
         )
         self._exec(cmd)
 
@@ -133,8 +132,10 @@ class MriPreprocessingPipeline(object):
         """
         Registers $mri_image to $mri_template template
         """
-        params = self.params['template_registration']
 
+        params = self.params['template_registration']
+        if 'skip' in params:
+            return
         if os.path.exists(mri_output) and not params['overwrite']:
             return
 
