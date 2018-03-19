@@ -8,6 +8,7 @@ params:
   params:
     brain_extraction:
       options: '-f 0.35 -g 0.1'
+      images_bet_params: data/raw/ppmi/images_bet.json
       overwrite: False
     template_registration:
       cost: normcorr
