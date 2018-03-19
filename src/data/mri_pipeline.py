@@ -3,6 +3,7 @@ import os
 import glob
 import subprocess
 import xml.etree.ElementTree as ET
+import json
 from modules.models.utils import custom_print
 
 
@@ -22,6 +23,17 @@ def filters_match(value, filters):
         match_type[type](type_value)
         for type, type_value in filters.items()
     ])
+
+
+def build_options(params):
+    options_list = []
+    if 'B' in params and params['B']:
+        options_list.append('-B')
+    if 'f' in params:
+        options_list.append('-f %.2f' % params['f'])
+    if 'g' in params:
+        options_list.append('-g %.2f' % params['g'])
+    return ' '.join(options_list)
 
 
 class MriPreprocessingPipeline(object):
@@ -109,32 +121,43 @@ class MriPreprocessingPipeline(object):
                 )
                 for folder in folders
             ]
-            self.brain_extraction(paths[0], paths[1])
-            self.template_registration(paths[1], paths[2])
+            self.brain_extraction(paths[0], paths[1], image_id)
+            self.template_registration(paths[1], paths[2], image_id)
 
     # ------------------------- Pipeline main steps
-    def brain_extraction(self, mri_image, mri_output):
+    def brain_extraction(self, mri_image, mri_output, image_id):
         params = self.params['brain_extraction']
         if 'skip' in params:
             return
         if os.path.exists(mri_output) and not params['overwrite']:
             return
 
+        options = params['options']
+        if 'images_bet_params' in params:
+            bet_options = json.load(open(params['images_bet_params'], 'r'))
+            if str(image_id) in bet_options:
+                params = bet_options[str(image_id)]
+                if params is None:
+                    return
+                options = build_options(params)
+
         cmd = 'bet {mri_image} {mri_output} {options}'
         cmd = cmd.format(
             mri_image=mri_image,
             mri_output=mri_output,
-            options=params["options"],
+            options=options,
         )
         self._exec(cmd)
 
-    def template_registration(self, mri_image, mri_output):
+    def template_registration(self, mri_image, mri_output, image_id):
         """
         Registers $mri_image to $mri_template template
         """
 
         params = self.params['template_registration']
         if 'skip' in params:
+            return
+        if not os.path.exists(mri_image):
             return
         if os.path.exists(mri_output) and not params['overwrite']:
             return
