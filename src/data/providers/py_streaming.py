@@ -24,7 +24,10 @@ class DataProvider(object):
         self.config = config = input_fn_config['py_streaming']
         self.random = random.Random()
         self.random.seed(config['seed'])
-        train_files, test_files = get_train_test_filenames(config)
+        train_files, test_files = self.get_train_test_filenames(config)
+        for i in range(len(train_files)):
+            print("Train Class ", i, len(train_files[i]))
+            print("Valid Class ", i, len(test_files[i]))
 
         for train, files in [(True, train_files), (False, test_files)]:
             self.inputs[train] = DataInput(
@@ -95,44 +98,40 @@ class DataProvider(object):
 
     def get_mri_shape(self):
         return list(self.mri_shape)
-# End of interface functions
 
+    def get_train_test_filenames(self, config):
+        paths = config['data_paths']
+        # All patients class labels dictionary and list of validation patient codes
+        patients_dict = pickle.load(open(paths['class_labels'], 'rb'))
+        valid_patients = pickle.load(open(paths['valid_data'], 'rb'))
+        train_patients = pickle.load(open(paths['train_data'], 'rb'))
+        print("Validation patients count in Dict: ", len(valid_patients),
+              "Train patients count in Dict:", len(train_patients))
 
-def get_train_test_filenames(config):
-    paths = config['data_paths']
-    # All patients class labels dictionary and list of validation patient codes
-    patients_dict = pickle.load(open(paths['class_labels'], 'rb'))
-    valid_patients = pickle.load(open(paths['valid_data'], 'rb'))
-    train_patients = pickle.load(open(paths['train_data'], 'rb'))
-    print("Validation patients count in Dict: ", len(valid_patients),
-          "Train patients count in Dict:", len(train_patients))
+        classes = config['classes']
+        train_filenames = [[] for i in range(0, classes)]
+        valid_filenames = [[] for i in range(0, classes)]
 
-    classes = config['classes']
-    train_filenames = [[] for i in range(0, classes)]
-    valid_filenames = [[] for i in range(0, classes)]
+        for directory in os.walk(paths['datadir']):
+            # Walk inside the directory
+            for file in directory[2]:
+                # Match all files ending with 'regex'
+                input_file = os.path.join(directory[0], file)
+                regex = r""+paths['regex']+"$"
+                if re.search(regex, input_file):
+                    pat_code = input_file.rsplit(paths['split_on'])
+                    patient_code = pat_code[0].rsplit('/', 1)[1]
+                    if patient_code in train_patients:
+                        train_filenames[patients_dict[patient_code]].append(
+                            input_file)
+                    if patient_code in valid_patients:
+                        valid_filenames[patients_dict[patient_code]].append(
+                            input_file)
 
-    for directory in os.walk(paths['datadir']):
-        # Walk inside the directory
-        for file in directory[2]:
-            # Match all files ending with 'regex'
-            input_file = os.path.join(directory[0], file)
-            regex = r""+paths['regex']+"$"
-            if re.search(regex, input_file):
-                pat_code = input_file.rsplit(paths['split_on'])
-                patient_code = pat_code[0].rsplit('/', 1)[1]
-                if patient_code in train_patients:
-                    train_filenames[patients_dict[patient_code]].append(
-                        input_file)
-                if patient_code in valid_patients:
-                    valid_filenames[patients_dict[patient_code]].append(
-                        input_file)
-
-    for i in range(0, classes):
-        print("Train Class ", i, len(train_filenames[i]))
-        print("Valid Class ", i, len(valid_filenames[i]))
-        train_filenames[i].sort()
-        valid_filenames[i].sort()
-    return train_filenames, valid_filenames
+        for i in range(0, classes):
+            train_filenames[i].sort()
+            valid_filenames[i].sort()
+        return train_filenames, valid_filenames
 
 
 class DataInput:
