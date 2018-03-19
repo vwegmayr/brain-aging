@@ -7,9 +7,10 @@ params:
   regexp_image_id_group: 1
   params:
     brain_extraction:
-      options: '-f 0.25'
+      options: '-f 0.25 -g 0.15'
       overwrite: False
     template_registration:
+      skip: True
       cost: normcorr
       searchcost: normcorr
       overwrite: False
