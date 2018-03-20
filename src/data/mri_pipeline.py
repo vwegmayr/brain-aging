@@ -4,6 +4,8 @@ import glob
 import subprocess
 import xml.etree.ElementTree as ET
 import json
+import random
+import pickle
 from modules.models.utils import custom_print
 
 
@@ -63,13 +65,15 @@ class MriPreprocessingPipeline(object):
         self.extract_image_id_regexp = re.compile(extract_image_id_regexp)
         self.regexp_image_id_group = regexp_image_id_group
         self.image_id_enabled = None
+        self.image_id_to_class = None
         if filter_xml is not None:
             self.filter_xml(**filter_xml)
         if shard is not None:
             self.shard(**shard)
 
-    def filter_xml(self, files, xml_image_id, filters):
+    def filter_xml(self, files, xml_image_id, filters, xml_class=None):
         self.image_id_enabled = set()
+        self.image_id_to_class = {}
         discarded_count = 0
         for f in glob.glob(files):
             tree = ET.parse(f)
@@ -82,10 +86,16 @@ class MriPreprocessingPipeline(object):
                 if not filters_match(value, filter['value']):
                     pass_all_filters = False
                     break
-            if pass_all_filters:
-                self.image_id_enabled.add(image_id)
-            else:
+            if not pass_all_filters:
                 discarded_count += 1
+                continue
+            self.image_id_enabled.add(image_id)
+            if xml_class is not None:
+                self.image_id_to_class[image_id] = xml_elem_unique(
+                    root,
+                    xml_class,
+                )
+
         custom_print('[filter_xml] %s images discarded' % (discarded_count))
 
     def shard(self, worker_index, num_workers):
@@ -98,10 +108,14 @@ class MriPreprocessingPipeline(object):
         ]
 
     def transform(self, X=None):
-        folders = ['01_brain_extracted', '02_registered']
+        folders = [
+            '01_brain_extracted',
+            '02_registered',
+        ]
         for f in folders:
             self._mkdir(f)
         custom_print('Applying MRI pipeline to %s files' % (len(self.files)))
+        all_images_ids = []
         for i, mri_raw in enumerate(self.files):
             image_id = self.extract_image_id_regexp.match(
                 mri_raw,
@@ -123,6 +137,10 @@ class MriPreprocessingPipeline(object):
             ]
             self.brain_extraction(paths[0], paths[1], image_id)
             self.template_registration(paths[1], paths[2], image_id)
+            all_images_ids.append(image_id)
+
+        # Split train/test
+        self.split_train_test(all_images_ids)
 
     # ------------------------- Pipeline main steps
     def brain_extraction(self, mri_image, mri_output, image_id):
@@ -163,7 +181,7 @@ class MriPreprocessingPipeline(object):
             return
 
         cmd = 'flirt -in {mri_image} -ref {ref} -out {out} ' + \
-            '-cost {cost} -searchcost {searchcost} -v'
+            '-cost {cost} -searchcost {searchcost} '
         cmd = cmd.format(
             mri_image=mri_image,
             ref=params['mri_template'],
@@ -172,6 +190,61 @@ class MriPreprocessingPipeline(object):
             searchcost=params['searchcost'],
         )
         self._exec(cmd)
+
+    def split_train_test(self, image_ids):
+        try:
+            params = self.params['split_train_test']
+            if 'skip' in params:
+                return
+        except KeyError:
+            return
+        if self.image_id_to_class is None:
+            custom_print('Train/Test split: No class loaded from XML.')
+            return
+
+        num_images = len(image_ids)
+        image_ids = [id for id in image_ids if id in self.image_id_to_class]
+        if num_images != len(image_ids):
+            custom_print(
+                'Train/Test split: %d/%d images with unknown class!' % (
+                    num_images - len(image_ids), num_images,
+                ))
+        r = random.Random(params['random_seed'])
+        all_test = []
+        all_train = []
+        patients_dict = {}
+        for class_idx, class_def in enumerate(params['test_images']):
+            class_images = [
+                img_id
+                for img_id in image_ids
+                if self.image_id_to_class[img_id] == class_def['class']
+            ]
+            r.shuffle(class_images)
+            test_images = class_images[:class_def['count']]
+            train_images = class_images[class_def['count']:]
+            custom_print('Class %d [%s]: train %d images / test %d images' % (
+                class_idx, class_def['class'],
+                len(train_images), len(test_images),
+            ))
+            all_test += test_images
+            all_train += train_images
+            patients_dict.update({
+                'I%d' % id: class_idx
+                for id in class_images
+            })
+        prefix = params['pkl_prefix']
+        pickle.dump(
+            all_test,
+            open(os.path.join(self.path, '%stest.pkl' % prefix), 'wb'),
+        )
+        pickle.dump(
+            all_train,
+            open(os.path.join(self.path, '%strain.pkl' % prefix), 'wb'),
+        )
+        pickle.dump(
+            patients_dict,
+            open(os.path.join(self.path, '%slabels.pkl' % prefix), 'wb'),
+        )
 
     # ------------------------- Utils and wrappers
     def _exec(self, cmd):
