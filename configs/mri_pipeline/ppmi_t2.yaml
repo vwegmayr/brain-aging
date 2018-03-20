@@ -33,6 +33,9 @@ params:
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
         value:
             eq: T2
+      - key: ./project/subject/study/imagingProtocol/description
+        value:
+            doesnt_contain: FLAIR
       # Only take the 75% images with the highest Z dimension (computed to about 32)
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
         value:

@@ -20,6 +20,7 @@ def filters_match(value, filters):
         'eq': lambda eq: eq == value,
         'gt': lambda f: float(value) > f,
         'lt': lambda f: float(value) < f,
+        'doesnt_contain': lambda l: l not in value,
     }
     return all([
         match_type[type](type_value)
@@ -113,6 +114,7 @@ class MriPreprocessingPipeline(object):
         steps_registered = {
             'brain_extraction': self.brain_extraction,
             'template_registration': self.template_registration,
+            'apply_mask': self.apply_mask,
         }
         for step in self.steps:
             self._mkdir(step['subfolder'])
@@ -193,6 +195,13 @@ class MriPreprocessingPipeline(object):
             searchcost=params['searchcost'],
         )
         self._exec(cmd)
+
+    def apply_mask(self, mri_image, mri_output, image_id, params):
+        if not os.path.exists(mri_image):
+            return
+        if os.path.exists(mri_output) and not params['overwrite']:
+            return
+
 
     def do_split_train_test(
         self,
