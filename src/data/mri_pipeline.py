@@ -56,10 +56,12 @@ class MriPreprocessingPipeline(object):
         regexp_image_id_group,
         filter_xml=None,
         shard=None,
-        params={},
+        steps=[],
+        split_train_test=None,
     ):
         self.path = path
-        self.params = params
+        self.steps = steps
+        self.split_train_test = split_train_test
         self.all_files = sorted(glob.glob(files_glob))
         self.files = self.all_files
         self.extract_image_id_regexp = re.compile(extract_image_id_regexp)
@@ -108,12 +110,12 @@ class MriPreprocessingPipeline(object):
         ]
 
     def transform(self, X=None):
-        folders = [
-            '01_brain_extracted',
-            '02_registered',
-        ]
-        for f in folders:
-            self._mkdir(f)
+        steps_registered = {
+            'brain_extraction': self.brain_extraction,
+            'template_registration': self.template_registration,
+        }
+        for step in self.steps:
+            self._mkdir(step['subfolder'])
         custom_print('Applying MRI pipeline to %s files' % (len(self.files)))
         all_images_ids = []
         for i, mri_raw in enumerate(self.files):
@@ -130,23 +132,28 @@ class MriPreprocessingPipeline(object):
 
             paths = [mri_raw] + [os.path.join(
                     self.path,
-                    folder,
+                    step['subfolder'],
                     'I{image_id}.nii.gz'.format(image_id=image_id),
                 )
-                for folder in folders
+                for step in self.steps
             ]
-            self.brain_extraction(paths[0], paths[1], image_id)
-            self.template_registration(paths[1], paths[2], image_id)
+            for step_id, step in enumerate(self.steps):
+                if 'skip' in step:
+                    continue
+                steps_registered[step['type']](
+                    paths[step_id],
+                    paths[step_id+1],
+                    image_id,
+                    step,
+                )
             all_images_ids.append(image_id)
 
         # Split train/test
-        self.split_train_test(all_images_ids)
+        if self.split_train_test is not None:
+            self.do_split_train_test(all_images_ids, **self.split_train_test)
 
     # ------------------------- Pipeline main steps
-    def brain_extraction(self, mri_image, mri_output, image_id):
-        params = self.params['brain_extraction']
-        if 'skip' in params:
-            return
+    def brain_extraction(self, mri_image, mri_output, image_id, params):
         if os.path.exists(mri_output) and not params['overwrite']:
             return
 
@@ -167,14 +174,10 @@ class MriPreprocessingPipeline(object):
         )
         self._exec(cmd)
 
-    def template_registration(self, mri_image, mri_output, image_id):
+    def template_registration(self, mri_image, mri_output, image_id, params):
         """
         Registers $mri_image to $mri_template template
         """
-
-        params = self.params['template_registration']
-        if 'skip' in params:
-            return
         if not os.path.exists(mri_image):
             return
         if os.path.exists(mri_output) and not params['overwrite']:
@@ -191,13 +194,13 @@ class MriPreprocessingPipeline(object):
         )
         self._exec(cmd)
 
-    def split_train_test(self, image_ids):
-        try:
-            params = self.params['split_train_test']
-            if 'skip' in params:
-                return
-        except KeyError:
-            return
+    def do_split_train_test(
+        self,
+        image_ids,
+        random_seed,
+        pkl_prefix,
+        test_images_def,
+    ):
         if self.image_id_to_class is None:
             custom_print('Train/Test split: No class loaded from XML.')
             return
@@ -209,11 +212,11 @@ class MriPreprocessingPipeline(object):
                 'Train/Test split: %d/%d images with unknown class!' % (
                     num_images - len(image_ids), num_images,
                 ))
-        r = random.Random(params['random_seed'])
+        r = random.Random(random_seed)
         all_test = []
         all_train = []
         patients_dict = {}
-        for class_idx, class_def in enumerate(params['test_images']):
+        for class_idx, class_def in enumerate(test_images_def):
             class_images = [
                 img_id
                 for img_id in image_ids
@@ -232,18 +235,17 @@ class MriPreprocessingPipeline(object):
                 'I%d' % id: class_idx
                 for id in class_images
             })
-        prefix = params['pkl_prefix']
         pickle.dump(
             all_test,
-            open(os.path.join(self.path, '%stest.pkl' % prefix), 'wb'),
+            open(os.path.join(self.path, '%stest.pkl' % pkl_prefix), 'wb'),
         )
         pickle.dump(
             all_train,
-            open(os.path.join(self.path, '%strain.pkl' % prefix), 'wb'),
+            open(os.path.join(self.path, '%strain.pkl' % pkl_prefix), 'wb'),
         )
         pickle.dump(
             patients_dict,
-            open(os.path.join(self.path, '%slabels.pkl' % prefix), 'wb'),
+            open(os.path.join(self.path, '%slabels.pkl' % pkl_prefix), 'wb'),
         )
 
     # ------------------------- Utils and wrappers

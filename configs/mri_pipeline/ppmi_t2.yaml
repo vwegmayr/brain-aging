@@ -5,24 +5,26 @@ params:
   files_glob: /local/PPMI/raw/*/*/*/*/*.nii
   extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
   regexp_image_id_group: 2
-  params:
-    brain_extraction:
+  steps:
+    - type: brain_extraction
+      subfolder: 01_brain_extracted
       options: '-f 0.35 -g 0.1'
       images_bet_params: data/raw/ppmi/images_bet.json
       overwrite: False
-    template_registration:
+    - type: template_registration
+      subfolder: 02_registered
       cost: normcorr
       searchcost: normcorr
       overwrite: False
       mri_template: data/raw/templates/MNI152_T2_2mm_brain.nii.gz
-    split_train_test:
-      random_seed: 0
-      pkl_prefix: PPMI_T2_NC_PD_
-      test_images:
-        - class: Control
-          count: 50
-        - class: PD
-          count: 100
+  split_train_test:
+    random_seed: 0
+    pkl_prefix: PPMI_T2_NC_PD_
+    test_images_def:
+      - class: Control
+        count: 50
+      - class: PD
+        count: 100
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
