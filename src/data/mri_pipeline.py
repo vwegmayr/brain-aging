@@ -112,9 +112,10 @@ class MriPreprocessingPipeline(object):
 
     def transform(self, X=None):
         steps_registered = {
+            'no_operation': self.no_operation,
+            'exec_command': self.exec_command,
             'brain_extraction': self.brain_extraction,
             'template_registration': self.template_registration,
-            'apply_mask': self.apply_mask,
         }
         for step in self.steps:
             self._mkdir(step['subfolder'])
@@ -142,6 +143,8 @@ class MriPreprocessingPipeline(object):
             for step_id, step in enumerate(self.steps):
                 if 'skip' in step:
                     continue
+                if os.path.exists(paths[step_id+1]) and not step['overwrite']:
+                    continue
                 steps_registered[step['type']](
                     paths[step_id],
                     paths[step_id+1],
@@ -155,10 +158,20 @@ class MriPreprocessingPipeline(object):
             self.do_split_train_test(all_images_ids, **self.split_train_test)
 
     # ------------------------- Pipeline main steps
-    def brain_extraction(self, mri_image, mri_output, image_id, params):
-        if os.path.exists(mri_output) and not params['overwrite']:
-            return
+    def no_operation(self, mri_image, mri_output, image_id, params):
+        pass
 
+    def exec_command(self, mri_image, mri_output, image_id, params):
+        cmd = params['command']
+        cmd = cmd.format(
+            mri_image=mri_image,
+            mri_output=mri_output,
+            image_id=image_id,
+            **params
+        )
+        self._exec(cmd)
+
+    def brain_extraction(self, mri_image, mri_output, image_id, params):
         options = params['options']
         if 'images_bet_params' in params:
             bet_options = json.load(open(params['images_bet_params'], 'r'))
@@ -182,8 +195,6 @@ class MriPreprocessingPipeline(object):
         """
         if not os.path.exists(mri_image):
             return
-        if os.path.exists(mri_output) and not params['overwrite']:
-            return
 
         cmd = 'flirt -in {mri_image} -ref {ref} -out {out} ' + \
             '-cost {cost} -searchcost {searchcost} '
@@ -195,13 +206,6 @@ class MriPreprocessingPipeline(object):
             searchcost=params['searchcost'],
         )
         self._exec(cmd)
-
-    def apply_mask(self, mri_image, mri_output, image_id, params):
-        if not os.path.exists(mri_image):
-            return
-        if os.path.exists(mri_output) and not params['overwrite']:
-            return
-
 
     def do_split_train_test(
         self,

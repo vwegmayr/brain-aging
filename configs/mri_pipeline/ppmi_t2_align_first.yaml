@@ -6,16 +6,16 @@ params:
   extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
   regexp_image_id_group: 2
   steps:
-    - type: brain_extraction
-      subfolder: _brain_extracted
-      options: '-f 0.35 -g 0.1'
-      images_bet_params: data/raw/ppmi/images_bet.json
-      overwrite: False
     - type: template_registration
-      subfolder: _brain_registered_2mm
+      subfolder: _registered_2mm
       cost: normcorr
       searchcost: normcorr
-      mri_template: data/raw/templates/MNI152_T2_2mm_brain.nii.gz
+      mri_template: data/raw/templates/MNI152_T2_2mm.nii.gz
+      overwrite: False
+    - type: exec_command
+      subfolder: _brain_extracted_2mm
+      command: 'fslmaths {mri_image} -mas {mask} {mri_output}'
+      mask: data/raw/templates/MNI152_T2_2mm_brain_mask.nii.gz
       overwrite: False
   split_train_test:
     random_seed: 0
