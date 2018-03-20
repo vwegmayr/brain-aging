@@ -17,7 +17,7 @@ import src.features as ft_def
 class DataProvider(object):
     def __init__(self, input_fn_config=None):
         if input_fn_config is None:
-            input_fn_config = {'py_streaming': {'classes': 2, 'seed': 0, 'batch_size': 12, 'data_paths': {'regex': '_normalized\\.nii\\.gz', 'split_on': '_normalized.nii.gz', 'class_labels': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl', 'train_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl', 'datadir': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/', 'valid_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'}}, 'data_provider': 'py_streaming', 'image_shape': [91, 109, 91], 'data_generation': {'data_converted_directory': 'data/ready/', 'data_sources': [{'glob': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*', 'name': 'ADNI_AIBL', 'features_from_filename': {'regexp': '.*/(\\d+)_normalized\\.nii\\.gz', 'features_group': {'study_image_id': 1}}, 'patients_features': 'data/raw/csv/adni_aibl__ad_hc.csv'}], 'image_normalization': {'outlier_percentile': 99, 'enable': True}, 'train_database_file': 'train.tfrecord', 'test_set_size_ratio': 0.2, 'test_set_random_seed': 0, 'dataset_compression': 'GZIP', 'test_database_file': 'test.tfrecord', 'train_test_split_on_feature': 'study_patient_id'}, 'data_streaming': {'dataset': [{'buffer_size': 400, 'call': 'prefetch'}, {'buffer_size': 500, 'call': 'shuffle'}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'call': 'batch', 'batch_size': 8}]}}
+            input_fn_config = {'py_streaming': {'classes': ['healthy', 'health_ad'], 'seed': 0, 'batch_size': 12, 'data_paths': {'regex': '_normalized\\.nii\\.gz', 'split_on': '_normalized.nii.gz', 'class_labels': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl', 'train_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl', 'datadir': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/', 'valid_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'}}, 'data_provider': 'py_streaming', 'image_shape': [91, 109, 91], 'data_generation': {'data_converted_directory': 'data/ready/', 'data_sources': [{'glob': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*', 'name': 'ADNI_AIBL', 'features_from_filename': {'regexp': '.*/(\\d+)_normalized\\.nii\\.gz', 'features_group': {'study_image_id': 1}}, 'patients_features': 'data/raw/csv/adni_aibl__ad_hc.csv'}], 'image_normalization': {'outlier_percentile': 99, 'enable': True}, 'train_database_file': 'train.tfrecord', 'test_set_size_ratio': 0.2, 'test_set_random_seed': 0, 'dataset_compression': 'GZIP', 'test_database_file': 'test.tfrecord', 'train_test_split_on_feature': 'study_patient_id'}, 'data_streaming': {'dataset': [{'buffer_size': 400, 'call': 'prefetch'}, {'buffer_size': 500, 'call': 'shuffle'}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'call': 'batch', 'batch_size': 8}]}}
         self.input_fn_config = input_fn_config
         self.inputs = {True: None, False: None}
 
@@ -53,20 +53,25 @@ class DataProvider(object):
         return (all_files, all_labels, all_seeds)
 
     def get_input_fn(self, train, shard):
-        def _read_files(f, label, seed):
-            return [
-                DataInput.load_and_augment_file(f, seed),
-                int(label == 0),
-                int(label == 1),
-            ]
+        classes = self.config['classes']
 
-        def _parser(_mri, _healthy, _health_ad):
+        def _read_files(f, label, seed):
+            ret = [DataInput.load_and_augment_file(f, seed)]
+            ret += [
+                int(label == i)
+                for i in range(len(classes))
+            ]
+            return ret
+
+        def _parser(_mri, *classes_values):
             ft_info = ft_def.all_features.feature_info
             ft = {
                 ft_def.MRI: tf.reshape(_mri, self.mri_shape),
-                ft_def.HEALTHY: _healthy,
-                ft_def.HEALTH_AD: _health_ad,
             }
+            ft.update({
+                c_ft: classes_values[c_id]
+                for c_id, c_ft in enumerate(classes)
+            })
             return {
                 ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
                 for ft_name, ft_tensor in ft.items()
@@ -79,7 +84,7 @@ class DataProvider(object):
             lambda filename, label, seed: tuple(tf.py_func(
                 _read_files,
                 [filename, label, seed],
-                [tf.float16, tf.int64, tf.int64],
+                [tf.float16] + [tf.int64] * len(classes),
                 stateful=False,
                 name='read_files',
             )),
@@ -109,8 +114,8 @@ class DataProvider(object):
               "Train patients count in Dict:", len(train_patients))
 
         classes = config['classes']
-        train_filenames = [[] for i in range(0, classes)]
-        valid_filenames = [[] for i in range(0, classes)]
+        train_filenames = [[] for i in range(len(classes))]
+        valid_filenames = [[] for i in range(len(classes))]
 
         for directory in os.walk(paths['datadir']):
             # Walk inside the directory
@@ -128,7 +133,7 @@ class DataProvider(object):
                         valid_filenames[patients_dict[patient_code]].append(
                             input_file)
 
-        for i in range(0, classes):
+        for i in range(len(classes)):
             train_filenames[i].sort()
             valid_filenames[i].sort()
         return train_filenames, valid_filenames

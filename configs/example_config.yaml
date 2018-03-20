@@ -14,7 +14,9 @@ params:
     py_streaming:
       batch_size: 12
       seed: 0
-      classes: 2
+      classes:
+        - healthy
+        - health_ad
       data_paths:
         datadir: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/'
         class_labels: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl'
