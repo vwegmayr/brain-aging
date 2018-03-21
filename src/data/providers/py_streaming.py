@@ -129,9 +129,11 @@ class DataProvider(object):
                     if patient_code in train_patients:
                         train_filenames[patients_dict[patient_code]].append(
                             input_file)
-                    if patient_code in valid_patients:
+                    elif patient_code in valid_patients:
                         valid_filenames[patients_dict[patient_code]].append(
                             input_file)
+                    # else:
+                    #    print('NOTICE: Patient code %s not found' % patient_code)
 
         for i in range(len(classes)):
             train_filenames[i].sort()

@@ -69,14 +69,16 @@ class MriPreprocessingPipeline(object):
         self.regexp_image_id_group = regexp_image_id_group
         self.image_id_enabled = None
         self.image_id_to_class = None
+        self.image_id_to_patient_id = None
         if filter_xml is not None:
             self.filter_xml(**filter_xml)
         if shard is not None:
             self.shard(**shard)
 
-    def filter_xml(self, files, xml_image_id, filters, xml_class=None):
+    def filter_xml(self, files, xml_image_id, filters, xml_class=None, xml_patient_id=None):
         self.image_id_enabled = set()
         self.image_id_to_class = {}
+        self.image_id_to_patient_id = {}
         discarded_count = 0
         for f in glob.glob(files):
             tree = ET.parse(f)
@@ -97,6 +99,11 @@ class MriPreprocessingPipeline(object):
                 self.image_id_to_class[image_id] = xml_elem_unique(
                     root,
                     xml_class,
+                )
+            if xml_patient_id is not None:
+                self.image_id_to_patient_id[image_id] = xml_elem_unique(
+                    root,
+                    xml_patient_id,
                 )
 
         custom_print('[filter_xml] %s images discarded' % (discarded_count))
@@ -229,18 +236,45 @@ class MriPreprocessingPipeline(object):
         all_test = []
         all_train = []
         patients_dict = {}
+        all_patient_ids = [v for v in self.image_id_to_patient_id.values()]
         for class_idx, class_def in enumerate(test_images_def):
+            # We want to split by patient ID, and reach a minimum number of images
             class_images = [
                 img_id
                 for img_id in image_ids
                 if self.image_id_to_class[img_id] == class_def['class']
             ]
-            r.shuffle(class_images)
-            test_images = class_images[:class_def['count']]
-            train_images = class_images[class_def['count']:]
-            custom_print('Class %d [%s]: train %d images / test %d images' % (
+            class_images = sorted(
+                class_images,
+                key=self.image_id_to_patient_id.__getitem__,
+            )
+            custom_print('Class %d [%s]' % (
                 class_idx, class_def['class'],
-                len(train_images), len(test_images),
+            ))
+            num_test_images = class_def['count']
+            if num_test_images == 0:
+                test_images = []
+                train_images = class_images
+            else:
+                last_test_patient_id = self.image_id_to_patient_id[
+                    class_images[num_test_images-1]
+                ]
+                while self.image_id_to_patient_id[
+                    class_images[num_test_images]] == last_test_patient_id:
+                    num_test_images += 1
+                test_images = class_images[:num_test_images]
+                train_images = class_images[num_test_images:]
+            custom_print('  TRAIN: %d images / %d patients' % (
+                len(train_images), len(set([
+                    self.image_id_to_patient_id[img_id]
+                    for img_id in train_images
+                ])),
+            ))
+            custom_print('  VALID: %d images / %d patients' % (
+                len(test_images), len(set([
+                    self.image_id_to_patient_id[img_id]
+                    for img_id in test_images
+                ])),
             ))
             all_test += test_images
             all_train += train_images
@@ -249,11 +283,11 @@ class MriPreprocessingPipeline(object):
                 for id in class_images
             })
         pickle.dump(
-            all_test,
+            ['I%d' % i for i in all_test],
             open(os.path.join(self.path, '%stest.pkl' % pkl_prefix), 'wb'),
         )
         pickle.dump(
-            all_train,
+            ['I%d' % i for i in all_train],
             open(os.path.join(self.path, '%strain.pkl' % pkl_prefix), 'wb'),
         )
         pickle.dump(

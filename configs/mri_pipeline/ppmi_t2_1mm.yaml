@@ -7,19 +7,19 @@ params:
   regexp_image_id_group: 2
   steps:
     - type: template_registration
-      subfolder: _registered_2mm
+      subfolder: _registered_1mm
       cost: normcorr
       searchcost: normcorr
-      mri_template: data/raw/templates/MNI152_T2_2mm.nii.gz
+      mri_template: data/raw/templates/MNI152_T2_1mm.nii.gz
       overwrite: False
     - type: exec_command
-      subfolder: _brain_extracted_2mm
+      subfolder: _brain_extracted_1mm
       command: 'fslmaths {mri_image} -mas {mask} {mri_output}'
-      mask: data/raw/templates/MNI152_T2_2mm_brain_mask.nii.gz
+      mask: data/raw/templates/MNI152_T2_1mm_brain_mask.nii.gz
       overwrite: False
   split_train_test:
     random_seed: 0
-    pkl_prefix: PPMI_T2_NC_PD_2mm_
+    pkl_prefix: PPMI_T2_NC_PD_1mm_
     test_images_def:
       - class: Control
         count: 50
@@ -29,6 +29,7 @@ params:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
     xml_class: ./project/subject/researchGroup
+    xml_patient_id: ./project/subject/subjectIdentifier
     filters:
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
         value:
