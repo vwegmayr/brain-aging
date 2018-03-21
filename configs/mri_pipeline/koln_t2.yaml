@@ -4,17 +4,27 @@ params:
   path: /local/KOLN/T2
   files_glob: /local/KOLN/T2/raw/*/*/*.nii.gz
   extract_image_id_regexp: .*/(\d+)/(\d+)_t2\.nii\.gz
-  regexp_image_id_group: 1
-  params:
-    brain_extraction:
-      options: '-f 0.25 -g 0.15'
-      overwrite: False
-    template_registration:
-      skip: True
+  regexp_image_id_group: null
+  regexp_patient_id_group: 2
+  set_all_single_class: PD
+  steps:
+    - type: template_registration
+      subfolder: _registered_2mm
       cost: normcorr
       searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T2_2mm.nii.gz
       overwrite: False
-      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
+    - type: exec_command
+      subfolder: _brain_extracted_2mm
+      command: 'fslmaths {mri_image} -mas {mask} {mri_output}'
+      mask: data/raw/templates/MNI152_T2_2mm_brain_mask.nii.gz
+      overwrite: False
+  split_train_test:
+    random_seed: 0
+    pkl_prefix: KOLN_T2
+    test_images_def:
+      - class: PD
+        count: 50
   filter_xml: null
   shard:
     num_workers: 1

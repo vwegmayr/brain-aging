@@ -4,7 +4,6 @@ import glob
 import subprocess
 import xml.etree.ElementTree as ET
 import json
-import random
 import pickle
 from modules.models.utils import custom_print
 
@@ -55,6 +54,8 @@ class MriPreprocessingPipeline(object):
         files_glob,
         extract_image_id_regexp,
         regexp_image_id_group,
+        regexp_patient_id_group=None,
+        set_all_single_class=None,
         filter_xml=None,
         shard=None,
         steps=[],
@@ -67,9 +68,12 @@ class MriPreprocessingPipeline(object):
         self.files = self.all_files
         self.extract_image_id_regexp = re.compile(extract_image_id_regexp)
         self.regexp_image_id_group = regexp_image_id_group
+        self.regexp_patient_id_group = regexp_patient_id_group
         self.image_id_enabled = None
         self.image_id_to_class = None
-        self.image_id_to_patient_id = None
+        self.set_all_single_class = None
+        self.image_id_to_patient_id = {}
+        self.image_id_counter = 0
         if filter_xml is not None:
             self.filter_xml(**filter_xml)
         if shard is not None:
@@ -78,7 +82,6 @@ class MriPreprocessingPipeline(object):
     def filter_xml(self, files, xml_image_id, filters, xml_class=None, xml_patient_id=None):
         self.image_id_enabled = set()
         self.image_id_to_class = {}
-        self.image_id_to_patient_id = {}
         discarded_count = 0
         for f in glob.glob(files):
             tree = ET.parse(f)
@@ -129,10 +132,7 @@ class MriPreprocessingPipeline(object):
         custom_print('Applying MRI pipeline to %s files' % (len(self.files)))
         all_images_ids = []
         for i, mri_raw in enumerate(self.files):
-            image_id = self.extract_image_id_regexp.match(
-                mri_raw,
-            ).group(self.regexp_image_id_group)
-            image_id = int(image_id)
+            image_id, patient_id = self.extract_image_and_patient(mri_raw)
             custom_print('Image %s/%s [image_id = %s]' % (
                 i, len(self.files), image_id))
             if self.image_id_enabled is not None:
@@ -163,6 +163,26 @@ class MriPreprocessingPipeline(object):
         # Split train/test
         if self.split_train_test is not None:
             self.do_split_train_test(all_images_ids, **self.split_train_test)
+
+    def extract_image_and_patient(self, mri_raw):
+        if self.regexp_image_id_group is not None:
+            image_id = int(self.extract_image_id_regexp.match(
+                mri_raw,
+            ).group(self.regexp_image_id_group))
+        else:
+            image_id = self.image_id_counter
+            self.image_id_counter += 1
+
+        if self.regexp_patient_id_group is not None:
+            patient_id = int(self.extract_image_id_regexp.match(
+                mri_raw,
+            ).group(self.regexp_patient_id_group))
+            assert(image_id not in self.image_id_to_patient_id)
+            self.image_id_to_patient_id[image_id] = patient_id
+        else:
+            assert(image_id in self.image_id_to_patient_id)
+            patient_id = self.image_id_to_patient_id[image_id]
+        return image_id, patient_id
 
     # ------------------------- Pipeline main steps
     def no_operation(self, mri_image, mri_output, image_id, params):
@@ -222,8 +242,13 @@ class MriPreprocessingPipeline(object):
         test_images_def,
     ):
         if self.image_id_to_class is None:
-            custom_print('Train/Test split: No class loaded from XML.')
-            return
+            if self.set_all_single_class is None:
+                custom_print('Train/Test split: No class loaded from XML.')
+                return
+            self.image_id_to_class = {
+                img_id: self.set_all_single_class
+                for img_id in image_ids
+            }
 
         num_images = len(image_ids)
         image_ids = [id for id in image_ids if id in self.image_id_to_class]
