@@ -25,6 +25,14 @@ params:
         count: 50
       - class: PD
         count: 150
+      - class: Prodromal
+        count: 0
+      - class: SWEDD
+        count: 0
+      - class: GenCohort Unaff
+        count: 0
+      - class: GenCohort PD
+        count: 0
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
