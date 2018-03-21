@@ -104,6 +104,7 @@ params:
         predict:
           - health_ad
           - healthy
+        num_classes_in_evaluation: null
         loss_weight_in_global_loss: 1.0
         head_l1_regularization: null
         train_only_globally: True

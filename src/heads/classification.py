@@ -14,6 +14,7 @@ class ClassificationHead(NetworkHeadBase):
         features,
         # Custom arguments (from config file)
         predict,
+        num_classes_in_evaluation=None,
         # Args passed to parent
         **kwargs
     ):
@@ -23,6 +24,10 @@ class ClassificationHead(NetworkHeadBase):
           List of boolean features to predict
           Example: ['is_class_a', 'is_class_b']
         """
+        if num_classes_in_evaluation is None:
+            num_classes_in_evaluation = len(predict)
+        assert(num_classes_in_evaluation <= len(predict))
+        self.num_classes_in_evaluation = num_classes_in_evaluation
         self.predict_feature_names = predict
         self.predictions = model.gen_head(
             last_layer,
@@ -100,7 +105,7 @@ class ClassificationHead(NetworkHeadBase):
             'false_positives': tf.metrics.false_positives(
                 actual_class, predicted),
             'mean_per_class_accuracy': tf.metrics.mean_per_class_accuracy(
-                actual_class, predicted, len(self.predict_feature_names)),
+                actual_class, predicted, self.num_classes_in_evaluation),
         })
         evaluation_metrics.update({
             n: tf.metrics.mean(v[0], weights=v[1], name='%s_weighted' % n)
