@@ -232,24 +232,27 @@ class MriPreprocessingPipeline(object):
                 'Train/Test split: %d/%d images with unknown class!' % (
                     num_images - len(image_ids), num_images,
                 ))
-        r = random.Random(random_seed)
+        # r = random.Random(random_seed)
         all_test = []
         all_train = []
         patients_dict = {}
-        all_patient_ids = [v for v in self.image_id_to_patient_id.values()]
         for class_idx, class_def in enumerate(test_images_def):
-            # We want to split by patient ID, and reach a minimum number of images
+            if not isinstance(class_def['class'], list):
+                assert(isinstance(class_def['class'], str))
+                class_def['class'] = [class_def['class']]
+            # We want to split by patient ID
+            # and reach a minimum number of images
             class_images = [
                 img_id
                 for img_id in image_ids
-                if self.image_id_to_class[img_id] == class_def['class']
+                if self.image_id_to_class[img_id] in class_def['class']
             ]
             class_images = sorted(
                 class_images,
                 key=self.image_id_to_patient_id.__getitem__,
             )
             custom_print('Class %d [%s]' % (
-                class_idx, class_def['class'],
+                class_idx, ','.class_def['class'],
             ))
             num_test_images = class_def['count']
             if num_test_images == 0:
@@ -260,7 +263,8 @@ class MriPreprocessingPipeline(object):
                     class_images[num_test_images-1]
                 ]
                 while self.image_id_to_patient_id[
-                    class_images[num_test_images]] == last_test_patient_id:
+                    class_images[num_test_images]
+                ] == last_test_patient_id:
                     num_test_images += 1
                 test_images = class_images[:num_test_images]
                 train_images = class_images[num_test_images:]
