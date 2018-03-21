@@ -97,7 +97,10 @@ class ClassificationHead(NetworkHeadBase):
         evaluation_metrics = \
             super(ClassificationHead, self).get_evaluated_metrics()
 
-        predicted = tf.argmax(self.predictions, 1)
+        predicted = tf.argmax(
+            self.predictions[:, 0:self.num_classes_in_evaluation],
+            1,
+        )
         actual_class = tf.argmax(self.labels, 1)
         evaluation_metrics.update({
             'false_negatives': tf.metrics.false_negatives(
