@@ -35,12 +35,13 @@ DATASET = all_features.add(
 
 # List features here
 AGE = all_features.add('age')
-HEALTH_AD = all_features.add('health_ad', 'ad', default=0)
-HEALTH_LMCI = all_features.add('health_lmci', 'lmci', default=0)
-HEALTH_EMCI = all_features.add('health_emci', 'emci', default=0)
-HEALTH_MCI = all_features.add('health_mci', 'mci', default=0)
-HEALTH_PD = all_features.add('health_pd', 'pd', default=0)
-HEALTH_SMC = all_features.add('health_smc', 'smc', default=0)
+
+for disease in [
+    'ad', 'lmci', 'emci', 'mci', 'pd', 'smc',
+    'prodromal', 'swedd', 'gencohort_unaff', 'gencohort_pd',
+]:
+    all_features.add('health_%s' % disease, disease, default=0)
+
 HEALTHY = all_features.add('healthy', 'hc', default=0)
 MRI = all_features.add('mri', t=tf.float32)
 SEX = all_features.add('sex', doc='male = 0; female = 1')
