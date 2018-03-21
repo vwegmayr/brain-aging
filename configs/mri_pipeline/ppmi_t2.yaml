@@ -21,18 +21,20 @@ params:
     random_seed: 0
     pkl_prefix: PPMI_T2_NC_PD_vanilla_
     test_images_def:
-      - class: Control
+      - class:
+        - Control
         count: 50
-      - class: PD
+      - class:
+        - PD
         count: 150
-      - class: Prodromal
-        count: 0
-      - class: SWEDD
-        count: 0
-      - class: GenCohort Unaff
-        count: 0
-      - class: GenCohort PD
-        count: 0
+#      - class: Prodromal
+#        count: 0
+#      - class: SWEDD
+#        count: 0
+#      - class: GenCohort Unaff
+#        count: 0
+#      - class: GenCohort PD
+#        count: 0
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID

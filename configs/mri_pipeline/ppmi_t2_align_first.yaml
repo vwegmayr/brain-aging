@@ -29,6 +29,7 @@ params:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
     xml_class: ./project/subject/researchGroup
+    xml_patient_id: ./project/subject/subjectIdentifier
     filters:
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Weighting']
         value:

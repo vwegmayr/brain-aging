@@ -21,7 +21,7 @@ params:
       overwrite: False
   split_train_test:
     random_seed: 0
-    pkl_prefix: KOLN_T2
+    pkl_prefix: KOLN_T2_
     test_images_def:
       - class: PD
         count: 50

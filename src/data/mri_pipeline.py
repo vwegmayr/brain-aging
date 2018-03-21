@@ -180,8 +180,10 @@ class MriPreprocessingPipeline(object):
             assert(image_id not in self.image_id_to_patient_id)
             self.image_id_to_patient_id[image_id] = patient_id
         else:
-            assert(image_id in self.image_id_to_patient_id)
-            patient_id = self.image_id_to_patient_id[image_id]
+            if image_id not in self.image_id_to_patient_id:
+                patient_id = None
+            else:
+                patient_id = self.image_id_to_patient_id[image_id]
         return image_id, patient_id
 
     # ------------------------- Pipeline main steps
@@ -277,7 +279,7 @@ class MriPreprocessingPipeline(object):
                 key=self.image_id_to_patient_id.__getitem__,
             )
             custom_print('Class %d [%s]' % (
-                class_idx, ','.class_def['class'],
+                class_idx, ','.join(class_def['class']),
             ))
             num_test_images = class_def['count']
             if num_test_images == 0:
