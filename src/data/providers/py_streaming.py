@@ -25,9 +25,11 @@ class DataProvider(object):
         self.random = random.Random()
         self.random.seed(config['seed'])
         train_files, test_files = get_train_test_filenames(config)
+        test_files = [t for t in test_files if len(t) > 0]
         for i in range(len(train_files)):
-            print("Train Class ", i, len(train_files[i]))
-            print("Valid Class ", i, len(test_files[i]))
+            print("Train Class %d: %d samples (%s)" % (i, len(train_files[i]), config['classes'][i]))
+        for i in range(len(test_files)):
+            print("Valid Class %d: %d samples (%s)" % (i, len(test_files[i]), config['classes'][i]))
 
         for train, files in [(True, train_files), (False, test_files)]:
             self.inputs[train] = DataInput(
