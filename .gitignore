@@ -5,9 +5,6 @@
 __pycache__/
 .kaggle-cli/
 data/*
-configs/
-!configs/example_config.yaml
-!configs/mri_pipeline.yaml
 .smt/
 .idea/
 .ropeproject/
