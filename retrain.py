@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-# CUDA_VISIBLE_DEVICES=0 smt run -r "Inception v3 finetuning" -m retrain.py --summaries_dir /local/dhaziza/data/ --image_dir notebooks/2d_crops/
+# CUDA_VISIBLE_DEVICES=1 smt run -r "PD_HC: inception [1000 train steps]" -m retrain.py --summaries_dir /local/dhaziza/data/ --image_dir notebooks/2d_crops/ --how_many_training_steps 1000
 
 r"""Simple transfer learning with Inception v3 or Mobilenet models.
 
@@ -212,9 +212,8 @@ def create_image_lists(image_dir, testing_percentage, validation_percentage):
       else:
         if 'train' in base_name:
           training_images.append(base_name)
-        elif percentage_hash < 50:
-          testing_images.append(base_name)
         else:
+          testing_images.append(base_name)
           validation_images.append(base_name)
     result[label_name] = {
         'dir': dir_name,
@@ -1293,7 +1292,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--validation_batch_size',
       type=int,
-      default=100,
+      default=-1,
       help="""\
       How many images to use in an evaluation batch. This validation set is
       used much more often than the test set, and is an early indicator of how
@@ -1392,12 +1391,12 @@ if __name__ == '__main__':
   sumatra_outcome = {
     "text_outcome": "",
     "numeric_outcome": {
-      "valid_accuracy": {
+      "second_half_avg_test_accuracy": {
         "x_label": "Z slice",
         "y": [],
         "x": [],
       },
-      "test_accuracy": {
+      "final_test_accuracy": {
         "x_label": "Z slice",
         "y": [],
         "x": [],
@@ -1410,11 +1409,11 @@ if __name__ == '__main__':
     FLAGS.image_dir = os.path.join(image_dir, 'z%d' % z)
     print('Training z=%d (%s)' % (z, FLAGS.summaries_dir))
     sys.stdout.flush()
-    valid_accuracy, test_accuracy = main([])
+    second_half_avg_test_accuracy, final_test_accuracy = main([])
     sumatra_outcome['text_outcome'] = 'Done z = %d' % z
-    sumatra_outcome['numeric_outcome']['valid_accuracy']['x'].append(z)
-    sumatra_outcome['numeric_outcome']['test_accuracy']['x'].append(z)
-    sumatra_outcome['numeric_outcome']['valid_accuracy']['y'].append(float(valid_accuracy))
-    sumatra_outcome['numeric_outcome']['test_accuracy']['y'].append(float(test_accuracy))
+    sumatra_outcome['numeric_outcome']['second_half_avg_test_accuracy']['x'].append(z)
+    sumatra_outcome['numeric_outcome']['final_test_accuracy']['x'].append(z)
+    sumatra_outcome['numeric_outcome']['second_half_avg_test_accuracy']['y'].append(float(second_half_avg_test_accuracy))
+    sumatra_outcome['numeric_outcome']['final_test_accuracy']['y'].append(float(final_test_accuracy))
     with open(os.path.join(summaries_dir, 'sumatra_outcome.json'), 'w+') as f:
       json.dump(sumatra_outcome, f)
