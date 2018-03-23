@@ -1390,6 +1390,7 @@ if __name__ == '__main__':
   image_dir = FLAGS.image_dir
   sumatra_outcome = {
     "text_outcome": "",
+    "run_tags": ["inception", "classification", "pd_hc", "finetuning"],
     "numeric_outcome": {
       "second_half_avg_test_accuracy": {
         "x_label": "Z slice",
