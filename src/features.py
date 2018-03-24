@@ -34,7 +34,7 @@ DATASET = all_features.add(
     'dataset', t=tf.string, default='', only_for_extractor=True)
 
 # List features here
-AGE = all_features.add('age')
+AGE = all_features.add('age', default=-1)
 
 for disease in [
     'ad', 'lmci', 'emci', 'mci', 'pd', 'smc',
@@ -44,7 +44,7 @@ for disease in [
 
 HEALTHY = all_features.add('healthy', 'hc', default=0)
 MRI = all_features.add('mri', t=tf.float32)
-SEX = all_features.add('sex', doc='male = 0; female = 1')
+SEX = all_features.add('sex', doc='male = 0; female = 1', default=-1)
 STUDY_ID = all_features.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = all_features.add('study_image_id', 'image', default=-1)
 STUDY_PATIENT_ID = all_features.add('study_patient_id', 'patient', default=-1)
