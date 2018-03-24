@@ -77,7 +77,7 @@ params:
         - call: batch
           batch_size: 8
   params: # Params for model (model_fn)
-    train_log_every_n_iter: 60
+    train_log_every_n_iter: 20
     hooks:
       - class: src.train_hooks.SessionHookFullTrace
         params:

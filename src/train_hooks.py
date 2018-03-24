@@ -20,6 +20,7 @@ class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
         """
         tensor_values is a dict {string => tensor_value }
         """
+        elapsed_secs, _ = self._timer.update_last_triggered_step(self._iter_count)
         self.estimator.training_log_values(tensor_values)
         # super(PrintAndLogTensorHook, self)._log_tensors(tensor_values)
         if self.print_summary_tensor is not None:
