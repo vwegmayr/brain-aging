@@ -32,6 +32,10 @@ class UniqueLogger:
         custom_print(text)
 
 
+class ImageNormalizationException(Exception):
+    pass
+
+
 def get_data_preprocessing_values(config):
     """
     Returns a dictionnary with serializable values.
@@ -170,12 +174,20 @@ class DataAggregator:
         }
 
         for s in iter_slices(img_data, self.config):
-            self._write_image(
-                writer,
-                s,
-                img_features,
-                image_path,
-            )
+            try:
+                self._write_image(
+                    writer,
+                    s,
+                    img_features,
+                    image_path,
+                )
+            except ImageNormalizationException:
+                self.add_error(
+                    image_path,
+                    'Unable to normalize image',
+                )
+                return
+
         self.stats[self.curr_study_name]['success'] += 1
 
     def _write_image(self, writer, img_data, img_features, image_path):
@@ -201,6 +213,7 @@ class DataAggregator:
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
+        print('%s [%s]' % (message, path))
 
     def finish(self):
         for w in self.writers.values():
@@ -221,6 +234,8 @@ class DataAggregator:
         mri_for_stats[mri > max_value] = max_value
         m = np.mean(mri_for_stats)
         std = np.std(mri_for_stats)
+        if std < 0.01:
+            raise ImageNormalizationException()
         return (mri - m) / std
 
 
