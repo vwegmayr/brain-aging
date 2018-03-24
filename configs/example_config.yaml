@@ -122,23 +122,7 @@ params:
     num_epochs: 15
     validations_per_epoch: 2
     stats_backward_compatibility:
-      # Classifier eval
       eval/classifier/accuracy: accuracy
-      eval/classifier/false_negatives: false_negatives
-      eval/classifier/false_positives: false_positives
-      # Classifier training
-      train/classifier/accuracy: train/accuracy
-      train/classifier/false_negatives: train/false_negatives
-      train/classifier/false_positives: train/false_positives
-      # Global variables
-      train/global_step: global_step
-      train/adversarial/loss: adv_loss
-      # Losses
-      eval/global_optimizer_loss: opt_loss
-      train/global_optimizer_loss: train/opt_loss
-      eval/loss: loss
-      train/classifier/loss: train/loss
-      train/regressor/loss: train/loss
     # Tensorflow RunConfig
     # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
     tf_estimator_run_config:
