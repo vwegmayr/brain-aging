@@ -1,5 +1,6 @@
 import tensorflow as tf
 import math
+import copy
 import numpy as np
 from modules.models.utils import custom_print
 
@@ -10,6 +11,32 @@ class DeepNNLayers(object):
         self.debug_summaries = False
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
+        self.parse_layers_defs = {
+            'batch_norm': self._parse_batch_norm,
+            'concat_layers': self._parse_concat_layers,
+        }
+
+    # ================= Parsing of CNN architecture =================
+    def _parse_batch_norm(self, context, input):
+        return self.batch_norm(input)
+
+    def _parse_concat_layers(self, context, input, layers_def):
+        layers_out = []
+        for l in layers_def:
+            layers_out.append(self.parse_single_layer(context, input, l))
+        return tf.concat(layers_out, 4)
+
+    def parse_layers(self, context, input, layers_def):
+        assert(isinstance(layers_def, list))
+        for l in layers_def:
+            input = self.parse_single_layer(context, input, l)
+        return input
+
+    def parse_single_layer(self, context, input, layer_def):
+        method = self.parse_layers_defs[layer_def['type']]
+        params = layer_def.copy()
+        del params['type']
+        return method(context, input, **params)
 
     # ================= Summaries and utils =================
     def print_shape(self, text):

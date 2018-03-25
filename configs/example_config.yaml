@@ -84,7 +84,47 @@ params:
             ckptdir: null
             every_step: null
             first_step: True
-    network_body: {}
+    network_body:
+      layers_def:
+        - type: batch_norm
+        - type: concat_layers
+          layers_def:
+            - type: conv_relu
+              filter_size: [5, 5, 5]
+              out_features: 15
+              name: conv1_a
+            - type: conv_relu
+              filter_size: [6, 6, 6]
+              out_features: 15
+              name: conv1_b
+            - type: conv_relu
+              filter_size: [7, 7, 7]
+              out_features: 15
+              name: conv1_c
+        - type: conv_relu
+          filter_size: [5, 5, 5]
+          out_features: 60
+          name: conv2
+        - type: conv_relu
+          filter_size: [5, 5, 5]
+          out_features: 64
+          name: conv3
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 100
+          name: conv4
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 128
+          name: conv5
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 256
+          name: conv6
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 512
+          name: conv7
     network_heads:
       # autoencoder:
       #   class: src.heads.autoencoder.AutoencoderHead

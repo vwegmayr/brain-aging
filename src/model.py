@@ -4,44 +4,42 @@ import features as features_def
 from deepnn.layers import DeepNNLayers
 
 
+class ModelLayerContext:
+    pass
+
+
 class Model(DeepNNLayers):
     def __init__(self, is_training, **kwargs):
         super(Model, self).__init__(**kwargs)
         self.is_training = is_training
+        self.parse_layers_defs.update({
+            'conv_relu': self._parse_conv_relu,
+        })
 
-    def gen_last_layer(self, ft):
+    def _parse_conv_relu(self, context, input, filter_size, out_features, name, log=True):
+        out = self.conv3d_layer(
+            input,
+            out_features,
+            filter_size,
+            strides=[2, 2, 2],
+            bn=False,
+            scope=name,
+            padding='SAME',
+        )
+        if log:
+            self.on_cnn_layer(out)
+        return out
+
+    def gen_last_layer(self, ft, layers_def):
         mri = tf.cast(ft[features_def.MRI], tf.float32)
         mri = tf.reshape(mri, [-1] + mri.get_shape()[1:4].as_list() + [1])
 
-        def conv_relu(input_, kernel_shape, scope, log=True):
-            out = self.conv3d_layer(
-                input_,
-                kernel_shape[4],
-                kernel_shape[0:3],
-                strides=[2, 2, 2],
-                bn=False,
-                scope=scope,
-                padding='SAME',
-            )
-            if log:
-                self.on_cnn_layer(out)
-            return out
-
-        conv = mri
-        self.on_cnn_layer(conv, 'input')
-        conv = tf.concat([
-            conv_relu(conv, [5, 5, 5, -1, 15], 'conv1_a', False),
-            conv_relu(conv, [6, 6, 6, -1, 15], 'conv1_b', False),
-            conv_relu(conv, [7, 7, 7, -1, 15], 'conv1_c', False),
-        ], 4)
-        self.on_cnn_layer(conv, 'conv1')
-        conv = conv_relu(conv, [5, 5, 5, 45, 60], 'conv2')
-        conv = conv_relu(conv, [5, 5, 5, 60, 64], 'conv3')
-        conv = conv_relu(conv, [3, 3, 3, 64, 100], 'conv4')
-        conv = conv_relu(conv, [3, 3, 3, 100, 128], 'conv5')
-        conv = conv_relu(conv, [3, 3, 3, 128, 256], 'conv6')
-        conv = conv_relu(conv, [3, 3, 3, 256, 512], 'conv7')
-        return tf.verify_tensor_all_finite(conv, "gen_last_layer returns non finite values!")
+        context = ModelLayerContext()
+        context.features = ft
+        return tf.verify_tensor_all_finite(
+            self.parse_layers(context, mri, layers_def),
+            "gen_last_layer returns non finite values!",
+        )
 
     def gen_head(self, fc, num_classes, **kwargs):
         assert(fc.get_shape().as_list()[1:4] == [1, 1, 1])
