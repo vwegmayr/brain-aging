@@ -17,8 +17,8 @@ class DeepNNLayers(object):
         }
 
     # ================= Parsing of CNN architecture =================
-    def _parse_batch_norm(self, context, input):
-        return self.batch_norm(input)
+    def _parse_batch_norm(self, context, input, **kwargs):
+        return self.batch_norm(input, **kwargs)
 
     def _parse_concat_layers(self, context, input, layers_def):
         layers_out = []
@@ -273,12 +273,12 @@ class DeepNNLayers(object):
         return out
 
     # ================= Regularization =================
-    def batch_norm(self, x, **kwargs):
+    def batch_norm(self, x, decay=0.9, **kwargs):
         return tf.contrib.layers.batch_norm(
             x,
             is_training=self.is_training,
             updates_collections=None,
-            decay=0.9,
+            decay=decay,
             **kwargs
         )
 
