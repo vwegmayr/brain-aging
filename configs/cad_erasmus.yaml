@@ -134,6 +134,10 @@ params:
           filter_size: [3, 3, 3]
           out_features: 512
           name: conv7
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 512
+          name: conv8
     network_heads:
       # autoencoder:
       #   class: src.heads.autoencoder.AutoencoderHead
