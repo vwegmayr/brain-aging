@@ -259,6 +259,8 @@ class DataSource(object):
                 dataset.add_image(f, ft)
             except LookupError as e:
                 dataset.add_error(f, str(e))
+            except IOError as e:
+                dataset.add_error(f, str(e))
 
 
 def get_all_data_sources(config):
