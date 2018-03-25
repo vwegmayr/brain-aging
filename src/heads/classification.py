@@ -46,7 +46,9 @@ class ClassificationHead(NetworkHeadBase):
             self.labels,
             self.predictions,
             reduction=tf.losses.Reduction.MEAN,
-            weights=tf.reduce_sum(self.labels * weights_per_class, 1),
+            weights=tf.reduce_sum(
+                tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+            ),
         )
 
         # Metrics for training/eval
