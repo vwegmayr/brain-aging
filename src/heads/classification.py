@@ -1,5 +1,6 @@
 import copy
 import tensorflow as tf
+import numpy as np
 from base import NetworkHeadBase
 from src.features import all_features
 
@@ -14,6 +15,7 @@ class ClassificationHead(NetworkHeadBase):
         features,
         # Custom arguments (from config file)
         predict,
+        loss_classes_weights={},
         num_classes_in_evaluation=None,
         # Args passed to parent
         **kwargs
@@ -35,12 +37,16 @@ class ClassificationHead(NetworkHeadBase):
         )
 
         # Compute loss
+        weights_per_class = {ft_name: 1.0 for ft_name in predict}
+        weights_per_class.update(loss_classes_weights)
+        weights_per_class = np.array([weights_per_class[ft_name] for ft_name in predict])
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
         self.loss = tf.losses.softmax_cross_entropy(
             self.labels,
             self.predictions,
             reduction=tf.losses.Reduction.MEAN,
+            weights=tf.reduce_sum(self.labels * weights_per_class, 1),
         )
 
         # Metrics for training/eval
