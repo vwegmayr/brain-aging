@@ -10,7 +10,7 @@ from modules.models.utils import custom_print
 import features as ft_def
 import src.data.providers
 from model import Model
-from train_hooks import PrintAndLogTensorHook
+from train_hooks import PrintAndLogTensorHook, SessionHookDumpTensors
 
 
 class Estimator(TensorflowBaseEstimator):
@@ -234,6 +234,7 @@ class Estimator(TensorflowBaseEstimator):
             **params['network_train_ops_settings']
         )
 
+        # Evaluation hooks
         evaluation_hooks = []
         all_summaries = tf.summary.merge_all()
         if all_summaries is not None:
@@ -242,6 +243,18 @@ class Estimator(TensorflowBaseEstimator):
                 output_dir=self.config["model_dir"] + "/eval",
                 summary_op=tf.summary.merge_all(),
             )]
+        tensors_to_dump = {}
+        for head in heads:
+            with tf.variable_scope(head.get_name()):
+                variables = head.get_tensors_to_dump()
+                tensors_to_dump.update({
+                    head.name + '/' + var_name: var_value
+                    for var_name, var_value in variables.items()
+                })
+        evaluation_hooks += [SessionHookDumpTensors(
+            self.save_path,
+            tensors_to_dump,
+        )]
 
         return tf.estimator.EstimatorSpec(
             mode=mode,

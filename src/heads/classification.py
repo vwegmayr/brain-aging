@@ -242,3 +242,12 @@ class ClassificationHead(NetworkHeadBase):
         ft_names.sort()
         tags.append('_'.join(ft_names))
         return tags
+
+    def get_tensors_to_dump(self):
+        if self.is_training:
+            return {}
+        return {
+            'proba': self.probas,
+            'labels': self.labels,
+            'logits': self.predictions,
+        }

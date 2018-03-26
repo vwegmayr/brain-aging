@@ -122,6 +122,9 @@ class NetworkHeadBase(object):
     def get_tags(self):
         return []
 
+    def get_tensors_to_dump(self):
+        return {}
+
     # -------------------------- Local and Global training distinction
     def register_globally_trained_variables(self, l):
         if not self.train_only_globally:
