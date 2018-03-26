@@ -39,7 +39,10 @@ class ClassificationHead(NetworkHeadBase):
         # Compute loss
         weights_per_class = {ft_name: 1.0 for ft_name in predict}
         weights_per_class.update(loss_classes_weights)
-        weights_per_class = np.array([weights_per_class[ft_name] for ft_name in predict])
+        weights_per_class = np.array([
+            weights_per_class[ft_name]
+            for ft_name in predict
+        ])
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
         self.loss = tf.losses.softmax_cross_entropy(
