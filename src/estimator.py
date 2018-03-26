@@ -165,6 +165,7 @@ class Estimator(TensorflowBaseEstimator):
                     model=m,
                     last_layer=last_layer,
                     features=features,
+                    is_training=(mode == tf.estimator.ModeKeys.TRAIN),
                     **h
                 )
                 self.sumatra_add_tags(head.get_tags())
@@ -233,6 +234,15 @@ class Estimator(TensorflowBaseEstimator):
             **params['network_train_ops_settings']
         )
 
+        evaluation_hooks = []
+        all_summaries = tf.summary.merge_all()
+        if all_summaries is not None:
+            evaluation_hooks = [tf.train.SummarySaverHook(
+                save_steps=1,
+                output_dir=self.config["model_dir"] + "/eval",
+                summary_op=tf.summary.merge_all(),
+            )]
+
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=global_loss,
@@ -242,6 +252,7 @@ class Estimator(TensorflowBaseEstimator):
                 params,
                 log_variables=train_log_variables,
             ),
+            evaluation_hooks=evaluation_hooks,
         )
 
     def generate_train_ops(
@@ -422,12 +433,16 @@ class Estimator(TensorflowBaseEstimator):
 
                 # All this data needs to be serializable, so get rid of
                 # numpy arrays, np.float32 etc..
-                sumatra_metrics[prefix + label] = {
-                    'type': 'numeric',
-                    'x': x_values[1:].tolist(),
-                    'x_label': 'Training epoch',
-                    'y': np.array(values).tolist(),
-                }
+                try:
+                    sumatra_metrics[prefix + label] = {
+                        'type': 'numeric',
+                        'x': x_values[1:].tolist(),
+                        'x_label': 'Training epoch',
+                        'y': np.array(values).astype(np.float32).tolist(),
+                    }
+                except ValueError:
+                    # For example if values is a string (serialized summary)
+                    pass
 
         accuracy_key = 'classifier/mean_per_class_accuracy'
         if accuracy_key in v_eval and len(v_eval[accuracy_key]) >= 8:

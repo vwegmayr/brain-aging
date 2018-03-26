@@ -13,6 +13,7 @@ class NetworkHeadBase(object):
         model,
         last_layer,
         features,
+        is_training,
         # Arguments from config
         loss_weight_in_global_loss=None,
         train_only_globally=True,
@@ -42,6 +43,7 @@ class NetworkHeadBase(object):
         ))
 
         self.name = name
+        self.is_training = is_training
         self.loss_weight_in_global_loss = loss_weight_in_global_loss
         self.train_only_globally = train_only_globally
         self.head_l1_regularization = head_l1_regularization
@@ -56,8 +58,10 @@ class NetworkHeadBase(object):
 
         # Setup summary for metrics
         self.metrics.update({'loss': self.loss})
-        for name, value in self.metrics.items():
-            tf.summary.scalar(name, value)
+        # Metrics are averaged over all test set (see @get_evaluated_metrics)
+        if is_training:
+            for name, value in self.metrics.items():
+                tf.summary.scalar(name, value)
 
     # -------------------------- Evaluation/training metrics
     def get_logged_training_variables(self):

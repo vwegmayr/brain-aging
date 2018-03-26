@@ -1,8 +1,72 @@
-import copy
 import tensorflow as tf
 import numpy as np
 from base import NetworkHeadBase
 from src.features import all_features
+
+
+class LoopBufferManager:
+    def __init__(self, size, default_value=0.0, name='loop_buffer'):
+        self.cursor_pos = tf.Variable(
+            0,
+            trainable=False,
+            name='%s/cursor_pos' % name,
+        )
+        self.buffer = tf.Variable(
+            [default_value] * size,
+            name='%s/buffer' % name,
+            trainable=False,
+        )
+        self.buffer_size = size
+        self.name = name
+
+    def insert_values(self, values):
+        values = tf.reshape(values, [-1])
+        num_values = tf.shape(values)[0]
+        write_pos_last = tf.minimum(
+            self.cursor_pos + num_values,
+            self.buffer_size,
+        )
+        with tf.control_dependencies([
+            # self.buffer[:self.cursor_pos]
+            tf.assert_less_equal(self.cursor_pos, self.buffer_size),
+            tf.assert_greater_equal(self.cursor_pos, 0),
+            # values[:write_pos_last - self.cursor_pos]
+            tf.assert_less_equal(write_pos_last - self.cursor_pos, num_values),
+            tf.assert_greater_equal(write_pos_last - self.cursor_pos, 0),
+            # self.buffer[write_pos_last:]
+            tf.assert_less_equal(write_pos_last, self.buffer_size),
+            tf.assert_greater_equal(write_pos_last, 0),
+        ]):
+            buf = self.buffer.assign(
+                tf.concat([
+                    self.buffer[:self.cursor_pos],
+                    values[:write_pos_last - self.cursor_pos],
+                    self.buffer[write_pos_last:],
+                ], 0),
+            )
+        with tf.control_dependencies([buf]):
+            return self.cursor_pos.assign(tf.cond(
+                self.cursor_pos + num_values >= self.buffer_size,
+                lambda: 0,
+                lambda: self.cursor_pos + num_values,
+            ))
+
+    def get_buffer(self):
+        return self.buffer
+
+
+def accumulated_histogram(variable, accumulate_size, name):
+    buf = LoopBufferManager(
+        accumulate_size,
+        name='%s/buf' % name,
+    )
+    update_op = buf.insert_values(variable)
+    summary = tf.summary.histogram(
+        name,
+        buf.get_buffer(),
+        collections=[],
+    )
+    return summary, update_op
 
 
 class ClassificationHead(NetworkHeadBase):
@@ -13,6 +77,7 @@ class ClassificationHead(NetworkHeadBase):
         model,
         last_layer,
         features,
+        is_training,
         # Custom arguments (from config file)
         predict,
         loss_classes_weights={},
@@ -96,11 +161,30 @@ class ClassificationHead(NetworkHeadBase):
             for name, v in self.classes_accuracy.items()
         })
 
+        # Histogram summaries
+        self.probas = tf.nn.softmax(self.predictions)
+        control_deps = []
+        if is_training:
+            HISTOGRAM_NUMBER_VALUES_TRAIN_SET = 350
+            for p_idx, p_ft_name in enumerate(self.predict_feature_names):
+                summary, update_op = accumulated_histogram(
+                    self.probas[:, p_idx],
+                    HISTOGRAM_NUMBER_VALUES_TRAIN_SET,
+                    'p_%s' % p_ft_name,
+                )
+                tf.add_to_collection(tf.GraphKeys.SUMMARIES, summary)
+                control_deps.append(update_op)
+
+        # Loss with all required operatioons
+        with tf.control_dependencies(control_deps):
+            self.loss = tf.identity(self.loss)
+
         super(ClassificationHead, self).__init__(
             name=name,
             model=model,
             last_layer=last_layer,
             features=features,
+            is_training=is_training,
             **kwargs
         )
 
@@ -125,6 +209,18 @@ class ClassificationHead(NetworkHeadBase):
             n: tf.metrics.mean(v[0], weights=v[1], name='%s_weighted' % n)
             for n, v in self.classes_accuracy.items()
         })
+
+        # Histograms
+        HISTOGRAM_NUMBER_VALUES_TEST_SET = 330
+        for p_idx, p_ft_name in enumerate(self.predict_feature_names):
+            summary, update_op = accumulated_histogram(
+                self.probas[:, p_idx],
+                HISTOGRAM_NUMBER_VALUES_TEST_SET,
+                'p_%s' % p_ft_name,
+            )
+            evaluation_metrics.update({
+                'p_%s' % p_ft_name: (summary, update_op)
+            })
         return evaluation_metrics
 
     def get_predictions(self):
