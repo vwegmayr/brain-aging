@@ -6,7 +6,7 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: 'spatialJacobian_brain baseline'
+    reason: 'ERSM: w=(1.7, 1.4, 0.6)'
     tags:
       - erasmus_adni
   input_fn_config: # Parameters for input generation (gen_input_fn)
