@@ -1,6 +1,5 @@
 import tensorflow as tf
 import math
-import copy
 import numpy as np
 from modules.models.utils import custom_print
 
@@ -13,12 +12,16 @@ class DeepNNLayers(object):
         self.enable_print_shapes = print_shapes
         self.parse_layers_defs = {
             'batch_norm': self._parse_batch_norm,
+            'batch_renorm': self._parse_batch_renorm,
             'concat_layers': self._parse_concat_layers,
         }
 
     # ================= Parsing of CNN architecture =================
     def _parse_batch_norm(self, context, input, **kwargs):
         return self.batch_norm(input, **kwargs)
+
+    def _parse_batch_renorm(self, context, input, **kwargs):
+        return self.batch_renorm(input, **kwargs)
 
     def _parse_concat_layers(self, context, input, layers_def):
         layers_out = []
@@ -274,11 +277,46 @@ class DeepNNLayers(object):
 
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
-        return tf.contrib.layers.batch_norm(
+        return tf.layers.batch_normalization(
             x,
-            is_training=self.is_training,
-            updates_collections=None,
-            decay=decay,
+            training=self.is_training,
+            momentum=decay,
+            **kwargs
+        )
+
+    def batch_renorm(
+        self,
+        x,
+        decay=0.9,
+        transition_begin_iter=250,
+        transition_d_end_iter=850,
+        transition_r_end_iter=1500,
+        max_r=3,
+        max_d=5,
+        **kwargs
+    ):
+        max_r = tf.cast(max_r, tf.float32)
+        max_d = tf.cast(max_d, tf.float32)
+        step = tf.cast(tf.train.get_global_step(), tf.float32)
+        r = (step - transition_begin_iter) * max_r / \
+            (transition_r_end_iter - transition_begin_iter)
+        r += (step - transition_r_end_iter) * 1.0 / \
+            (transition_begin_iter - transition_r_end_iter)
+        r = tf.clip_by_value(r, 1.0, max_r)
+        d = (step - transition_begin_iter) * max_d / \
+            (transition_d_end_iter - transition_begin_iter)
+        d = tf.clip_by_value(d, 0.0, max_d)
+        renorm_clipping = {
+            'rmin': 1./r,
+            'rmax': r,
+            'dmax': d,
+        }
+        return tf.layers.batch_normalization(
+            x,
+            training=self.is_training,
+            momentum=decay,
+            renorm=True,
+            renorm_clipping=renorm_clipping,
             **kwargs
         )
 
