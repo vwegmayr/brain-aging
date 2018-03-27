@@ -94,6 +94,7 @@ params:
     network_body:
       layers_def:
         - type: batch_norm
+          decay: 0.98
         - type: concat_layers
           layers_def:
             - type: conv_relu
@@ -117,11 +118,13 @@ params:
           out_features: 64
           name: conv3
         - type: batch_norm
+          decay: 0.98
         - type: conv_relu
           filter_size: [3, 3, 3]
           out_features: 100
           name: conv4
         - type: batch_norm
+          decay: 0.98
         - type: conv_relu
           filter_size: [3, 3, 3]
           out_features: 128
@@ -136,7 +139,7 @@ params:
           name: conv7
         - type: conv_relu
           filter_size: [3, 3, 3]
-          out_features: 512
+          out_features: 1024
           name: conv8
     network_heads:
       # autoencoder:
