@@ -10,19 +10,17 @@ class DeepNNLayers(object):
         self.debug_summaries = False
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
+        def func_fwd_input(fn):
+            return lambda context, input, **kwargs: fn(input, **kwargs)
         self.parse_layers_defs = {
-            'batch_norm': self._parse_batch_norm,
-            'batch_renorm': self._parse_batch_renorm,
+            'batch_norm': func_fwd_input(self.batch_norm),
+            'batch_renorm': func_fwd_input(self.batch_renorm),
             'concat_layers': self._parse_concat_layers,
+            'conv2d': func_fwd_input(self.conv2d_layer),
+            'conv3d': func_fwd_input(self.conv3d_layer),
         }
 
     # ================= Parsing of CNN architecture =================
-    def _parse_batch_norm(self, context, input, **kwargs):
-        return self.batch_norm(input, **kwargs)
-
-    def _parse_batch_renorm(self, context, input, **kwargs):
-        return self.batch_renorm(input, **kwargs)
-
     def _parse_concat_layers(self, context, input, layers_def):
         layers_out = []
         for l in layers_def:
@@ -123,6 +121,7 @@ class DeepNNLayers(object):
         scope="conv3d_layer",
         conv_type='conv',
         bn=True,
+        reversed_filters=False,
     ):
         assert(conv_type in ['conv', 'deconv'])
         with tf.variable_scope(scope):
@@ -140,6 +139,21 @@ class DeepNNLayers(object):
                 regularizer=tf.contrib.layers.l1_regularizer(1.0),
             )
             W = tf.reshape(W, W_shape)
+            if reversed_filters:
+                additionnal_filters = [
+                    W,
+                    tf.reverse(W, [0]),
+                    tf.reverse(W, [1]),
+                    tf.reverse(W, [0, 1]),
+                ]
+                if len(filter_weights) == 3:
+                    additionnal_filters += [
+                        tf.reverse(W, [2]),
+                        tf.reverse(W, [0, 2]),
+                        tf.reverse(W, [1, 2]),
+                        tf.reverse(W, [0, 1, 2]),
+                    ]
+                W = tf.concat(additionnal_filters, -1)
             out = func(
                 x,
                 filter=W,
@@ -154,6 +168,8 @@ class DeepNNLayers(object):
                     [num_filters],
                     initializer=tf.constant_initializer(0.001),
                 )
+                if reversed_filters:
+                    b = tf.concat([b] * len(additionnal_filters), -1)
                 out += b
             out = nl(out)
             if self.debug_summaries:
