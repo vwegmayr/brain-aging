@@ -110,17 +110,19 @@ class ClassificationHead(NetworkHeadBase):
         ])
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
-        self.loss = tf.losses.softmax_cross_entropy(
+        labels_float = tf.cast(self.labels, tf.float32)
+        weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
             self.labels,
             self.predictions,
-            reduction=tf.losses.Reduction.MEAN,
+            reduction=tf.losses.Reduction.NONE,
             weights=tf.reduce_sum(
-                tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                labels_float * weights_per_class, 1,
             ),
         )
+        self.loss = tf.reduce_mean(weighted_loss_per_sample)
 
         # Metrics for training/eval
-        batch_size = tf.shape(self.labels)[0]
+        batch_size = tf.cast(tf.shape(self.labels)[0], tf.float32)
         accuracy = tf.cast(
             tf.equal(
                 tf.argmax(self.predictions, 1),
@@ -136,7 +138,7 @@ class ClassificationHead(NetworkHeadBase):
             tf.reduce_sum(tf.cast(
                 tf.equal(tf.argmax(self.predictions, 1), i),
                 tf.float32,
-            )) / tf.cast(batch_size, tf.float32)
+            )) / batch_size
             for i, ft_name in enumerate(self.predict_feature_names)
         })
 
@@ -160,6 +162,17 @@ class ClassificationHead(NetworkHeadBase):
             name: v[0]
             for name, v in self.classes_accuracy.items()
         })
+        loss_contribution_ratio = [
+            tf.reduce_sum(
+                weighted_loss_per_sample * labels_float[:, i] / batch_size
+            )
+            for i, _ in enumerate(predict)
+        ]
+        self.metrics.update({
+            'loss_contribution_ratio/%s' % class_name: \
+                loss_contribution_ratio[i] / self.loss
+            for i, class_name in enumerate(predict)
+        })
 
         # Histogram summaries
         self.probas = tf.nn.softmax(self.predictions)
@@ -175,7 +188,7 @@ class ClassificationHead(NetworkHeadBase):
                 tf.add_to_collection(tf.GraphKeys.SUMMARIES, summary)
                 control_deps.append(update_op)
 
-        # Loss with all required operatioons
+        # Loss with all required operations
         with tf.control_dependencies(control_deps):
             self.loss = tf.identity(self.loss)
 
