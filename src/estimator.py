@@ -447,11 +447,13 @@ class Estimator(TensorflowBaseEstimator):
                 # All this data needs to be serializable, so get rid of
                 # numpy arrays, np.float32 etc..
                 try:
+                    v = np.array(values).astype(np.float32)
+                    v = np.nan_to_num(v)
                     sumatra_metrics[prefix + label] = {
                         'type': 'numeric',
                         'x': x_values[1:].tolist(),
                         'x_label': 'Training epoch',
-                        'y': np.array(values).astype(np.float32).tolist(),
+                        'y': v.tolist(),
                     }
                 except ValueError:
                     # For example if values is a string (serialized summary)
