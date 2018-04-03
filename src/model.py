@@ -48,6 +48,7 @@ class Model(DeepNNLayers):
         fc = self.fc_layer(fc, 512, name='fullcn')
         fc = self.dropout(fc, 0.3)
         fc = self.fc_layer(fc, num_classes, nl=tf.identity, name='logits')
+        fc = self.batch_norm(fc)
         return tf.verify_tensor_all_finite(fc, "gen_head returns non finite values!")
 
     def gen_deconv_head(self, fc):
