@@ -134,6 +134,14 @@ class ClassificationHead(NetworkHeadBase):
             'accuracy': tf.reduce_mean(accuracy),
         }
         self.metrics.update({
+            'labels/%s_ratio' % class_name: tf.reduce_mean(tf.cast(self.labels[:, i], tf.float32))
+            for i, class_name in enumerate(predict)
+        })
+        self.metrics.update({
+            'logits/%s' % class_name: tf.reduce_mean(tf.cast(self.predictions[:, i], tf.float32))
+            for i, class_name in enumerate(predict)
+        })
+        self.metrics.update({
             'predicted_%s_ratio' % ft_name:
             tf.reduce_sum(tf.cast(
                 tf.equal(tf.argmax(self.predictions, 1), i),
@@ -187,7 +195,13 @@ class ClassificationHead(NetworkHeadBase):
                 )
                 tf.add_to_collection(tf.GraphKeys.SUMMARIES, summary)
                 control_deps.append(update_op)
-
+                summary, update_op = accumulated_histogram(
+                    self.predictions[:, p_idx],
+                    HISTOGRAM_NUMBER_VALUES_TRAIN_SET,
+                    'logits_%s' % p_ft_name,
+                )
+                tf.add_to_collection(tf.GraphKeys.SUMMARIES, summary)
+                control_deps.append(update_op)
         # Loss with all required operations
         with tf.control_dependencies(control_deps):
             self.loss = tf.identity(self.loss)
@@ -233,6 +247,14 @@ class ClassificationHead(NetworkHeadBase):
             )
             evaluation_metrics.update({
                 'p_%s' % p_ft_name: (summary, update_op)
+            })
+            summary, update_op = accumulated_histogram(
+                self.predictions[:, p_idx],
+                HISTOGRAM_NUMBER_VALUES_TEST_SET,
+                'logits_%s' % p_ft_name,
+            )
+            evaluation_metrics.update({
+                'logits_%s' % p_ft_name: (summary, update_op)
             })
         return evaluation_metrics
 
