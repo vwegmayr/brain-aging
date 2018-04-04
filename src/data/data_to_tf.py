@@ -85,17 +85,24 @@ class DataAggregator:
             tf.python_io.TFRecordCompressionType,
             config['dataset_compression'],
         )
-        self.writers = {
-            'train': tf.python_io.TFRecordWriter(
-                os.path.join(converted_dir, config['train_database_file']),
-                tf.python_io.TFRecordOptions(compression),
-            ),
-            'test': tf.python_io.TFRecordWriter(
-                os.path.join(converted_dir, config['test_database_file']),
-                tf.python_io.TFRecordOptions(compression),
-            ),
-        }
-        self.value_to_writer = {}
+        self.test_writer = tf.python_io.TFRecordWriter(
+            os.path.join(converted_dir, config['test_database_file']),
+            tf.python_io.TFRecordOptions(compression),
+        )
+        self.train_writers = [{
+                ft: tf.python_io.TFRecordWriter(
+                    os.path.join(
+                        converted_dir,
+                        config['train_database_file'].format(
+                            feature=ft, shard=shard,
+                        ),
+                    ),
+                    tf.python_io.TFRecordOptions(compression),
+                )
+                for ft in config['train_dataset_split']['split_features']
+            }
+            for shard in range(config['train_dataset_split']['num_shards'])
+        ]
         self.curr_study_id = -1
         self.curr_study_name = ''
         self.count = 0
@@ -110,21 +117,33 @@ class DataAggregator:
             'errors': []
         }
         self.count = 1
-        self.value_to_writer = {}
+        self.train_test_split = {}
         self.total_files = total_files
 
-    def get_writer_for_image(self, features):
+    def get_sample_dataset(self, features):
         # Train/test dataset already defined
         if ft_def.DATASET in features:
-            return self.writers[features[ft_def.DATASET]]
+            return features[ft_def.DATASET]
 
         ft_value = features[self.config['train_test_split_on_feature']]
-        if ft_value not in self.value_to_writer:
+        if ft_value not in self.train_test_split:
             if random.random() < self.config['test_set_size_ratio']:
-                self.value_to_writer[ft_value] = self.writers['test']
+                self.train_test_split[ft_value] = 'test'
             else:
-                self.value_to_writer[ft_value] = self.writers['train']
-        return self.value_to_writer[ft_value]
+                self.train_test_split[ft_value] = 'train'
+        return self.train_test_split[ft_value]
+
+    def get_writer_for_image(self, features):
+        train_or_test = self.get_sample_dataset(features)
+        if train_or_test == 'test':
+            return self.test_writer
+        # Train set is sharded + splitted by feature
+        shard_writers = random.choice(self.train_writers)
+        for k, v in shard_writers.items():
+            assert(k in features)
+            if features[k]:
+                return v
+        return None
 
     def add_image(self, image_path, features):
         Feature = tf.train.Feature
@@ -146,6 +165,10 @@ class DataAggregator:
             return
 
         writer = self.get_writer_for_image(features)
+        if writer is None:
+            self.add_error(image_path, 'Image has no writer')
+            return
+
         # Transform features and write
         features = {
             k: v
@@ -216,8 +239,11 @@ class DataAggregator:
         print('%s [%s]' % (message, path))
 
     def finish(self):
-        for w in self.writers.values():
-            w.close()
+        self.test_writer.close()
+        for shard_writers in self.train_writers:
+            for w in shard_writers.values():
+                w.close()
+
         UniqueLogger.log('---- DATA CONVERSION STATS ----')
         for k, v in self.stats.items():
             UniqueLogger.log('%s: %d ok / %d errors' % (
