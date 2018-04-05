@@ -6,7 +6,7 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: 'ERSM: w=(1.7, 1.4, 0.6)'
+    reason: 'ERSM: resampled, balanced minibatchs (optimized) [shuffle random]'
     tags:
       - erasmus_adni
   input_fn_config: # Parameters for input generation (gen_input_fn)
@@ -29,7 +29,7 @@ params:
         split_on: '_normalized.nii.gz'
     data_generation:
       data_converted_directory: data/ready/
-      train_database_file: train.tfrecord
+      train_database_file: train_{feature}_s{shard}.tfrecord
       test_database_file: test.tfrecord
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
@@ -41,6 +41,12 @@ params:
       image_normalization:
         enable: True
         outlier_percentile: 99
+      train_dataset_split:
+        num_shards: 2
+        split_features:
+          - healthy
+          - health_ad
+          - health_mci
       data_sources:
         # - name: ADNI_AIBL
         #   glob: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/*_*.nii.gz
@@ -76,11 +82,6 @@ params:
       dataset:
         - call: prefetch
           buffer_size: 200
-        - call: shuffle
-          buffer_size: 200
-        - call: map
-          map_func: src.data.providers.tf_streaming.parser
-          num_parallel_calls: 8
         - call: batch
           batch_size: 8
   params: # Params for model (model_fn)
@@ -162,9 +163,9 @@ params:
           - health_ad
           - health_mci
         loss_classes_weights:
-          healthy: 1.388
-          health_ad: 1.693
-          health_mci: 0.592
+          healthy: 1.0
+          health_ad: 1.0
+          health_mci: 1.0
         num_classes_in_evaluation: null
         loss_weight_in_global_loss: 1.0
         head_l1_regularization: null

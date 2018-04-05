@@ -12,8 +12,10 @@ class DataProvider(object):
             input_fn_config['image_shape']
         self.path = generate_tf_dataset(input_fn_config['data_generation'])
         self.input_fn_config = input_fn_config
+        self.seed = 0
 
     def get_input_fn(self, train, shard):
+        self.seed += 1
         def _input_fn():
             return input_iterator(
                 self.input_fn_config['data_generation'],
@@ -21,6 +23,7 @@ class DataProvider(object):
                 data_path=self.path,
                 shard=shard,
                 type='train' if train else 'test',
+                shuffle_seed=self.seed,
             )
         return _input_fn
 
@@ -95,14 +98,43 @@ def input_iterator(
     data_path,
     shard=None,
     type='train',
+    shuffle_seed=0,
 ):
     assert(type in ['train', 'test'])
-    dataset = tf.data.TFRecordDataset([os.path.join(
-            data_path,
-            config_data_generation[type + '_database_file'],
-        )],
-        compression_type=config_data_generation['dataset_compression'],
-    )
-    if shard is not None:
-        dataset = dataset.shard(index=shard[0], num_shards=shard[1])
+    def get_dataset(filename):
+        return tf.data.TFRecordDataset([os.path.join(
+                data_path,
+                filename,
+            )],
+            compression_type=config_data_generation['dataset_compression'],
+        )
+    if type == 'test':
+        dataset = get_dataset(config_data_generation['test_database_file'])
+    else:
+        datasets = [
+            get_dataset('train_healthy_s{shard}.tfrecord'.format(shard=shard[0])).repeat(2).shuffle(buffer_size=100, seed=shuffle_seed).map(lambda r: (tf.convert_to_tensor(0), r)),
+            get_dataset('train_health_ad_s{shard}.tfrecord'.format(shard=shard[0])).repeat(2).shuffle(buffer_size=100, seed=shuffle_seed).map(lambda r: (tf.convert_to_tensor(1), r)),
+            get_dataset('train_health_mci_s{shard}.tfrecord'.format(shard=shard[0])).shuffle(buffer_size=100, seed=shuffle_seed).map(lambda r: (tf.convert_to_tensor(2), r)),
+        ]
+        # Resample
+        def first(a, b):
+            return a
+        def second_second(a, b):
+            return b[1]
+        total = float(417 * 2 + 342 * 2 + 978)
+        for i, d in enumerate(datasets):
+            datasets[i] = d.apply(tf.contrib.data.rejection_resample(
+                first,
+                [0.33, 0.33, 0.33],
+                [2 * 417./total, 2 * 342./total, 978./total],
+                seed=0,
+            )).map(second_second)
+        # Concatenate
+        def flat_map_concat_fn(class1, *args):
+            d = tf.data.Dataset.from_tensors(class1)
+            for c in args:
+                d = d.concatenate(tf.data.Dataset.from_tensors(c))
+            return d
+        dataset = tf.data.Dataset.zip(tuple(datasets)).flat_map(flat_map_concat_fn)
+    dataset = dataset.map(parser, num_parallel_calls=8)
     return gen_dataset_iterator(config_data_streaming['dataset'], dataset)
