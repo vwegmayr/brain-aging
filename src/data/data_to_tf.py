@@ -179,21 +179,19 @@ class DataAggregator:
             return
 
         # Transform features and write
-        features = {
-            k: v
-            for k, v in features.items()
-            if not ft_def.all_features.feature_info[k]['only_for_extractor']
-        }
-
         def _int64_to_feature(v):
             return Feature(int64_list=Int64List(value=[v]))
+
+        def _str_to_feature(s):
+            return Feature(bytes_list=tf.train.BytesList(
+                value=[tf.compat.as_bytes(s)]
+            ))
         features[ft_def.STUDY_ID] = self.curr_study_id
 
         # Check we have all features set
         for ft_name, ft_name_def in ft_def.all_features.feature_info.items():
             if (ft_name != ft_def.MRI and
-                    ft_name not in features and
-                    not ft_name_def['only_for_extractor']):
+                    ft_name not in features):
                 if ft_name_def['default'] is None:
                     UniqueLogger.log('[FATAL] Feature `%s` missing for %s' % (
                         ft_name, image_path))
@@ -203,7 +201,13 @@ class DataAggregator:
         img_features = {
             k: _int64_to_feature(v)
             for k, v in features.items()
+            if ft_def.all_features.feature_info[k]['type'] != tf.string
         }
+        img_features.update({
+            k: _str_to_feature(v)
+            for k, v in features.items()
+            if ft_def.all_features.feature_info[k]['type'] == tf.string
+        })
 
         for s in iter_slices(img_data, self.config):
             try:
@@ -235,7 +239,6 @@ class DataAggregator:
         assert(all([
             ft_name in img_features
             for ft_name, ft_info in ft_def.all_features.feature_info.items()
-            if not ft_info['only_for_extractor']
         ]))
 
         example = tf.train.Example(

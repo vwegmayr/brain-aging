@@ -13,14 +13,12 @@ class FeaturesMgr:
         shape=[1],
         doc=None,
         default=None,
-        only_for_extractor=False,
     ):
         self.feature_info[s] = {
             'type': t,
             'shortname': shortname if shortname is not None else s,
             'shape': shape,
             'default': default,
-            'only_for_extractor': only_for_extractor,
         }
         return s
 
@@ -29,9 +27,9 @@ all_features = FeaturesMgr()
 
 # Internal features for extraction
 IMAGE_LABEL = all_features.add(
-    'image_label', 'label', t=tf.string, default='', only_for_extractor=True)
+    'image_label', 'label', t=tf.string, default='')
 DATASET = all_features.add(
-    'dataset', t=tf.string, default='', only_for_extractor=True)
+    'dataset', t=tf.string, default='')
 
 # List features here
 AGE = all_features.add('age', default=-1)
