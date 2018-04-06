@@ -74,6 +74,11 @@ class DataProvider(object):
                 c_ft: classes_values[c_id]
                 for c_id, c_ft in enumerate(classes)
             })
+            ft.update({
+                ft_name: d['default']
+                for ft_name, d in ft_def.all_features.feature_info.items()
+                if ft_name not in ft
+            })
             return {
                 ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
                 for ft_name, ft_tensor in ft.items()
