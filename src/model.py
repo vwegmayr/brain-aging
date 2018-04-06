@@ -45,8 +45,6 @@ class Model(DeepNNLayers):
         assert(fc.get_shape().as_list()[1:4] == [1, 1, 1])
         ft_in = fc.get_shape().as_list()[4]
         fc = tf.reshape(fc, [tf.shape(fc)[0], ft_in])
-        fc = self.fc_layer(fc, 512, name='fullcn')
-        fc = self.dropout(fc, 0.3)
         fc = self.fc_layer(fc, num_classes, nl=tf.identity, name='logits')
         fc = self.batch_norm(fc)
         return tf.verify_tensor_all_finite(fc, "gen_head returns non finite values!")
