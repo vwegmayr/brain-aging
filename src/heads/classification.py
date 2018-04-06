@@ -319,8 +319,7 @@ class ClassificationSVMHead(ClassificationHead):
         SVM_C_CONST = 0.1
 
         # Get features
-        assert(last_layer.get_shape().as_list()[1:4] == [1, 1, 1])
-        ft_in = last_layer.get_shape().as_list()[4]
+        ft_in = np.prod(last_layer.get_shape().as_list()[1:])
         features = tf.reshape(last_layer, [tf.shape(last_layer)[0], ft_in])
 
         all_predictions = []
