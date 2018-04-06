@@ -322,7 +322,7 @@ class ClassificationSVMHead(ClassificationHead):
         last_layer,
         weights_per_class,
     ):
-        SVM_C_CONST = 0.1
+        SVM_C_CONST = 0 #0.00001
 
         # Get features
         ft_in = np.prod(last_layer.get_shape().as_list()[1:])
@@ -330,32 +330,37 @@ class ClassificationSVMHead(ClassificationHead):
 
         all_predictions = []
         all_loss = tf.constant(0.0)
-        for i, ft_name in self.predict_feature_names:
+        for i, ft_name in enumerate(self.predict_feature_names):
             ft_shortname = all_features.feature_info[ft_name]['shortname']
             with tf.variable_scope('%s_vs_rest' % (ft_shortname)):
                 # Prediction and loss
                 predictions, W = self.build_svm_layer(features)
                 weighted_loss_per_sample = tf.losses.hinge_loss(
                     tf.cast(self.labels[:, i], tf.float32),
-                    predictions,
+                    tf.reshape(predictions, [-1]),
                     reduction=tf.losses.Reduction.NONE,
+                    weights=tf.reduce_sum(
+                        tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                    ),
                 )
-                reg_loss = SVM_C_CONST * 0.5 * tf.reduce_sum(tf.square(W))
+                w_l2 = 0.5 * tf.reduce_sum(tf.square(W))
+                reg_loss = SVM_C_CONST * w_l2
                 hinge_loss = tf.reduce_mean(weighted_loss_per_sample)
                 loss = hinge_loss + reg_loss
                 self.metrics.update({
                     '%s_vs_rest/hinge_loss' % ft_shortname: hinge_loss,
+                    '%s_vs_rest/w_l2' % ft_shortname: w_l2,
                     '%s_vs_rest/reg_loss' % ft_shortname: reg_loss,
                     '%s_vs_rest/reg_loss_ratio' % ft_shortname:
                         reg_loss / loss,
                 })
                 all_predictions.append(predictions)
                 all_loss += loss
-        return tf.concat(all_predictions, 1), loss, None
+        return tf.concat(all_predictions, 1), all_loss, None
 
     def build_svm_layer(self, features):
         ft_in = features.get_shape().as_list()[1]
-        W = tf.Variable(tf.zeros([ft_in, 1]))
-        b = tf.Variable(tf.zeros([1]))
+        W = tf.Variable(tf.zeros([ft_in, 1]), name="svm_w")
+        b = tf.Variable(tf.zeros([1]), name="svm_b")
         y_raw = tf.matmul(features, W) + b
         return y_raw, W
