@@ -73,6 +73,14 @@ def iter_slices(img_data, config):
     if 'image_slices' in config:
         for s in config['image_slices']:
             yield get_3d_array_dim(img_data, s['dimension'], s['value'])
+    elif 'image_crop' in config:
+        image_crop = config['image_crop']
+        assert(len(image_crop) == 6)
+        yield img_data[
+            image_crop[0]:image_crop[1],
+            image_crop[2]:image_crop[3],
+            image_crop[4]:image_crop[5],
+        ]
     else:
         yield img_data
 
