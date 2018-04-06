@@ -81,32 +81,39 @@ class DataAggregator:
     def __init__(self, config, converted_dir):
         self.config = config
         self.study_to_id = {}
-        compression = getattr(
-            tf.python_io.TFRecordCompressionType,
-            config['dataset_compression'],
-        )
-        self.test_writer = tf.python_io.TFRecordWriter(
-            os.path.join(converted_dir, config['test_database_file']),
-            tf.python_io.TFRecordOptions(compression),
-        )
-        self.train_writers = [{
-                ft: tf.python_io.TFRecordWriter(
-                    os.path.join(
-                        converted_dir,
-                        config['train_database_file'].format(
-                            feature=ft, shard=shard,
-                        ),
-                    ),
-                    tf.python_io.TFRecordOptions(compression),
-                )
-                for ft in config['train_dataset_split']['split_features']
-            }
-            for shard in range(config['train_dataset_split']['num_shards'])
-        ]
+
+        self.create_writers(converted_dir, **config['train_dataset_split'])
         self.curr_study_id = -1
         self.curr_study_name = ''
         self.count = 0
         self.stats = {}
+
+    def create_writers(self, converted_dir, split_features=[], num_shards=1):
+        compression = getattr(
+            tf.python_io.TFRecordCompressionType,
+            self.config['dataset_compression'],
+        )
+
+        def create_writer(filename):
+            return tf.python_io.TFRecordWriter(
+                os.path.join(converted_dir, filename),
+                tf.python_io.TFRecordOptions(compression),
+            )
+        self.test_writer = create_writer(self.config['test_database_file'])
+        self.train_writers = []
+        for shard in range(num_shards):
+            shard_writers = {
+                '': create_writer(self.config['train_database_file'].format(
+                            feature='', shard=shard,
+                    ))
+            }
+            shard_writers.update({
+                ft: create_writer(self.config['train_database_file'].format(
+                            feature=ft, shard=shard,
+                    ))
+                for ft in split_features
+            })
+            self.train_writers.append(shard_writers)
 
     def begin_study(self, study_name, total_files):
         self.study_to_id[study_name] = len(self.study_to_id)
@@ -140,10 +147,12 @@ class DataAggregator:
         # Train set is sharded + splitted by feature
         shard_writers = random.choice(self.train_writers)
         for k, v in shard_writers.items():
+            if k == '':
+                continue
             assert(k in features)
             if features[k]:
                 return v
-        return None
+        return shard_writers['']
 
     def add_image(self, image_path, features):
         Feature = tf.train.Feature
