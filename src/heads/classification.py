@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from base import NetworkHeadBase
+import src.features as ft_def
 from src.features import all_features
 
 
@@ -97,6 +98,7 @@ class ClassificationHead(NetworkHeadBase):
         self.model = model
         self.num_classes_in_evaluation = num_classes_in_evaluation
         self.predict_feature_names = predict
+        self.features = features
         self.metrics = {}
 
         # Compute loss
@@ -304,6 +306,10 @@ class ClassificationHead(NetworkHeadBase):
             'proba': self.probas,
             'labels': self.labels,
             'logits': self.predictions,
+            'image_label': self.features[ft_def.IMAGE_LABEL],
+            'dataset': self.features[ft_def.DATASET],
+            'study_patient_id': self.features[ft_def.STUDY_PATIENT_ID],
+            'study_image_id': self.features[ft_def.STUDY_IMAGE_ID],
         }
 
 
