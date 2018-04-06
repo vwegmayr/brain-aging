@@ -61,7 +61,6 @@ class Estimator(TensorflowBaseEstimator):
                     dtype=ft_info['type']
                 )
             for name, ft_info in ft_def.all_features.feature_info.items()
-            if not ft_info['only_for_extractor']
         }
 
     def fit_main_training_loop(self, X, y):
