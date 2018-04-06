@@ -227,7 +227,7 @@ class ClassificationHead(NetworkHeadBase):
         )
         weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
             self.labels,
-            self.predictions,
+            predictions,
             reduction=tf.losses.Reduction.NONE,
             weights=tf.reduce_sum(
                 tf.cast(self.labels, tf.float32) * weights_per_class, 1,
