@@ -6,7 +6,7 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: 'ERSM: resampled, balanced minibatchs (optimized) [shuffle random]'
+    reason: 'CNN: HC vs AD'
     tags:
       - erasmus_adni
   input_fn_config: # Parameters for input generation (gen_input_fn)
@@ -29,7 +29,7 @@ params:
         split_on: '_normalized.nii.gz'
     data_generation:
       data_converted_directory: data/ready/
-      train_database_file: train_{feature}_s{shard}.tfrecord
+      train_database_file: train_s{shard}.tfrecord
       test_database_file: test.tfrecord
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
@@ -38,15 +38,22 @@ params:
       # image_slices:
       #   - dimension: 2
       #     value: 45
+      image_crop:
+        - 10
+        - 170
+        - 15
+        - 205
+        - 0
+        - 158
+      filters:
+          any_is_true:
+            - healthy
+            - health_ad
       image_normalization:
         enable: True
         outlier_percentile: 99
       train_dataset_split:
         num_shards: 2
-        split_features:
-          - healthy
-          - health_ad
-          - health_mci
       data_sources:
         # - name: ADNI_AIBL
         #   glob: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/*_*.nii.gz
@@ -161,11 +168,9 @@ params:
         predict:
           - healthy
           - health_ad
-          - health_mci
         loss_classes_weights:
           healthy: 1.0
           health_ad: 1.0
-          health_mci: 1.0
         num_classes_in_evaluation: null
         loss_weight_in_global_loss: 1.0
         head_l1_regularization: null
