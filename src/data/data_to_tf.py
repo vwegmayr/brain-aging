@@ -162,6 +162,14 @@ class DataAggregator:
                 return v
         return shard_writers['']
 
+    def pass_filters(self, features, any_is_true=None):
+        if any_is_true is None:
+            return True
+        for ft in any_is_true:
+            if features[ft]:
+                return True
+        return False
+
     def add_image(self, image_path, features):
         Feature = tf.train.Feature
         Int64List = tf.train.Int64List
@@ -171,6 +179,10 @@ class DataAggregator:
                 str(datetime.datetime.now()), self.curr_study_name,
                 self.count, self.total_files))
         self.count += 1
+
+        if 'filters' in self.config:
+            if not self.pass_filters(features, **self.config['filters']):
+                return
 
         img_data = nib.load(image_path).get_data()
         if list(img_data.shape) != list(self.config['image_shape']):
