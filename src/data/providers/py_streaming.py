@@ -148,6 +148,7 @@ def get_train_test_filenames(config):
         if 'modify_train_set' in config:
             train_filenames[i] = modify_train_set(
                 train_filenames[i],
+                config['classes'][i],
                 **config['modify_train_set']
             )
         train_filenames[i].sort()
@@ -294,9 +295,11 @@ class DataInput:
 
 def modify_train_set(
     train_set,
+    class_name,
     patients_csv=None,
     regex_extract_image_id=None,
     keep_patients=None,
+    max_images_per_patient=None,
     keep_images=None,
     seed=0,
 ):
@@ -319,6 +322,13 @@ def modify_train_set(
             if patient_id not in set_patient_to_images:
                 set_patient_to_images[patient_id] = []
             set_patient_to_images[patient_id].append(file)
+        # For every patient, limit number of images
+        if max_images_per_patient is not None:
+            for patient_id in set_patient_to_images.keys():
+                set_patient_to_images[patient_id].sort()
+                r.shuffle(set_patient_to_images[patient_id])
+                set_patient_to_images[patient_id] = \
+                    set_patient_to_images[patient_id][:max_images_per_patient]
         # Select patients
         take_patients = set_patient_to_images.keys()
         r.shuffle(take_patients)
@@ -327,6 +337,20 @@ def modify_train_set(
         train_set = []
         for patient_id in take_patients:
             train_set += set_patient_to_images[patient_id]
+        # Debug print
+        counts, number_patients = np.unique([
+                len(v) for v in set_patient_to_images.values()
+            ],
+            return_counts=True,
+        )
+        print('  %s/train_set filtering' % class_name)
+        for i in range(len(counts)):
+            if i > 5:
+                print('    ...')
+                break
+            print('    %d patients with %d samples each' % (
+                number_patients[i], counts[i],
+            ))
         return train_set
     elif keep_images is not None:
         train_set.sort()
