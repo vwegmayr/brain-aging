@@ -14,6 +14,10 @@ params:
     py_streaming:
       batch_size: 12
       seed: 0
+      # modify_train_set:
+        # patients_csv: data/raw/csv/adni_aibl.csv
+        # regex_extract_image_id: (?:.*)/A?(\d+)_(?:.*)\.nii\.gz
+        # keep_patients: 50
       classes:
         - healthy
         - health_ad

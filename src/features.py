@@ -27,7 +27,9 @@ all_features = FeaturesMgr()
 
 # Internal features for extraction
 IMAGE_LABEL = all_features.add(
-    'image_label', 'label', t=tf.string, default='')
+    'image_label', t=tf.string, default='')
+SUBJECT_LABEL = all_features.add(
+    'patient_label', t=tf.string, default='')
 DATASET = all_features.add(
     'dataset', t=tf.string, default='')
 

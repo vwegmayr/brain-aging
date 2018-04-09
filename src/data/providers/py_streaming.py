@@ -6,6 +6,7 @@ import random
 import pickle
 import os
 import re
+import csv
 import copy
 import tensorflow as tf
 import numpy as np
@@ -144,6 +145,11 @@ def get_train_test_filenames(config):
                 #    print('NOTICE: Patient code %s not found' % patient_code)
 
     for i in range(len(classes)):
+        if 'modify_train_set' in config:
+            train_filenames[i] = modify_train_set(
+                train_filenames[i],
+                **config['modify_train_set']
+            )
         train_filenames[i].sort()
         valid_filenames[i].sort()
     return train_filenames, valid_filenames
@@ -284,3 +290,46 @@ class DataInput:
             mri_image = DataInput.translate(mri_image, r)
             mri_image = DataInput.rotate(mri_image, r)
         return mri_image.astype(np.float16)
+
+
+def modify_train_set(
+    train_set,
+    patients_csv=None,
+    regex_extract_image_id=None,
+    keep_patients=None,
+    keep_images=None,
+    seed=0,
+):
+    # Can't have both
+    assert(not keep_patients or not keep_images)
+    r = random.Random(seed)
+    if keep_patients is not None:
+        # Load image_id -> patient_id mapping
+        image_id_to_patient_id = {}
+        with open(patients_csv) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                image_id_to_patient_id[int(row[ft_def.STUDY_IMAGE_ID])] = row[ft_def.STUDY_PATIENT_ID]
+        # Create patient_id -> [file1, file2, ...] mapping
+        set_patient_to_images = {}
+        regex = re.compile(regex_extract_image_id)
+        for file in train_set:
+            image_id = int(regex.match(file).group(1))
+            patient_id = image_id_to_patient_id[image_id]
+            if patient_id not in set_patient_to_images:
+                set_patient_to_images[patient_id] = []
+            set_patient_to_images[patient_id].append(file)
+        # Select patients
+        take_patients = set_patient_to_images.keys()
+        r.shuffle(take_patients)
+        take_patients = take_patients[:keep_patients]
+        # Take all the files of selected patients
+        train_set = []
+        for patient_id in take_patients:
+            train_set += set_patient_to_images[patient_id]
+        return train_set
+    elif keep_images is not None:
+        train_set.sort()
+        r.shuffle(train_set)
+        return train_set[:keep_images]
+    return train_set
