@@ -18,6 +18,7 @@ class DeepNNLayers(object):
             'concat_layers': self._parse_concat_layers,
             'conv2d': func_fwd_input(self.conv2d_layer),
             'conv3d': func_fwd_input(self.conv3d_layer),
+            'normalize_image': func_fwd_input(self.normalize_image),
         }
 
     # ================= Parsing of CNN architecture =================
@@ -340,3 +341,7 @@ class DeepNNLayers(object):
         if not self.is_training:
             return x
         return tf.nn.dropout(x, keep_prob=prob)
+
+    def normalize_image(self, x):
+        mean, var = tf.nn.moments(x, axes=[1, 2, 3, 4], keep_dims=True)
+        return (x - mean) / tf.sqrt(var + 0.0001)
