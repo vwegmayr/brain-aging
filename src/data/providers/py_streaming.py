@@ -300,60 +300,59 @@ def modify_train_set(
     regex_extract_image_id=None,
     keep_patients=None,
     max_images_per_patient=None,
-    keep_images=None,
+    min_images_per_patient=None,
     seed=0,
 ):
-    # Can't have both
-    assert(not keep_patients or not keep_images)
     r = random.Random(seed)
+    # Load image_id -> patient_id mapping
+    image_id_to_patient_id = {}
+    with open(patients_csv) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            image_id_to_patient_id[int(row[ft_def.STUDY_IMAGE_ID])] = row[ft_def.STUDY_PATIENT_ID]
+    # Create patient_id -> [file1, file2, ...] mapping
+    set_patient_to_images = {}
+    regex = re.compile(regex_extract_image_id)
+    for file in train_set:
+        image_id = int(regex.match(file).group(1))
+        patient_id = image_id_to_patient_id[image_id]
+        if patient_id not in set_patient_to_images:
+            set_patient_to_images[patient_id] = []
+        set_patient_to_images[patient_id].append(file)
+    # For every patient, limit number of images
+    if max_images_per_patient is not None:
+        for patient_id in set_patient_to_images.keys():
+            set_patient_to_images[patient_id].sort()
+            r.shuffle(set_patient_to_images[patient_id])
+            set_patient_to_images[patient_id] = \
+                set_patient_to_images[patient_id][:max_images_per_patient]
+    if min_images_per_patient is not None:
+        set_patient_to_images = {
+            k: v
+            for k, v in set_patient_to_images.items()
+            if len(v) >= min_images_per_patient
+        }
+    # Select patients
+    take_patients = set_patient_to_images.keys()
+    r.shuffle(take_patients)
     if keep_patients is not None:
-        # Load image_id -> patient_id mapping
-        image_id_to_patient_id = {}
-        with open(patients_csv) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                image_id_to_patient_id[int(row[ft_def.STUDY_IMAGE_ID])] = row[ft_def.STUDY_PATIENT_ID]
-        # Create patient_id -> [file1, file2, ...] mapping
-        set_patient_to_images = {}
-        regex = re.compile(regex_extract_image_id)
-        for file in train_set:
-            image_id = int(regex.match(file).group(1))
-            patient_id = image_id_to_patient_id[image_id]
-            if patient_id not in set_patient_to_images:
-                set_patient_to_images[patient_id] = []
-            set_patient_to_images[patient_id].append(file)
-        # For every patient, limit number of images
-        if max_images_per_patient is not None:
-            for patient_id in set_patient_to_images.keys():
-                set_patient_to_images[patient_id].sort()
-                r.shuffle(set_patient_to_images[patient_id])
-                set_patient_to_images[patient_id] = \
-                    set_patient_to_images[patient_id][:max_images_per_patient]
-        # Select patients
-        take_patients = set_patient_to_images.keys()
-        r.shuffle(take_patients)
         take_patients = take_patients[:keep_patients]
-        # Take all the files of selected patients
-        train_set = []
-        for patient_id in take_patients:
-            train_set += set_patient_to_images[patient_id]
-        # Debug print
-        counts, number_patients = np.unique([
-                len(v) for v in set_patient_to_images.values()
-            ],
-            return_counts=True,
-        )
-        print('  %s/train_set filtering' % class_name)
-        for i in range(len(counts)):
-            if i > 5:
-                print('    ...')
-                break
-            print('    %d patients with %d samples each' % (
-                number_patients[i], counts[i],
-            ))
-        return train_set
-    elif keep_images is not None:
-        train_set.sort()
-        r.shuffle(train_set)
-        return train_set[:keep_images]
+    # Take all the files of selected patients
+    train_set = []
+    for patient_id in take_patients:
+        train_set += set_patient_to_images[patient_id]
+    # Debug print
+    counts, number_patients = np.unique([
+            len(v) for v in set_patient_to_images.values()
+        ],
+        return_counts=True,
+    )
+    print('  %s/train_set filtering' % class_name)
+    for i in range(len(counts)):
+        if i > 5:
+            print('    ...')
+            break
+        print('    %d patients with %d samples each' % (
+            number_patients[i], counts[i],
+        ))
     return train_set
