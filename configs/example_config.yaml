@@ -32,7 +32,7 @@ params:
         split_on: '_normalized.nii.gz'
     data_generation:
       data_converted_directory: data/ready/
-      train_database_file: train.tfrecord
+      train_database_file: train_s{shard}.tfrecord
       test_database_file: test.tfrecord
       dataset_compression: GZIP
       test_set_size_ratio: 0.2
@@ -42,8 +42,10 @@ params:
       #   - dimension: 2
       #     value: 45
       image_normalization:
-        enable: True
+        enable: False
         outlier_percentile: 99
+      train_dataset_split:
+        num_shards: 2
       data_sources:
         - name: ADNI_AIBL
           glob: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/*_*.nii.gz
@@ -51,7 +53,7 @@ params:
             regexp: .*/([A0-9]+)_(aug_){0,1}normalized\.nii\.gz
             features_group:
               image_label: 1
-          patients_features: data/raw/csv/adni_aibl__ad_hc__sai.csv
+          patients_features: data/raw/csv/adni_aibl__ad_hc.csv
         # - name: PPMI
         #   glob: /local/PPMI/02_registered/I*.nii.gz
         #   features_from_filename:
@@ -70,16 +72,6 @@ params:
 
     data_streaming:
       dataset:
-        - call: prefetch
-          buffer_size: 400
-        - call: shuffle
-          buffer_size: 500
-        - call: map
-          map_func: src.data.providers.tf_streaming.parser
-          num_parallel_calls: 8
-        - call: map
-          map_func: src.data.providers.tf_streaming.random_crop
-          num_parallel_calls: 8
         - call: batch
           batch_size: 8
   params: # Params for model (model_fn)
