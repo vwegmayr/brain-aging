@@ -323,7 +323,7 @@ class ClassificationSVMHead(ClassificationHead):
         last_layer,
         weights_per_class,
     ):
-        SVM_C_CONST = 0 #0.00001
+        SVM_C_CONST = 5 #0.00001
 
         # Get features
         ft_in = np.prod(last_layer.get_shape().as_list()[1:])
