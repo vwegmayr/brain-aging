@@ -394,6 +394,13 @@ def modify_train_set(
     train_set = []
     for patient_id in take_patients:
         train_set += set_patient_to_images[patient_id]
+    # Group images by patient_id - this time to print correct stats
+    set_patient_to_images = {}
+    for f in train_set:
+        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
+        if patient_id not in set_patient_to_images:
+            set_patient_to_images[patient_id] = []
+        set_patient_to_images[patient_id].append(f)
     # Debug print
     counts, number_patients = np.unique([
             len(v) for v in set_patient_to_images.values()
