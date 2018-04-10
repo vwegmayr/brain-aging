@@ -355,6 +355,16 @@ def retrieve_features(
     return file_to_features
 
 
+def map_patient_to_files(train_set, file_to_features):
+    set_patient_to_images = {}
+    for f in train_set:
+        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
+        if patient_id not in set_patient_to_images:
+            set_patient_to_images[patient_id] = []
+        set_patient_to_images[patient_id].append(f)
+    return set_patient_to_images
+
+
 def modify_train_set(
     train_set,
     class_name,
@@ -365,14 +375,11 @@ def modify_train_set(
     maximum_total_files=None,
     seed=0,
 ):
+    if maximum_total_files is None or maximum_total_files > len(train_set):
+        maximum_total_files = len(train_set)
     r = random.Random(seed)
     # Group images by patient_id
-    set_patient_to_images = {}
-    for f in train_set:
-        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
-        if patient_id not in set_patient_to_images:
-            set_patient_to_images[patient_id] = []
-        set_patient_to_images[patient_id].append(f)
+    set_patient_to_images = map_patient_to_files(train_set, file_to_features)
     # For every patient, limit number of images
     if max_images_per_patient is not None:
         for patient_id in set_patient_to_images.keys():
@@ -392,20 +399,19 @@ def modify_train_set(
     if keep_patients is not None:
         take_patients = take_patients[:keep_patients]
     # Take all the files of selected patients
+    max_reps = 0
     train_set = []
-    for patient_id in take_patients:
-        train_set += set_patient_to_images[patient_id]
+    while len(train_set) < maximum_total_files:
+        # Add a file from every patient
+        for patient_id in take_patients:
+            if max_reps < len(set_patient_to_images[patient_id]):
+                train_set.append(set_patient_to_images[patient_id][max_reps])
+                if len(train_set) == maximum_total_files:
+                    break
+        max_reps += 1
     r.shuffle(train_set)
-    if maximum_total_files is not None:
-        train_set = train_set[:maximum_total_files]
-    # Group images by patient_id - this time to print correct stats
-    set_patient_to_images = {}
-    for f in train_set:
-        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
-        if patient_id not in set_patient_to_images:
-            set_patient_to_images[patient_id] = []
-        set_patient_to_images[patient_id].append(f)
     # Debug print
+    set_patient_to_images = map_patient_to_files(train_set, file_to_features)
     counts, number_patients = np.unique([
             len(v) for v in set_patient_to_images.values()
         ],
@@ -413,8 +419,8 @@ def modify_train_set(
     )
     print('  %s/train_set filtering' % class_name)
     for i in range(len(counts)):
-        if i > 5:
-            print('    ...')
+        if i > 3:
+            print('    ... up to %d samples each' % max_reps)
             break
         print('    %d patients with %d samples each' % (
             number_patients[i], counts[i],
