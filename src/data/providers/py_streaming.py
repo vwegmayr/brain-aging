@@ -362,6 +362,7 @@ def modify_train_set(
     keep_patients=None,
     max_images_per_patient=None,
     min_images_per_patient=None,
+    maximum_total_files=None,
     seed=0,
 ):
     r = random.Random(seed)
@@ -394,6 +395,9 @@ def modify_train_set(
     train_set = []
     for patient_id in take_patients:
         train_set += set_patient_to_images[patient_id]
+    r.shuffle(train_set)
+    if maximum_total_files is not None:
+        train_set = train_set[:maximum_total_files]
     # Group images by patient_id - this time to print correct stats
     set_patient_to_images = {}
     for f in train_set:
