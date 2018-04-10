@@ -13,6 +13,7 @@ import numpy as np
 import nibabel as nb
 import scipy.ndimage.interpolation as sni
 import src.features as ft_def
+from src.data.features_store import str_to_ft
 
 
 class DataProvider(object):
@@ -25,7 +26,7 @@ class DataProvider(object):
         self.config = config = input_fn_config['py_streaming']
         self.random = random.Random()
         self.random.seed(config['seed'])
-        train_files, test_files = get_train_test_filenames(config)
+        train_files, test_files, self.file_to_features = get_train_test_filenames(config)
         test_files = [t for t in test_files if len(t) > 0]
         for i in range(len(train_files)):
             print("Train Class %d: %d samples (%s)" % (i, len(train_files[i]), config['classes'][i]))
@@ -57,20 +58,40 @@ class DataProvider(object):
 
     def get_input_fn(self, train, shard):
         classes = self.config['classes']
+        ft_info = ft_def.all_features.feature_info
+        port_features = [
+            ft_def.IMAGE_LABEL,
+            ft_def.SUBJECT_LABEL,
+            ft_def.STUDY_IMAGE_ID,
+            ft_def.STUDY_PATIENT_ID,
+        ]
 
         def _read_files(f, label, seed):
+            ft = self.file_to_features[f]
             ret = [DataInput.load_and_augment_file(f, seed)]
+            ret += [
+                ft[pf]
+                for pf in port_features
+            ]
             ret += [
                 int(label == i)
                 for i in range(len(classes))
             ]
             return ret
 
-        def _parser(_mri, *classes_values):
-            ft_info = ft_def.all_features.feature_info
+        def _parser(
+            _mri,
+            *other_values
+        ):
+            ported_features = other_values[:len(port_features)]
+            classes_values = other_values[len(port_features):]
             ft = {
                 ft_def.MRI: tf.reshape(_mri, self.mri_shape),
             }
+            ft.update({
+                port_features[i]: ported_features[i]
+                for i in range(len(ported_features))
+            })
             ft.update({
                 c_ft: classes_values[c_id]
                 for c_id, c_ft in enumerate(classes)
@@ -92,7 +113,11 @@ class DataProvider(object):
             lambda filename, label, seed: tuple(tf.py_func(
                 _read_files,
                 [filename, label, seed],
-                [tf.float16] + [tf.int64] * len(classes),
+                [tf.float16] + [
+                    ft_info[fname]['type']
+                    for i, fname in enumerate(port_features)
+                ] +
+                [tf.int64] * len(classes),
                 stateful=False,
                 name='read_files',
             )),
@@ -144,16 +169,24 @@ def get_train_test_filenames(config):
                 # else:
                 #    print('NOTICE: Patient code %s not found' % patient_code)
 
+
+    file_to_features = retrieve_features(
+        [l2 for l1 in train_filenames for l2 in l1] +
+        [l2 for l1 in valid_filenames for l2 in l1],
+        **config['retrieve_features']
+    )
+
     for i in range(len(classes)):
         if 'modify_train_set' in config:
             train_filenames[i] = modify_train_set(
                 train_filenames[i],
                 config['classes'][i],
+                file_to_features,
                 **config['modify_train_set']
             )
         train_filenames[i].sort()
         valid_filenames[i].sort()
-    return train_filenames, valid_filenames
+    return train_filenames, valid_filenames, file_to_features
 
 
 class DataInput:
@@ -293,32 +326,52 @@ class DataInput:
         return mri_image.astype(np.float16)
 
 
+def retrieve_features(
+    dataset,
+    patients_csv,
+    regex_extract_image_id,
+):
+    image_id_to_features = {}
+    with open(patients_csv) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            row = {
+                k: str_to_ft(k, v)
+                for k, v in row.items()
+                if k in ft_def.all_features.feature_info
+            }
+            row.update({
+                ft_name: d['default']
+                for ft_name, d in ft_def.all_features.feature_info.items()
+                if ft_name not in row
+            })
+            image_id_to_features[int(row[ft_def.STUDY_IMAGE_ID])] = row
+    regex = re.compile(regex_extract_image_id)
+    file_to_features = {}
+    for file in dataset:
+        image_id = int(regex.match(file).group(1))
+        patient_id = image_id_to_features[image_id][ft_def.STUDY_PATIENT_ID]
+        file_to_features[file] = image_id_to_features[image_id]
+    return file_to_features
+
+
 def modify_train_set(
     train_set,
     class_name,
-    patients_csv=None,
-    regex_extract_image_id=None,
+    file_to_features,
     keep_patients=None,
     max_images_per_patient=None,
     min_images_per_patient=None,
     seed=0,
 ):
     r = random.Random(seed)
-    # Load image_id -> patient_id mapping
-    image_id_to_patient_id = {}
-    with open(patients_csv) as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            image_id_to_patient_id[int(row[ft_def.STUDY_IMAGE_ID])] = row[ft_def.STUDY_PATIENT_ID]
-    # Create patient_id -> [file1, file2, ...] mapping
+    # Group images by patient_id
     set_patient_to_images = {}
-    regex = re.compile(regex_extract_image_id)
-    for file in train_set:
-        image_id = int(regex.match(file).group(1))
-        patient_id = image_id_to_patient_id[image_id]
+    for f in train_set:
+        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
         if patient_id not in set_patient_to_images:
             set_patient_to_images[patient_id] = []
-        set_patient_to_images[patient_id].append(file)
+        set_patient_to_images[patient_id].append(f)
     # For every patient, limit number of images
     if max_images_per_patient is not None:
         for patient_id in set_patient_to_images.keys():
@@ -355,4 +408,5 @@ def modify_train_set(
         print('    %d patients with %d samples each' % (
             number_patients[i], counts[i],
         ))
+    # Append some features
     return train_set

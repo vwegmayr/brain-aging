@@ -307,6 +307,7 @@ class ClassificationHead(NetworkHeadBase):
             'labels': self.labels,
             'logits': self.predictions,
             'image_label': self.features[ft_def.IMAGE_LABEL],
+            'subject_label': self.features[ft_def.SUBJECT_LABEL],
             'dataset': self.features[ft_def.DATASET],
             'study_patient_id': self.features[ft_def.STUDY_PATIENT_ID],
             'study_image_id': self.features[ft_def.STUDY_IMAGE_ID],
