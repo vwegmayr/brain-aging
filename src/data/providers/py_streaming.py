@@ -386,6 +386,8 @@ def modify_train_set(
     train_set,
     class_name,
     file_to_features,
+    ensure_all_patients_have_at_least_this_n_of_files=None,
+    remove_data_augmentation=None,
     keep_patients=None,
     max_images_per_patient=None,
     min_images_per_patient=None,
@@ -393,8 +395,20 @@ def modify_train_set(
     seed=0,
 ):
     r = random.Random(seed)
+    if remove_data_augmentation is not None:
+        train_set = [
+            f
+            for f in train_set
+            if remove_data_augmentation not in f
+        ]
     # Group images by patient_id
     set_patient_to_images = map_patient_to_files(train_set, file_to_features)
+    if ensure_all_patients_have_at_least_this_n_of_files is not None:
+        set_patient_to_images = {
+            p: l
+            for p, l in set_patient_to_images.items()
+            if len(l) >= ensure_all_patients_have_at_least_this_n_of_files
+        }
     # For every patient, limit number of images
     if max_images_per_patient is not None:
         for patient_id in set_patient_to_images.keys():
