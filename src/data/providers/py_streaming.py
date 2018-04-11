@@ -26,7 +26,7 @@ class DataProvider(object):
         self.config = config = input_fn_config['py_streaming']
         self.random = random.Random()
         self.random.seed(config['seed'])
-        train_files, test_files, self.file_to_features = get_train_test_filenames(config)
+        train_files, test_files, self.file_to_features = get_train_test_filenames(config, self.random)
         test_files = [t for t in test_files if len(t) > 0]
         for i in range(len(train_files)):
             print("Train Class %d: %d samples (%s)" % (i, len(train_files[i]), config['classes'][i]))
@@ -138,7 +138,7 @@ class DataProvider(object):
         return list(self.mri_shape)
 
 
-def get_train_test_filenames(config):
+def get_train_test_filenames(config, r):
     paths = config['data_paths']
     # All patients class labels dictionary and list of validation patient codes
     patients_dict = pickle.load(open(paths['class_labels'], 'rb'))
@@ -184,6 +184,23 @@ def get_train_test_filenames(config):
                 file_to_features,
                 **config['modify_train_set']
             )
+        if 'wrong_split' in config:
+            c = config['wrong_split']
+            _aug = c['skip_images_containing']
+            groupped_by_image = {
+                f: [f]
+                for f in train_filenames[i]
+                if _aug not in f
+            }
+            for f in train_filenames[i]:
+                if _aug in f:
+                    groupped_by_image[f.replace(_aug, '')].append(f)
+            take_count = int(len(groupped_by_image) * c['test_ratio'])
+            fnames_not_augmented = groupped_by_image.keys()
+            r.shuffle(fnames_not_augmented)
+            valid_filenames[i] = [img_f for img_f in fnames_not_augmented[:take_count]][:400]
+            train_filenames[i] = [img_f for img_group in fnames_not_augmented[take_count:] for img_f in groupped_by_image[img_group]]
+            #import ipdb; ipdb.set_trace()
         train_filenames[i].sort()
         valid_filenames[i].sort()
     return train_filenames, valid_filenames, file_to_features
