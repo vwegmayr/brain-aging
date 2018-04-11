@@ -392,8 +392,6 @@ def modify_train_set(
     maximum_total_files=None,
     seed=0,
 ):
-    if maximum_total_files is None or maximum_total_files > len(train_set):
-        maximum_total_files = len(train_set)
     r = random.Random(seed)
     # Group images by patient_id
     set_patient_to_images = map_patient_to_files(train_set, file_to_features)
@@ -415,6 +413,11 @@ def modify_train_set(
     r.shuffle(take_patients)
     if keep_patients is not None:
         take_patients = take_patients[:keep_patients]
+    total_files = 0
+    for p in take_patients:
+        total_files += len(set_patient_to_images[p])
+    if maximum_total_files is None or maximum_total_files > total_files:
+        maximum_total_files = total_files
     # Take all the files of selected patients
     max_reps = 0
     train_set = []
