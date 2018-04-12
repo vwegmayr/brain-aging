@@ -48,3 +48,6 @@ SEX = all_features.add('sex', doc='male = 0; female = 1', default=-1)
 STUDY_ID = all_features.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = all_features.add('study_image_id', 'image', default=-1)
 STUDY_PATIENT_ID = all_features.add('study_patient_id', 'patient', default=-1)
+
+SUBJECT_DIVERSITY = all_features.add(
+    'subject_diversity', default=1)

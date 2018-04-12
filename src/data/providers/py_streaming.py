@@ -369,6 +369,18 @@ def retrieve_features(
         image_id = int(regex.match(file).group(1))
         patient_id = image_id_to_features[image_id][ft_def.STUDY_PATIENT_ID]
         file_to_features[file] = image_id_to_features[image_id]
+    # Fill the diversity value
+    patient_image_count = {}
+    for file, features in file_to_features.items():
+        if '_aug' in file:
+            continue
+        patient_id = features[ft_def.STUDY_PATIENT_ID]
+        if patient_id not in patient_image_count:
+            patient_image_count[patient_id] = 0
+        patient_image_count[patient_id] += 1
+    for file, features in file_to_features.items():
+        patient_id = features[ft_def.STUDY_PATIENT_ID]
+        features[ft_def.SUBJECT_DIVERSITY] = patient_image_count[patient_id]
     return file_to_features
 
 
