@@ -20,6 +20,7 @@ class DeepNNLayers(object):
             'conv3d': func_fwd_input(self.conv3d_layer),
             'normalize_image': func_fwd_input(self.normalize_image),
             'residual_block': func_fwd_input(self.residual_block),
+            'conditionnal_branch': self.conditionnal_branch,
         }
 
     # ================= Parsing of CNN architecture =================
@@ -304,6 +305,15 @@ class DeepNNLayers(object):
             x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, scope='conv2')
             x += shortcut
             return tf.nn.relu(x)
+
+    def conditionnal_branch(self, context, x, global_step_threshold, before_threshold, after_threshold):
+        output_before_threshold = self.parse_layers(context, x, before_threshold)
+        output_after_threshold = self.parse_layers(context, x, after_threshold)
+        return tf.cond(
+            tf.train.get_global_step() < global_step_threshold,
+            lambda: output_before_threshold,
+            lambda: output_after_threshold,
+        )
 
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
