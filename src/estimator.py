@@ -471,3 +471,4 @@ class Estimator(TensorflowBaseEstimator):
                 )
         else:
             self.sumatra_outcome['text_outcome'] = 'TODO'
+        self.sumatra_outcome['main_metrics'] = [accuracy_key]
