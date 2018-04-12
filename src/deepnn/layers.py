@@ -19,6 +19,7 @@ class DeepNNLayers(object):
             'conv2d': func_fwd_input(self.conv2d_layer),
             'conv3d': func_fwd_input(self.conv3d_layer),
             'normalize_image': func_fwd_input(self.normalize_image),
+            'residual_block': func_fwd_input(self.residual_block),
         }
 
     # ================= Parsing of CNN architecture =================
@@ -291,6 +292,18 @@ class DeepNNLayers(object):
                 out.get_shape().as_list()[1:],
             ))
         return out
+
+
+    def residual_block(self, x, name, num_features=None):
+        with tf.variable_scope(name):
+            if num_features is None:
+                num_features = x.get_shape().as_list()[-1]
+                assert(num_features is not None)
+            shortcut = x
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.nn.relu, scope='conv1')
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, scope='conv2')
+            x += shortcut
+            return tf.nn.relu(x)
 
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
