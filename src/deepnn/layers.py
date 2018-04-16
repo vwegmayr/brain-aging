@@ -4,14 +4,27 @@ import numpy as np
 from modules.models.utils import custom_print
 
 
+def parse_function(string, modules):
+    submodules = string.split('.')
+    if submodules[0] not in modules:
+        return None
+    func = modules[submodules[0]]
+    for submodule in submodules[1:]:
+        func = getattr(func, submodule)
+        assert(func is not None)
+    return func
+
+
+def func_fwd_input(fn):
+    return lambda context, input, **kwargs: fn(input, **kwargs)
+
+
 class DeepNNLayers(object):
     def __init__(self, print_shapes=True):
         self.is_training = True
         self.debug_summaries = False
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
-        def func_fwd_input(fn):
-            return lambda context, input, **kwargs: fn(input, **kwargs)
         self.parse_layers_defs = {
             'batch_norm': func_fwd_input(self.batch_norm),
             'batch_renorm': func_fwd_input(self.batch_renorm),
@@ -37,10 +50,18 @@ class DeepNNLayers(object):
         return input
 
     def parse_single_layer(self, context, input, layer_def):
-        method = self.parse_layers_defs[layer_def['type']]
+        layer_type = layer_def['type']
+        if layer_type in self.parse_layers_defs:
+            func_ptr = self.parse_layers_defs[layer_type]
+        else:
+            # Parse function name
+            func_ptr = parse_function(layer_type, {
+                'tf': tf,
+            })
+            func_ptr = func_fwd_input(func_ptr)
         params = layer_def.copy()
         del params['type']
-        return method(context, input, **params)
+        return func_ptr(context, input, **params)
 
     # ================= Summaries and utils =================
     def print_shape(self, text):
