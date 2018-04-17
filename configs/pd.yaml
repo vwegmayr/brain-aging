@@ -1,0 +1,174 @@
+# rm -rf .smt /local/dhaziza && mkdir /local/dhaziza
+# smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data -l cmdline
+#CUDA_VISIBLE_DEVICES=2 smt run -r "(new) AD v HC baseline" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+
+class: src.estimator.Estimator
+params:
+  sumatra_outcome_config:
+    reason: "Smoothed: dataset_norm_online"
+    tags: null
+  input_fn_config: # Parameters for input generation (gen_input_fn)
+    data_provider: py_streaming
+    image_shape: [91, 109, 91]
+    py_streaming:
+      batch_size: 48
+      seed: 0
+      retrieve_features:
+        patients_csv: data/raw/csv/adni_aibl.csv
+        regex_extract_image_id: (?:.*)/A?(\d+)_(?:.*)\.nii\.gz
+      #modify_train_set:
+      #  max_images_per_patient: 1
+      #modify_test_set:
+      #  max_images_per_patient: 1
+      classes:
+        - healthy
+        - health_pd
+    data_generation:
+      data_converted_directory: data/ready/
+      train_database_file: train_s{shard}.tfrecord
+      test_database_file: test.tfrecord
+      dataset_compression: GZIP
+      test_set_size_ratio: 0.2
+      train_test_split_on_feature: study_patient_id
+      test_set_random_seed: 0
+      # image_slices:
+      #   - dimension: 2
+      #     value: 45
+      image_normalization:
+        enable: False
+        outlier_percentile: 99
+      train_dataset_split:
+        num_shards: 2
+      data_sources:
+        # - name: ADNI_AIBL
+          # glob_pattern: /local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
+          # features_from_filename:
+            # regexp: .*/([A0-9]+)_(aug_){0,1}mni_aligned\.nii\.gz
+            # features_group:
+              # image_label: 1
+          # patients_features: data/raw/csv/adni_aibl.csv
+        - name: PPMI
+          glob_pattern: /local/PPMI/_brain_registered_2mm/I*.nii.gz
+          features_from_filename:
+            regexp: .*/I(\d+)\.nii\.gz
+            features_group:
+              study_image_id: 1
+          patients_features: data/raw/csv/ppmi.csv
+        # - name: KOLN_T1
+        #   glob_pattern: data/raw/KOLN_T1/*/*/*.nii.gz
+        #   features_from_filename:
+        #     regexp: .*/(\d+)/(\d+)_t1\.nii\.gz
+        #     features_group:
+        #       study_image_id: 1
+        #       study_patient_id: 2
+        #   patients_features: data/raw/csv/koln.csv
+
+    data_streaming:
+      dataset:
+        - call: batch
+          batch_size: 8
+  params: # Params for model (model_fn)
+    train_log_every_n_iter: 20
+    hooks:
+      - class: src.train_hooks.SessionHookFullTrace
+        params:
+            ckptdir: null
+            every_step: null
+            first_step: True
+    network_body:
+      layers_def:
+        - type: dataset_norm_online
+          smooth_params:
+            kernel_half_size: 10
+            sigma: 0.5
+        - type: batch_norm
+        - type: concat_layers
+          layers_def:
+            - type: conv_relu
+              filter_size: [5, 5, 5]
+              out_features: 15
+              name: conv1_a
+            - type: conv_relu
+              filter_size: [6, 6, 6]
+              out_features: 15
+              name: conv1_b
+            - type: conv_relu
+              filter_size: [7, 7, 7]
+              out_features: 15
+              name: conv1_c
+        - type: conv_relu
+          filter_size: [5, 5, 5]
+          out_features: 60
+          name: conv2
+        - type: conv_relu
+          filter_size: [5, 5, 5]
+          out_features: 64
+          name: conv3
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 100
+          name: conv4
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 128
+          name: conv5
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 256
+          name: conv6
+        - type: conv_relu
+          filter_size: [3, 3, 3]
+          out_features: 512
+          name: conv7
+    network_heads:
+      # autoencoder:
+      #   class: src.heads.autoencoder.AutoencoderHead
+      #   loss_weight_in_global_loss: 0.5
+      #   head_l1_regularization: null
+      #   train_only_globally: True
+      # regressor:
+      #   class: src.heads.regression.RegressionHead
+      #   predict:
+      #     - feature: age
+      #       average: 75
+      #   loss_weight_in_global_loss: null
+      #   head_l1_regularization: null
+      #   train_only_globally: False
+      classifier:
+        class: src.heads.classification.ClassificationHead
+        predict:
+          - health_pd
+          - healthy
+        num_classes_in_evaluation: null
+        loss_weight_in_global_loss: 1.0
+        head_l1_regularization: null
+        train_only_globally: True
+      # adversarial:
+      #   class: src.heads.categorical_variable_classification.CategoricalVariableClassificationHead
+      #   predict: study_patient_id
+      #   num_buckets: 200
+      #   loss_weight_in_global_loss: null  # <= 0 for adv network
+      #   head_l1_regularization: null
+      #   train_only_globally: False
+    network_train_ops_settings:
+      alternative_training_steps: 0  # 1280
+      adam_aggregation_method: EXPERIMENTAL_ACCUMULATE_N
+  run_config:
+    num_epochs: 15
+    validations_per_epoch: 2
+    stats_backward_compatibility:
+      eval/classifier/accuracy: accuracy
+    # Tensorflow RunConfig
+    # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
+    tf_estimator_run_config:
+      save_summary_steps: 10
+      tf_random_seed: 40
+      save_checkpoints_steps: 500
+      log_step_count_steps: 10
+      keep_checkpoint_max: 2
+      session_config:
+        allow_soft_placement: True
+        gpu_options:
+          per_process_gpu_memory_fraction: 0.9
+          allow_growth: False
