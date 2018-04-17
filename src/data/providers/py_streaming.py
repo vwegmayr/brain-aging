@@ -29,15 +29,17 @@ class DataProvider(object):
         self.config = config = input_fn_config['py_streaming']
         self.random = random.Random()
         self.random.seed(config['seed'])
-        train_files, test_files = get_train_test_filenames(
-            input_fn_config['data_generation'],
-            config['classes'],
-            self.random,
+        train_files, test_files, self.file_to_features = \
+            get_train_test_filenames(
+                input_fn_config['data_generation'],
+                config['classes'],
+                self.random,
         )
-        self.file_to_features = modify_files_if_needed(
+        modify_files_if_needed(
             train_files,
             test_files,
             config,
+            self.file_to_features,
             self.random,
         )
         test_files = [t for t in test_files if len(t) > 0]
@@ -166,6 +168,7 @@ class DataAggregatorStoreFileNames(DataAggregator):
         self.datasets = {}
         for dname in ['train', 'test']:
             self.datasets[dname] = [[] for _ in classes]
+        self.file_to_features = {}
 
     def _add_image(self, image_path, features):
         dataset = self.datasets[self.get_sample_dataset(features)]
@@ -173,6 +176,7 @@ class DataAggregatorStoreFileNames(DataAggregator):
         for i, c in enumerate(self.classes):
             if features[c]:
                 dataset[i].append(image_path)
+                self.file_to_features[image_path] = features
                 ok = True
         return ok
 
@@ -182,23 +186,24 @@ def get_train_test_filenames(data_generation, classes, r):
         data_generation, classes, r,
     )
     process_all_files(data_generation, dataset)
-    return dataset.datasets['train'], dataset.datasets['test']
+    return dataset.datasets['train'], dataset.datasets['test'], dataset.file_to_features
 
 
-def modify_files_if_needed(train_filenames, valid_filenames, config, r):
-    file_to_features = retrieve_features(
-        [l2 for l1 in train_filenames for l2 in l1] +
-        [l2 for l1 in valid_filenames for l2 in l1],
-        **config['retrieve_features']
-    )
-
+def modify_files_if_needed(train_filenames, valid_filenames, config, file_to_features, r):
     for i in range(len(train_filenames)):
         if 'modify_train_set' in config:
-            train_filenames[i] = modify_train_set(
+            train_filenames[i] = modify_dataset_set(
                 train_filenames[i],
                 config['classes'][i],
                 file_to_features,
                 **config['modify_train_set']
+            )
+        if 'modify_test_set' in config:
+            train_filenames[i] = modify_dataset_set(
+                train_filenames[i],
+                config['classes'][i],
+                file_to_features,
+                **config['modify_test_set']
             )
         if 'wrong_split' in config:
             c = config['wrong_split']
@@ -218,7 +223,6 @@ def modify_files_if_needed(train_filenames, valid_filenames, config, r):
             train_filenames[i] = [img_f for img_group in fnames_not_augmented[take_count:] for img_f in groupped_by_image[img_group]]
         train_filenames[i].sort()
         valid_filenames[i].sort()
-    return file_to_features
 
 
 class DataInput:
@@ -358,47 +362,6 @@ class DataInput:
         return mri_image.astype(np.float16)
 
 
-def retrieve_features(
-    dataset,
-    patients_csv,
-    regex_extract_image_id,
-):
-    image_id_to_features = {}
-    with open(patients_csv) as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            row = {
-                k: str_to_ft(k, v)
-                for k, v in row.items()
-                if k in ft_def.all_features.feature_info
-            }
-            row.update({
-                ft_name: d['default']
-                for ft_name, d in ft_def.all_features.feature_info.items()
-                if ft_name not in row
-            })
-            image_id_to_features[int(row[ft_def.STUDY_IMAGE_ID])] = row
-    regex = re.compile(regex_extract_image_id)
-    file_to_features = {}
-    for file in dataset:
-        image_id = int(regex.match(file).group(1))
-        patient_id = image_id_to_features[image_id][ft_def.STUDY_PATIENT_ID]
-        file_to_features[file] = image_id_to_features[image_id]
-    # Fill the diversity value
-    patient_image_count = {}
-    for file, features in file_to_features.items():
-        if '_aug' in file:
-            continue
-        patient_id = features[ft_def.STUDY_PATIENT_ID]
-        if patient_id not in patient_image_count:
-            patient_image_count[patient_id] = 0
-        patient_image_count[patient_id] += 1
-    for file, features in file_to_features.items():
-        patient_id = features[ft_def.STUDY_PATIENT_ID]
-        features[ft_def.SUBJECT_DIVERSITY] = patient_image_count[patient_id]
-    return file_to_features
-
-
 def map_patient_to_files(train_set, file_to_features):
     set_patient_to_images = {}
     for f in train_set:
@@ -409,7 +372,7 @@ def map_patient_to_files(train_set, file_to_features):
     return set_patient_to_images
 
 
-def modify_train_set(
+def modify_dataset_set(
     train_set,
     class_name,
     file_to_features,
