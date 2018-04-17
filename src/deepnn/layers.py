@@ -26,15 +26,15 @@ class DeepNNLayers(object):
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
         self.parse_layers_defs = {
-            'batch_norm': func_fwd_input(self.batch_norm),
-            'batch_renorm': func_fwd_input(self.batch_renorm),
             'concat_layers': self._parse_concat_layers,
-            'conv2d': func_fwd_input(self.conv2d_layer),
-            'conv3d': func_fwd_input(self.conv3d_layer),
-            'normalize_image': func_fwd_input(self.normalize_image),
-            'residual_block': func_fwd_input(self.residual_block),
             'conditionnal_branch': self.conditionnal_branch,
         }
+        for f in [
+            'batch_norm', 'batch_renorm', 'conv2d', 'conv3d',
+            'normalize_image', 'residual_block', 'localized_batch_norm',
+            'dataset_norm_online', 'voxel_wide_norm_online',
+        ]:
+            self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
     # ================= Parsing of CNN architecture =================
     def _parse_concat_layers(self, context, input, layers_def):
@@ -381,6 +381,83 @@ class DeepNNLayers(object):
             renorm_clipping=renorm_clipping,
             **kwargs
         )
+
+    def apply_gaussian(self, x, kernel_half_size, sigma):
+        dim_size = kernel_half_size * 2 + 1
+        fx, fy, fz = np.mgrid[
+            -kernel_half_size:kernel_half_size+1,
+            -kernel_half_size:kernel_half_size+1,
+            -kernel_half_size:kernel_half_size+1,
+        ]
+        gauss_filter = np.exp(-(fx**2 + fy**2 + fz**2)/float(sigma*sigma*2))
+        gauss_filter = gauss_filter / gauss_filter.sum()
+        gauss_filter = gauss_filter.reshape(
+            [dim_size, dim_size, dim_size, 1, 1],
+        )
+        return tf.nn.conv3d(
+            x,
+            gauss_filter,
+            strides=[1, 1, 1, 1, 1],
+            padding='SAME',
+        )
+
+    def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
+        smoothed_x = self.apply_gaussian(
+            x,
+            kernel_half_size=kernel_half_size,
+            sigma=sigma,
+        )
+        smoothed_x2 = self.apply_gaussian(
+            x ** 2,
+            kernel_half_size=kernel_half_size,
+            sigma=sigma,
+        )
+        smoothed_x = tf.reduce_mean(smoothed_x, axis=0, keep_dims=True)
+        smoothed_x2 = tf.reduce_mean(smoothed_x2, axis=0, keep_dims=True)
+        variance = smoothed_x2 - smoothed_x * smoothed_x
+        return (x - smoothed_x) / (tf.sqrt(variance + eps))
+
+    def voxel_wide_norm_online(self, x):
+        with tf.variable_scope('voxel_wide_norm_online'):
+            image_shape = x.get_shape()[1:5]
+            accumulated_count = tf.Variable(
+                0.0,
+                trainable=False,
+                name='accumulated_count',
+            )
+            accumulated_x = tf.Variable(
+                np.zeros(image_shape),
+                trainable=False,
+                name='accumulated_x',
+            )
+            accumulated_x2 = tf.Variable(
+                np.zeros(image_shape),
+                trainable=False,
+                name='accumulated_x2',
+            )
+            x_mean = tf.nn.reduce_mean(x, axes=[0], keep_dims=False)
+            x2_mean = tf.nn.reduce_mean(x ** 2, axes=[0], keep_dims=False)
+            with tf.control_dependencies([
+                accumulated_count.assign_add(1.0),
+                accumulated_x.assign_add(x_mean),
+                accumulated_x2.assign_add(x2_mean),
+            ]):
+                mean = accumulated_x / accumulated_count
+                variance = accumulated_x2 / accumulated_count
+                variance -= mean ** 2
+                return (x - mean) / tf.sqrt(variance + 0.001)
+
+    def dataset_norm_online(self, x, smooth_params=None):
+        with tf.variable_scope('dataset_norm_online'):
+            # 1. Smooth images
+            if smooth_params is not None:
+                x = self.apply_gaussian(x, **smooth_params)
+            # 2. Image normalization
+            x = self.normalize_image(x)
+            # 3. Voxel normalization
+            x = self.voxel_wide_norm_online(x)
+            # 4. Image normalization again
+            return self.normalize_image(x)
 
     def dropout(self, x, prob):
         if not self.is_training:
