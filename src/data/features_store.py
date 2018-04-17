@@ -83,19 +83,25 @@ class FeaturesStore:
         if ft_def.STUDY_IMAGE_ID in ft:
             image_id = ft[ft_def.STUDY_IMAGE_ID]
             if image_id in self.images_ft:
-                ft.update(self.images_ft[image_id])
-                found_csv_entry = True
-        # Or by patient ID
-        if ft_def.STUDY_PATIENT_ID in ft:
-            patient_id = ft[ft_def.STUDY_PATIENT_ID]
-            if patient_id in self.patients_ft:
-                ft.update(self.patients_ft[patient_id])
+                add_ft = self.images_ft[image_id].copy()
+                add_ft.update(ft)
+                ft = add_ft
                 found_csv_entry = True
         # Or by image label
         if ft_def.IMAGE_LABEL in ft:
             image_label = ft[ft_def.IMAGE_LABEL]
             if image_label in self.image_label_ft:
-                ft.update(self.image_label_ft[image_label])
+                add_ft = self.image_label_ft[image_label].copy()
+                add_ft.update(ft)
+                ft = add_ft
+                found_csv_entry = True
+        # Or by patient ID
+        if ft_def.STUDY_PATIENT_ID in ft:
+            patient_id = ft[ft_def.STUDY_PATIENT_ID]
+            if patient_id in self.patients_ft:
+                add_ft = self.patients_ft[patient_id].copy()
+                add_ft.update(ft)
+                ft = add_ft
                 found_csv_entry = True
         if not found_csv_entry:
             raise LookupError('No CSV features found')
