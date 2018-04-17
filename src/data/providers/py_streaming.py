@@ -95,10 +95,9 @@ class DataProvider(object):
         classes = self.config['classes']
         ft_info = ft_def.all_features.feature_info
         port_features = [
-            ft_def.IMAGE_LABEL,
-            ft_def.SUBJECT_LABEL,
-            ft_def.STUDY_IMAGE_ID,
-            ft_def.STUDY_PATIENT_ID,
+            k
+            for k in ft_def.all_features.feature_info.keys()
+            if k != ft_def.MRI
         ]
 
         def _read_files(f, label, seed):
@@ -108,28 +107,18 @@ class DataProvider(object):
                 ft[pf]
                 for pf in port_features
             ]
-            ret += [
-                int(label == i)
-                for i in range(len(classes))
-            ]
             return ret
 
         def _parser(
             _mri,
-            *other_values
+            *ported_features
         ):
-            ported_features = other_values[:len(port_features)]
-            classes_values = other_values[len(port_features):]
             ft = {
                 ft_def.MRI: tf.reshape(_mri, self.mri_shape),
             }
             ft.update({
                 port_features[i]: ported_features[i]
                 for i in range(len(ported_features))
-            })
-            ft.update({
-                c_ft: classes_values[c_id]
-                for c_id, c_ft in enumerate(classes)
             })
             ft.update({
                 ft_name: d['default']
@@ -151,8 +140,7 @@ class DataProvider(object):
                 [tf.float16] + [
                     ft_info[fname]['type']
                     for i, fname in enumerate(port_features)
-                ] +
-                [tf.int64] * len(classes),
+                ],
                 stateful=False,
                 name='read_files',
             )),
