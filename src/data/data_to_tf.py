@@ -243,11 +243,11 @@ class DataSource(object):
         for f in self.all_files:
             try:
                 ft = self.features_store.get_features_for_file(f)
-                dataset.add_image(f, ft)
             except LookupError as e:
-                dataset.add_error(f, str(e))
+                dataset.add_error(f, 'LookupError: %s' % str(e))
             except IOError as e:
-                dataset.add_error(f, str(e))
+                dataset.add_error(f, 'IOError: %s' % str(e))
+            dataset.add_image(f, ft)
 
 
 def get_all_data_sources(config):
