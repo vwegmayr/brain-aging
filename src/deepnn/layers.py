@@ -338,9 +338,10 @@ class DeepNNLayers(object):
 
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
+        if 'training' not in kwargs:
+            kwargs['training'] = self.is_training
         return tf.layers.batch_normalization(
             x,
-            training=self.is_training,
             momentum=decay,
             **kwargs
         )
