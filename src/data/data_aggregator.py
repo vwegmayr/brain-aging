@@ -1,4 +1,5 @@
 import random
+import numpy as np
 import datetime
 import abc
 import src.features as ft_def
@@ -44,7 +45,7 @@ class DataAggregator:
 
     def get_sample_dataset(self, features):
         # Train/test dataset already defined
-        if ft_def.DATASET in features:
+        if ft_def.DATASET in features and features[ft_def.DATASET] != '':
             return features[ft_def.DATASET]
 
         ft_value = features[self.config['train_test_split_on_feature']]
@@ -96,8 +97,8 @@ class DataAggregator:
     def finish(self):
         UniqueLogger.log('---- DATA CONVERSION STATS ----')
         for k, v in self.stats.items():
+            errors, errors_count = np.unique(v['errors'], return_counts=True)
             UniqueLogger.log('%s: %d ok / %d errors' % (
                 k, v['success'], len(v['errors'])))
-            if len(v['errors']) > 0:
-                UniqueLogger.log('    First error:')
-                UniqueLogger.log('    %s' % v['errors'][0])
+            for e, e_c in zip(errors, errors_count):
+                UniqueLogger.log('  %4d times:   %s' % (e_c, e))
