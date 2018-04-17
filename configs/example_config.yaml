@@ -23,14 +23,6 @@ params:
       classes:
         - healthy
         - health_ad
-      data_paths:
-        datadir: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/'
-        # datadir: '/local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/'
-        class_labels: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl'
-        valid_data: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'
-        train_data: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl'
-        regex: '_normalized\.nii\.gz'
-        split_on: '_normalized.nii.gz'
     data_generation:
       data_converted_directory: data/ready/
       train_database_file: train_s{shard}.tfrecord
@@ -49,21 +41,23 @@ params:
         num_shards: 2
       data_sources:
         - name: ADNI_AIBL
-          glob: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/*_*.nii.gz
+          glob_pattern: /local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/*_*.nii.gz
+          # glob_pattern: /local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
           features_from_filename:
             regexp: .*/([A0-9]+)_(aug_){0,1}normalized\.nii\.gz
+            # regexp: .*/([A0-9]+)_(aug_){0,1}mni_aligned\.nii\.gz
             features_group:
               image_label: 1
           patients_features: data/raw/csv/adni_aibl__ad_hc.csv
         # - name: PPMI
-        #   glob: /local/PPMI/02_registered/I*.nii.gz
+        #   glob_pattern: /local/PPMI/02_registered/I*.nii.gz
         #   features_from_filename:
         #     regexp: .*/I(\d+)\.nii\.gz
         #     features_group:
         #       study_image_id: 1
         #   patients_features: data/raw/csv/ppmi.csv
         # - name: KOLN_T1
-        #   glob: data/raw/KOLN_T1/*/*/*.nii.gz
+        #   glob_pattern: data/raw/KOLN_T1/*/*/*.nii.gz
         #   features_from_filename:
         #     regexp: .*/(\d+)/(\d+)_t1\.nii\.gz
         #     features_group:

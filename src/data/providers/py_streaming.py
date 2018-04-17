@@ -14,10 +14,13 @@ import nibabel as nb
 import scipy.ndimage.interpolation as sni
 import src.features as ft_def
 from src.data.features_store import str_to_ft
+from src.data.data_to_tf import process_all_files
+from src.data.data_aggregator import DataAggregator
 
 
 class DataProvider(object):
     def __init__(self, input_fn_config=None):
+        print('Data streaming option: py_streaming')
         if input_fn_config is None:
             input_fn_config = {'py_streaming': {'classes': ['healthy', 'health_ad'], 'seed': 0, 'batch_size': 12, 'data_paths': {'regex': '_normalized\\.nii\\.gz', 'split_on': '_normalized.nii.gz', 'class_labels': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl', 'train_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl', 'datadir': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/', 'valid_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'}}, 'data_provider': 'py_streaming', 'image_shape': [91, 109, 91], 'data_generation': {'data_converted_directory': 'data/ready/', 'data_sources': [{'glob': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*', 'name': 'ADNI_AIBL', 'features_from_filename': {'regexp': '.*/(\\d+)_normalized\\.nii\\.gz', 'features_group': {'study_image_id': 1}}, 'patients_features': 'data/raw/csv/adni_aibl__ad_hc.csv'}], 'image_normalization': {'outlier_percentile': 99, 'enable': True}, 'train_database_file': 'train.tfrecord', 'test_set_size_ratio': 0.2, 'test_set_random_seed': 0, 'dataset_compression': 'GZIP', 'test_database_file': 'test.tfrecord', 'train_test_split_on_feature': 'study_patient_id'}, 'data_streaming': {'dataset': [{'buffer_size': 400, 'call': 'prefetch'}, {'buffer_size': 500, 'call': 'shuffle'}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'call': 'batch', 'batch_size': 8}]}}
         self.input_fn_config = input_fn_config
@@ -26,12 +29,26 @@ class DataProvider(object):
         self.config = config = input_fn_config['py_streaming']
         self.random = random.Random()
         self.random.seed(config['seed'])
-        train_files, test_files, self.file_to_features = get_train_test_filenames(config, self.random)
+        train_files, test_files = get_train_test_filenames(
+            input_fn_config['data_generation'],
+            config['classes'],
+            self.random,
+        )
+        self.file_to_features = modify_files_if_needed(
+            train_files,
+            test_files,
+            config,
+            self.random,
+        )
         test_files = [t for t in test_files if len(t) > 0]
         for i in range(len(train_files)):
-            print("Train Class %d: %d samples (%s)" % (i, len(train_files[i]), config['classes'][i]))
+            print("Train Class %d: %d samples (%s)" % (
+                i, len(train_files[i]), config['classes'][i]
+            ))
         for i in range(len(test_files)):
-            print("Valid Class %d: %d samples (%s)" % (i, len(test_files[i]), config['classes'][i]))
+            print("Valid Class %d: %d samples (%s)" % (
+                i, len(test_files[i]), config['classes'][i]
+            ))
 
         for train, files in [(True, train_files), (False, test_files)]:
             self.inputs[train] = DataInput(
@@ -138,45 +155,44 @@ class DataProvider(object):
         return list(self.mri_shape)
 
 
-def get_train_test_filenames(config, r):
-    paths = config['data_paths']
-    # All patients class labels dictionary and list of validation patient codes
-    patients_dict = pickle.load(open(paths['class_labels'], 'rb'))
-    valid_patients = pickle.load(open(paths['valid_data'], 'rb'))
-    train_patients = pickle.load(open(paths['train_data'], 'rb'))
-    print("Validation patients count in Dict: ", len(valid_patients),
-          "Train patients count in Dict:", len(train_patients))
+class DataAggregatorStoreFileNames(DataAggregator):
+    def __init__(self, config, classes, r):
+        DataAggregator.__init__(
+            self,
+            config,
+            r,
+        )
+        self.classes = classes
+        self.datasets = {}
+        for dname in ['train', 'test']:
+            self.datasets[dname] = [[] for _ in classes]
 
-    classes = config['classes']
-    train_filenames = [[] for i in range(len(classes))]
-    valid_filenames = [[] for i in range(len(classes))]
-
-    for directory in os.walk(paths['datadir']):
-        # Walk inside the directory
-        for file in directory[2]:
-            # Match all files ending with 'regex'
-            input_file = os.path.join(directory[0], file)
-            regex = r""+paths['regex']+"$"
-            if re.search(regex, input_file):
-                pat_code = input_file.rsplit(paths['split_on'])
-                patient_code = pat_code[0].rsplit('/', 1)[1]
-                if patient_code in train_patients:
-                    train_filenames[patients_dict[patient_code]].append(
-                        input_file)
-                elif patient_code in valid_patients:
-                    valid_filenames[patients_dict[patient_code]].append(
-                        input_file)
-                # else:
-                #    print('NOTICE: Patient code %s not found' % patient_code)
+    def _add_image(self, image_path, features):
+        dataset = self.datasets[self.get_sample_dataset(features)]
+        ok = False
+        for i, c in enumerate(self.classes):
+            if features[c]:
+                dataset[i].append(image_path)
+                ok = True
+        return ok
 
 
+def get_train_test_filenames(data_generation, classes, r):
+    dataset = DataAggregatorStoreFileNames(
+        data_generation, classes, r,
+    )
+    process_all_files(data_generation, dataset)
+    return dataset.datasets['train'], dataset.datasets['test']
+
+
+def modify_files_if_needed(train_filenames, valid_filenames, config, r):
     file_to_features = retrieve_features(
         [l2 for l1 in train_filenames for l2 in l1] +
         [l2 for l1 in valid_filenames for l2 in l1],
         **config['retrieve_features']
     )
 
-    for i in range(len(classes)):
+    for i in range(len(train_filenames)):
         if 'modify_train_set' in config:
             train_filenames[i] = modify_train_set(
                 train_filenames[i],
@@ -200,10 +216,9 @@ def get_train_test_filenames(config, r):
             r.shuffle(fnames_not_augmented)
             valid_filenames[i] = [img_f for img_f in fnames_not_augmented[:take_count]][:400]
             train_filenames[i] = [img_f for img_group in fnames_not_augmented[take_count:] for img_f in groupped_by_image[img_group]]
-            #import ipdb; ipdb.set_trace()
         train_filenames[i].sort()
         valid_filenames[i].sort()
-    return train_filenames, valid_filenames, file_to_features
+    return file_to_features
 
 
 class DataInput:
