@@ -28,9 +28,11 @@ class DeepNNLayers(object):
         self.parse_layers_defs = {
             'concat_layers': self._parse_concat_layers,
             'conditionnal_branch': self.conditionnal_branch,
+            'conv2d': func_fwd_input(self.conv2d_layer),
+            'conv3d': func_fwd_input(self.conv3d_layer),
         }
         for f in [
-            'batch_norm', 'batch_renorm', 'conv2d', 'conv3d',
+            'batch_norm', 'batch_renorm',
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
         ]:
@@ -419,24 +421,27 @@ class DeepNNLayers(object):
 
     def voxel_wide_norm_online(self, x):
         with tf.variable_scope('voxel_wide_norm_online'):
-            image_shape = x.get_shape()[1:5]
+            image_shape = x.get_shape()[1:]
             accumulated_count = tf.Variable(
-                0.0,
+                0,
+                dtype=tf.float32,
                 trainable=False,
                 name='accumulated_count',
             )
             accumulated_x = tf.Variable(
-                np.zeros(image_shape),
+                np.zeros(image_shape, np.float32),
+                dtype=tf.float32,
                 trainable=False,
                 name='accumulated_x',
             )
             accumulated_x2 = tf.Variable(
-                np.zeros(image_shape),
+                np.zeros(image_shape, np.float32),
+                dtype=tf.float32,
                 trainable=False,
                 name='accumulated_x2',
             )
-            x_mean = tf.nn.reduce_mean(x, axes=[0], keep_dims=False)
-            x2_mean = tf.nn.reduce_mean(x ** 2, axes=[0], keep_dims=False)
+            x_mean = tf.reduce_mean(x, axis=[0], keep_dims=False)
+            x2_mean = tf.reduce_mean(x ** 2, axis=[0], keep_dims=False)
             with tf.control_dependencies([
                 accumulated_count.assign_add(1.0),
                 accumulated_x.assign_add(x_mean),
