@@ -12,7 +12,7 @@ params:
     data_provider: py_streaming
     image_shape: [91, 109, 91]
     py_streaming:
-      batch_size: 12
+      batch_size: 48
       seed: 0
       retrieve_features:
         patients_csv: data/raw/csv/adni_aibl.csv
@@ -25,6 +25,7 @@ params:
         - health_ad
       data_paths:
         datadir: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/'
+        # datadir: '/local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/'
         class_labels: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl'
         valid_data: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'
         train_data: '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl'
