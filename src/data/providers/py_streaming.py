@@ -43,14 +43,8 @@ class DataProvider(object):
             self.random,
         )
         test_files = [t for t in test_files if len(t) > 0]
-        for i in range(len(train_files)):
-            print("Train Class %d: %d samples (%s)" % (
-                i, len(train_files[i]), config['classes'][i]
-            ))
-        for i in range(len(test_files)):
-            print("Valid Class %d: %d samples (%s)" % (
-                i, len(test_files[i]), config['classes'][i]
-            ))
+        self.display_dataset_stats("Train", train_files)
+        self.display_dataset_stats("Valid", test_files)
 
         for train, files in [(True, train_files), (False, test_files)]:
             self.inputs[train] = DataInput(
@@ -59,6 +53,28 @@ class DataProvider(object):
             )
             self.inputs[train].shuffle(self.random)
         self.mri_shape = nb.load(train_files[0][0]).get_data().shape
+
+    def display_dataset_stats(self, train_or_test, dataset):
+        for i in range(len(dataset)):
+            if len(dataset[i]) == 0:
+                print("%6s Class %1d [%10s]: <EMPTY>" % (train_or_test, i, self.config['classes'][i]))
+                continue
+            print("%6s Class %1d [%10s]: %4d samples | age mean: %.1f std: %.1f | %d unique patients" % (
+                train_or_test, i, self.config['classes'][i],
+                len(dataset[i]),
+                np.mean([
+                    self.file_to_features[f][ft_def.AGE]
+                    for f in dataset[i]
+                ]),
+                np.std([
+                    self.file_to_features[f][ft_def.AGE]
+                    for f in dataset[i]
+                ]),
+                len(np.unique([
+                    self.file_to_features[f][ft_def.STUDY_PATIENT_ID]
+                    for f in dataset[i]
+                ])),
+            ))
 
     def get_shuffled_filenames(self, train, shard):
         dataset = self.inputs[train].create_shard(shard)
