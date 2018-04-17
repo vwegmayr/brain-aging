@@ -91,7 +91,7 @@ class DataAggregator:
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
-        print('%s [%s]' % (message, path))
+        # print('%s [%s]' % (message, path))
 
     def finish(self):
         UniqueLogger.log('---- DATA CONVERSION STATS ----')
