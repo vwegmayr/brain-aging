@@ -442,15 +442,14 @@ class DeepNNLayers(object):
             )
             x_mean = tf.reduce_mean(x, axis=[0], keep_dims=False)
             x2_mean = tf.reduce_mean(x ** 2, axis=[0], keep_dims=False)
-            with tf.control_dependencies([
-                accumulated_count.assign_add(1.0),
-                accumulated_x.assign_add(x_mean),
-                accumulated_x2.assign_add(x2_mean),
-            ]):
-                mean = accumulated_x / accumulated_count
-                variance = accumulated_x2 / accumulated_count
-                variance -= mean ** 2
-                return (x - mean) / tf.sqrt(variance + 0.001)
+            if self.is_training:
+                accumulated_count = accumulated_count.assign_add(1.0)
+                accumulated_x = accumulated_x.assign_add(x_mean),
+                accumulated_x2 = accumulated_x2.assign_add(x2_mean)
+            mean = accumulated_x / accumulated_count
+            variance = accumulated_x2 / accumulated_count
+            variance -= mean ** 2
+            return (x - mean) / tf.sqrt(variance + 0.001)
 
     def dataset_norm_online(self, x, smooth_params=None):
         with tf.variable_scope('dataset_norm_online'):
