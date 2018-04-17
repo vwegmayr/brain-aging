@@ -248,6 +248,7 @@ class DataSource(object):
             except IOError as e:
                 dataset.add_error(f, 'IOError: %s' % str(e))
             dataset.add_image(f, ft)
+        dataset.finish_study()
 
 
 def get_all_data_sources(config):

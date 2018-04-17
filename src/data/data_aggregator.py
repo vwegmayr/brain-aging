@@ -39,9 +39,15 @@ class DataAggregator:
             'success': 0,
             'errors': []
         }
+        self.current_study_images = []
         self.count = 1
         self.train_test_split = {}
         self.total_files = total_files
+
+    def finish_study(self):
+        for img_data in self.current_study_images:
+            if self._add_image(img_data[0], img_data[1]):
+                self.stats[self.curr_study_name]['success'] += 1
 
     def get_sample_dataset(self, features):
         # Train/test dataset already defined
@@ -87,8 +93,7 @@ class DataAggregator:
                     assert(False)
                 features[ft_name] = ft_name_def['default']
 
-        if self._add_image(image_path, features):
-            self.stats[self.curr_study_name]['success'] += 1
+        self.current_study_images.append((image_path, features))
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
