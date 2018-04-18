@@ -271,7 +271,7 @@ class DataInput:
                 ]
         else:
             child.files = copy.copy(self.files)
-        child.balance_minibatches = balance_minibatches
+        child.balance_minibatches = self.balance_minibatches
         return child
 
     def next_batch_filenames(self, r):
@@ -284,7 +284,7 @@ class DataInput:
         batch_files = []
         batch_labels = []
 
-        if not balance_minibatches:
+        if not self.balance_minibatches:
             for i in range(0, self.num_classes):
                 batch_files += self.files[i]
                 batch_labels += [i] * len(self.files[i])
