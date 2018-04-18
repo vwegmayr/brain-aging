@@ -36,6 +36,104 @@ def merge_class_into(agg, from_feature, to_feature):
     ))
 
 
+def map_patient_to_files(train_set, file_to_features):
+    set_patient_to_images = {}
+    for f in train_set:
+        patient_id = file_to_features[f][ft_def.STUDY_PATIENT_ID]
+        if patient_id not in set_patient_to_images:
+            set_patient_to_images[patient_id] = []
+        set_patient_to_images[patient_id].append(f)
+    return set_patient_to_images
+
+def modify_dataset(
+    agg,
+    comment,
+    filter_only_class=None,
+    ensure_all_patients_have_at_least_this_n_of_files=None,
+    remove_data_augmentation=None,
+    keep_patients=None,
+    max_images_per_patient=None,
+    min_images_per_patient=None,
+    maximum_total_files=None,
+    seed=0,
+):
+    file_to_features = agg.file_to_features
+    dataset = agg.current_study_images
+    if filter_only_class is not None:
+        dataset = [f for f in dataset if file_to_features[f][filter_only_class]]
+    agg.current_study_images = [
+        f for f in agg.current_study_images
+        if f not in dataset
+    ]
+    r = random.Random(seed)
+    if remove_data_augmentation is not None:
+        dataset = [
+            f
+            for f in dataset
+            if remove_data_augmentation not in f
+        ]
+    # Group images by patient_id
+    set_patient_to_images = map_patient_to_files(dataset, file_to_features)
+    if ensure_all_patients_have_at_least_this_n_of_files is not None:
+        set_patient_to_images = {
+            p: l
+            for p, l in set_patient_to_images.items()
+            if len(l) >= ensure_all_patients_have_at_least_this_n_of_files
+        }
+    # For every patient, limit number of images
+    if max_images_per_patient is not None:
+        for patient_id in set_patient_to_images.keys():
+            set_patient_to_images[patient_id].sort()
+            r.shuffle(set_patient_to_images[patient_id])
+            set_patient_to_images[patient_id] = \
+                set_patient_to_images[patient_id][:max_images_per_patient]
+    if min_images_per_patient is not None:
+        set_patient_to_images = {
+            k: v
+            for k, v in set_patient_to_images.items()
+            if len(v) >= min_images_per_patient
+        }
+    # Select patients
+    take_patients = set_patient_to_images.keys()
+    r.shuffle(take_patients)
+    if keep_patients is not None:
+        take_patients = take_patients[:keep_patients]
+    total_files = 0
+    for p in take_patients:
+        total_files += len(set_patient_to_images[p])
+    if maximum_total_files is None or maximum_total_files > total_files:
+        maximum_total_files = total_files
+    # Take all the files of selected patients
+    max_reps = 0
+    dataset = []
+    while len(dataset) < maximum_total_files:
+        # Add a file from every patient
+        for patient_id in take_patients:
+            if max_reps < len(set_patient_to_images[patient_id]):
+                dataset.append(set_patient_to_images[patient_id][max_reps])
+                if len(dataset) == maximum_total_files:
+                    break
+        max_reps += 1
+    r.shuffle(dataset)
+    # Debug print
+    set_patient_to_images = map_patient_to_files(dataset, file_to_features)
+    counts, number_patients = np.unique([
+            len(v) for v in set_patient_to_images.values()
+        ],
+        return_counts=True,
+    )
+    print('  Dataset filtering: %s' % comment)
+    for i in range(len(counts)):
+        if i > 3:
+            print('    ... up to %d samples each' % max_reps)
+            break
+        print('    %d patients with %d samples each' % (
+            number_patients[i], counts[i],
+        ))
+    # Append some features
+    agg.current_study_images += dataset
+
+
 class DataAggregator:
     def __init__(self, config, r):
         self.config = config
@@ -67,12 +165,13 @@ class DataAggregator:
     def finish_study(self, modifiers):
         ALL_MODIFIERS = {
             'merge_class_into': merge_class_into,
+            'modify_dataset': modify_dataset,
         }
         for m in modifiers:
             ALL_MODIFIERS[m['type']](self, **m['args'])
 
         for img_data in self.current_study_images:
-            if self._add_image(img_data[0], img_data[1]):
+            if self._add_image(img_data, self.file_to_features[img_data]):
                 self.stats[self.curr_study_name]['success'] += 1
 
     def get_sample_dataset(self, features):
@@ -120,7 +219,7 @@ class DataAggregator:
                 features[ft_name] = ft_name_def['default']
 
         self.file_to_features[image_path] = features
-        self.current_study_images.append((image_path, features))
+        self.current_study_images.append(image_path)
 
     def add_error(self, path, message):
         self.stats[self.curr_study_name]['errors'].append(message)
