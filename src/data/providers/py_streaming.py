@@ -55,9 +55,9 @@ class DataProvider(object):
                 print("%6s Class %1d [%10s]: <EMPTY>" % (
                     train_or_test, i, self.config['classes'][i]))
                 continue
-            print(
+            print((
                 "%6s Class %1d [%10s]: %4d samples | " +
-                "age mean: %.1f std: %.1f | %d unique patients" % (
+                "age mean: %.1f std: %.1f | %d unique patients") % (
                     train_or_test, i, self.config['classes'][i],
                     len(dataset[i]),
                     np.mean([
