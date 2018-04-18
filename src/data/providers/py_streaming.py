@@ -3,17 +3,12 @@ This module contains functions to handle the input data to the CNN model.
 """
 
 import random
-import pickle
-import os
-import re
-import csv
 import copy
 import tensorflow as tf
 import numpy as np
 import nibabel as nb
 import scipy.ndimage.interpolation as sni
 import src.features as ft_def
-from src.data.features_store import str_to_ft
 from src.data.data_to_tf import process_all_files
 from src.data.data_aggregator import DataAggregator
 
@@ -21,8 +16,6 @@ from src.data.data_aggregator import DataAggregator
 class DataProvider(object):
     def __init__(self, input_fn_config=None):
         print('Data streaming option: py_streaming')
-        if input_fn_config is None:
-            input_fn_config = {'py_streaming': {'classes': ['healthy', 'health_ad'], 'seed': 0, 'batch_size': 12, 'data_paths': {'regex': '_normalized\\.nii\\.gz', 'split_on': '_normalized.nii.gz', 'class_labels': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_class_labels_T1_NC_AD.pkl', 'train_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_train_T1_NC_AD.pkl', 'datadir': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train_NC_AD/', 'valid_data': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/py2/AIBL_ADNI_valid_T1_NC_AD.pkl'}}, 'data_provider': 'py_streaming', 'image_shape': [91, 109, 91], 'data_generation': {'data_converted_directory': 'data/ready/', 'data_sources': [{'glob': '/local/ADNI_AIBL/ADNI_AIBL_T1_normalized/train/[0-9]*[0-9]_normalized*', 'name': 'ADNI_AIBL', 'features_from_filename': {'regexp': '.*/(\\d+)_normalized\\.nii\\.gz', 'features_group': {'study_image_id': 1}}, 'patients_features': 'data/raw/csv/adni_aibl__ad_hc.csv'}], 'image_normalization': {'outlier_percentile': 99, 'enable': True}, 'train_database_file': 'train.tfrecord', 'test_set_size_ratio': 0.2, 'test_set_random_seed': 0, 'dataset_compression': 'GZIP', 'test_database_file': 'test.tfrecord', 'train_test_split_on_feature': 'study_patient_id'}, 'data_streaming': {'dataset': [{'buffer_size': 400, 'call': 'prefetch'}, {'buffer_size': 500, 'call': 'shuffle'}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'map_func': 'f', 'call': 'map', 'num_parallel_calls': 8}, {'call': 'batch', 'batch_size': 8}]}}
         self.input_fn_config = input_fn_config
         self.inputs = {True: None, False: None}
 
@@ -34,7 +27,7 @@ class DataProvider(object):
                 input_fn_config['data_generation'],
                 config['classes'],
                 self.random,
-        )
+            )
         modify_files_if_needed(
             train_files,
             test_files,
@@ -58,24 +51,27 @@ class DataProvider(object):
     def display_dataset_stats(self, train_or_test, dataset):
         for i in range(len(dataset)):
             if len(dataset[i]) == 0:
-                print("%6s Class %1d [%10s]: <EMPTY>" % (train_or_test, i, self.config['classes'][i]))
+                print("%6s Class %1d [%10s]: <EMPTY>" % (
+                    train_or_test, i, self.config['classes'][i]))
                 continue
-            print("%6s Class %1d [%10s]: %4d samples | age mean: %.1f std: %.1f | %d unique patients" % (
-                train_or_test, i, self.config['classes'][i],
-                len(dataset[i]),
-                np.mean([
-                    self.file_to_features[f][ft_def.AGE]
-                    for f in dataset[i]
-                ]),
-                np.std([
-                    self.file_to_features[f][ft_def.AGE]
-                    for f in dataset[i]
-                ]),
-                len(np.unique([
-                    self.file_to_features[f][ft_def.STUDY_PATIENT_ID]
-                    for f in dataset[i]
-                ])),
-            ))
+            print(
+                "%6s Class %1d [%10s]: %4d samples | " +
+                "age mean: %.1f std: %.1f | %d unique patients" % (
+                    train_or_test, i, self.config['classes'][i],
+                    len(dataset[i]),
+                    np.mean([
+                        self.file_to_features[f][ft_def.AGE]
+                        for f in dataset[i]
+                    ]),
+                    np.std([
+                        self.file_to_features[f][ft_def.AGE]
+                        for f in dataset[i]
+                    ]),
+                    len(np.unique([
+                        self.file_to_features[f][ft_def.STUDY_PATIENT_ID]
+                        for f in dataset[i]
+                    ])),
+                ))
 
     def get_shuffled_filenames(self, train, shard):
         dataset = self.inputs[train].create_shard(shard)
@@ -93,7 +89,6 @@ class DataProvider(object):
         return (all_files, all_labels, all_seeds)
 
     def get_input_fn(self, train, shard):
-        classes = self.config['classes']
         ft_info = ft_def.all_features.feature_info
         port_features = [
             k
@@ -189,10 +184,20 @@ def get_train_test_filenames(data_generation, classes, r):
         data_generation, classes, r,
     )
     process_all_files(data_generation, dataset)
-    return dataset.datasets['train'], dataset.datasets['test'], dataset.file_to_features
+    return [
+        dataset.datasets['train'],
+        dataset.datasets['test'],
+        dataset.file_to_features,
+    ]
 
 
-def modify_files_if_needed(train_filenames, valid_filenames, config, file_to_features, r):
+def modify_files_if_needed(
+    train_filenames,
+    valid_filenames,
+    config,
+    file_to_features,
+    r,
+):
     for i in range(len(train_filenames)):
         if 'wrong_split' in config:
             c = config['wrong_split']
@@ -208,8 +213,15 @@ def modify_files_if_needed(train_filenames, valid_filenames, config, file_to_fea
             take_count = int(len(groupped_by_image) * c['test_ratio'])
             fnames_not_augmented = groupped_by_image.keys()
             r.shuffle(fnames_not_augmented)
-            valid_filenames[i] = [img_f for img_f in fnames_not_augmented[:take_count]][:400]
-            train_filenames[i] = [img_f for img_group in fnames_not_augmented[take_count:] for img_f in groupped_by_image[img_group]]
+            valid_filenames[i] = [
+                img_f
+                for img_f in fnames_not_augmented[:take_count]
+            ][:400]
+            train_filenames[i] = [
+                img_f
+                for img_group in fnames_not_augmented[take_count:]
+                for img_f in groupped_by_image[img_group]
+            ]
         train_filenames[i].sort()
         valid_filenames[i].sort()
 
