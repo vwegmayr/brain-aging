@@ -6,6 +6,10 @@ import src.features as ft_def
 from modules.models.utils import custom_print
 
 
+class ImageNormalizationException(Exception):
+    pass
+
+
 class UniqueLogger:
     printed = set()
 
@@ -26,6 +30,7 @@ class DataAggregator:
         self.count = 0
         self.stats = {}
         self.r = r
+        self.file_to_features = {}
 
     @abc.abstractmethod
     def _add_image(self, image_path, features):
@@ -93,6 +98,7 @@ class DataAggregator:
                     assert(False)
                 features[ft_name] = ft_name_def['default']
 
+        self.file_to_features[image_path] = features
         self.current_study_images.append((image_path, features))
 
     def add_error(self, path, message):
@@ -107,3 +113,23 @@ class DataAggregator:
                 k, v['success'], len(v['errors'])))
             for e, e_c in zip(errors, errors_count):
                 UniqueLogger.log('  %4d times:   %s' % (e_c, e))
+
+    # Image data processing
+    def _norm(self, mri, enable, outlier_percentile):
+        if not enable:
+            return mri
+        max_value = np.percentile(mri, outlier_percentile)
+        mri_for_stats = np.copy(mri)
+        mri_for_stats[mri > max_value] = max_value
+        m = np.mean(mri_for_stats)
+        std = np.std(mri_for_stats)
+        if std < 0.01:
+            raise ImageNormalizationException()
+        return (mri - m) / std
+
+    def process_image_data(self, image_path, image_data):
+        image_data = self._norm(
+            image_data,
+            **self.config['image_normalization']
+        )
+        return image_data

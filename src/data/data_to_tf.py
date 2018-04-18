@@ -18,11 +18,7 @@ import datetime
 import nibabel as nib
 import src.features as ft_def
 from src.data.features_store import FeaturesStore
-from src.data.data_aggregator import DataAggregator, UniqueLogger
-
-
-class ImageNormalizationException(Exception):
-    pass
+from src.data.data_aggregator import DataAggregator, UniqueLogger, ImageNormalizationException
 
 
 def get_data_preprocessing_values(config):
@@ -179,10 +175,7 @@ class DataAggregatorToTFWriters(DataAggregator):
         return shard_writers['']
 
     def _write_image(self, writer, img_data, img_features, image_path):
-        img_data = self._norm(
-            img_data,
-            **self.config['image_normalization']
-        )
+        image_data = self.process_image_data(img_data, image_path)
         img_features[ft_def.MRI] = tf.train.Feature(
             float_list=tf.train.FloatList(
                 value=img_data.reshape([-1])
@@ -197,18 +190,6 @@ class DataAggregatorToTFWriters(DataAggregator):
             features=tf.train.Features(feature=img_features),
         )
         writer.write(example.SerializeToString())
-
-    def _norm(self, mri, enable, outlier_percentile):
-        if not enable:
-            return mri
-        max_value = np.percentile(mri, outlier_percentile)
-        mri_for_stats = np.copy(mri)
-        mri_for_stats[mri > max_value] = max_value
-        m = np.mean(mri_for_stats)
-        std = np.std(mri_for_stats)
-        if std < 0.01:
-            raise ImageNormalizationException()
-        return (mri - m) / std
 
     def finish(self):
         self.test_writer.close()
