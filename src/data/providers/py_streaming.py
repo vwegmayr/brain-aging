@@ -50,6 +50,7 @@ class DataProvider(object):
             self.inputs[train] = DataInput(
                 config,
                 train_files if train else test_files,
+                balance_minibatches=train,
             )
             self.inputs[train].shuffle(self.random)
         self.mri_shape = nb.load(train_files[0][0]).get_data().shape
@@ -235,13 +236,14 @@ class DataInput:
     Initialize this class with the required parameter file and the dataset
     as a tuple of filenames for each class.
     """
-    def __init__(self, config, data, mean=0, var=0):
+    def __init__(self, config, data, balance_minibatches=True, mean=0, var=0):
         self.config = config
         self.batch_size = config['batch_size']
         self.num_classes = len(data)
         self.files = [data[i] for i in range(0, self.num_classes)]
         self.batch_index = [0 for i in range(0, self.num_classes)]
         self.batch_looped = [0 for i in range(0, self.num_classes)]
+        self.balance_minibatches = balance_minibatches
         self.mean = mean
         self.var = var
 
@@ -271,6 +273,7 @@ class DataInput:
                 ]
         else:
             child.files = copy.copy(self.files)
+        child.balance_minibatches = balance_minibatches
         return child
 
     def next_batch_filenames(self, r):
@@ -282,6 +285,12 @@ class DataInput:
         """
         batch_files = []
         batch_labels = []
+
+        if not balance_minibatches:
+            for i in range(0, self.num_classes):
+                batch_files += self.files[i]
+                batch_labels += [i] * len(self.files[i])
+            return batch_files, batch_labels
 
         # Increment batch_size/num_class for each class
         inc = int(self.batch_size / self.num_classes)
