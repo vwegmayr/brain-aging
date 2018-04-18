@@ -140,21 +140,27 @@ class MriPreprocessingPipeline(object):
                     custom_print('... Skipped')
                     continue
 
-            paths = [mri_raw] + [os.path.join(
+            for step_id, step in enumerate(self.steps):
+                if 'skip' in step:
+                    continue
+                if step['from_subfolder'] == 'raw':
+                    path_from = mri_raw
+                else:
+                    path_from = os.path.join(
+                        self.path,
+                        step['from_subfolder'],
+                        'I{image_id}.nii.gz'.format(image_id=image_id),
+                    )
+                path_to = os.path.join(
                     self.path,
                     step['subfolder'],
                     'I{image_id}.nii.gz'.format(image_id=image_id),
                 )
-                for step in self.steps
-            ]
-            for step_id, step in enumerate(self.steps):
-                if 'skip' in step:
-                    continue
-                if os.path.exists(paths[step_id+1]) and not step['overwrite']:
+                if os.path.exists(path_to) and not step['overwrite']:
                     continue
                 steps_registered[step['type']](
-                    paths[step_id],
-                    paths[step_id+1],
+                    path_from,
+                    path_to,
                     image_id,
                     step,
                 )

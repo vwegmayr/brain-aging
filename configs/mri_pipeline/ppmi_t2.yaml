@@ -6,35 +6,56 @@ params:
   extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
   regexp_image_id_group: 2
   steps:
+    # Manual brain extraction and then align [1mm]
     - type: brain_extraction
+      from_subfolder: raw
       subfolder: _brain_manual_extracted
       options: '-f 0.35 -g 0.1'
       images_bet_params: data/raw/ppmi/images_bet.json
       overwrite: False
     - type: template_registration
+      from_subfolder: _brain_manual_extracted
+      subfolder: _brain_manual_extracted_registered_1mm
+      cost: normcorr
+      searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T2_1mm_brain.nii.gz
+      overwrite: False
+    # Manual brain extraction and then align [2mm]
+    - type: template_registration
+      from_subfolder: _brain_manual_extracted
       subfolder: _brain_manual_extracted_registered_2mm
       cost: normcorr
       searchcost: normcorr
       mri_template: data/raw/templates/MNI152_T2_2mm_brain.nii.gz
       overwrite: False
-  split_train_test:
-    random_seed: 0
-    pkl_prefix: PPMI_T2_NC_PD_vanilla_
-    test_images_def:
-      - class:
-        - Control
-        count: 50
-      - class:
-        - PD
-        count: 150
-#      - class: Prodromal
-#        count: 0
-#      - class: SWEDD
-#        count: 0
-#      - class: GenCohort Unaff
-#        count: 0
-#      - class: GenCohort PD
-#        count: 0
+    # Align and then extract brain [1mm]
+    - type: template_registration
+      from_subfolder: raw
+      subfolder: _registered_1mm
+      cost: normcorr
+      searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T2_1mm.nii.gz
+      overwrite: False
+    - type: exec_command
+      from_subfolder: _registered_1mm
+      subfolder: _brain_extracted_1mm
+      command: 'fslmaths {mri_image} -mas {mask} {mri_output}'
+      mask: data/raw/templates/MNI152_T2_1mm_brain_mask.nii.gz
+      overwrite: False
+    # Align and then extract brain [2mm]
+    - type: template_registration
+      from_subfolder: raw
+      subfolder: _registered_2mm
+      cost: normcorr
+      searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T2_2mm.nii.gz
+      overwrite: False
+    - type: exec_command
+      from_subfolder: _registered_2mm
+      subfolder: _brain_extracted_2mm
+      command: 'fslmaths {mri_image} -mas {mask} {mri_output}'
+      mask: data/raw/templates/MNI152_T2_2mm_brain_mask.nii.gz
+      overwrite: False
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
