@@ -45,6 +45,7 @@ def map_patient_to_files(train_set, file_to_features):
         set_patient_to_images[patient_id].append(f)
     return set_patient_to_images
 
+
 def modify_dataset(
     agg,
     comment,
@@ -122,7 +123,7 @@ def modify_dataset(
         ],
         return_counts=True,
     )
-    print('  Dataset filtering: %s' % comment)
+    print('Dataset filtering: %s' % comment)
     for i in range(len(counts)):
         if i > 3:
             print('    ... up to %d samples each' % max_reps)
@@ -133,9 +134,23 @@ def modify_dataset(
     # Append some features
     agg.current_study_images += dataset
 
+
 def set_dataset(agg, dataset):
     for f in agg.current_study_images:
         agg.file_to_features[f][ft_def.DATASET] = dataset
+
+
+def update_features(agg, comment, update_features, conditions={}):
+    affected_count = 0
+    for f in agg.current_study_images:
+        condition_pass = all([
+            agg.file_to_features[f][c] == c_val
+            for c, c_val in conditions.items()
+        ])
+        if condition_pass:
+            agg.file_to_features[f].update(update_features)
+            affected_count += 1
+    print('update_features(%s): %d affected' % (comment, affected_count))
 
 
 class DataAggregator:
@@ -171,6 +186,7 @@ class DataAggregator:
             'merge_class_into': merge_class_into,
             'modify_dataset': modify_dataset,
             'set_dataset': set_dataset,
+            'update_features': update_features,
         }
         for m in modifiers:
             ALL_MODIFIERS[m['type']](self, **m['args'])
