@@ -173,7 +173,6 @@ class DataAggregatorStoreFileNames(DataAggregator):
         self.datasets = {}
         for dname in ['train', 'test']:
             self.datasets[dname] = [[] for _ in classes]
-        self.file_to_features = {}
 
     def _add_image(self, image_path, features):
         dataset = self.datasets[self.get_sample_dataset(features)]
@@ -181,7 +180,6 @@ class DataAggregatorStoreFileNames(DataAggregator):
         for i, c in enumerate(self.classes):
             if features[c]:
                 dataset[i].append(image_path)
-                self.file_to_features[image_path] = features
                 ok = True
         return ok
 
@@ -386,7 +384,7 @@ def map_patient_to_files(train_set, file_to_features):
 
 
 def modify_dataset_set(
-    train_set,
+    dataset,
     class_name,
     file_to_features,
     ensure_all_patients_have_at_least_this_n_of_files=None,
@@ -399,13 +397,13 @@ def modify_dataset_set(
 ):
     r = random.Random(seed)
     if remove_data_augmentation is not None:
-        train_set = [
+        dataset = [
             f
-            for f in train_set
+            for f in dataset
             if remove_data_augmentation not in f
         ]
     # Group images by patient_id
-    set_patient_to_images = map_patient_to_files(train_set, file_to_features)
+    set_patient_to_images = map_patient_to_files(dataset, file_to_features)
     if ensure_all_patients_have_at_least_this_n_of_files is not None:
         set_patient_to_images = {
             p: l
@@ -437,24 +435,24 @@ def modify_dataset_set(
         maximum_total_files = total_files
     # Take all the files of selected patients
     max_reps = 0
-    train_set = []
-    while len(train_set) < maximum_total_files:
+    dataset = []
+    while len(dataset) < maximum_total_files:
         # Add a file from every patient
         for patient_id in take_patients:
             if max_reps < len(set_patient_to_images[patient_id]):
-                train_set.append(set_patient_to_images[patient_id][max_reps])
-                if len(train_set) == maximum_total_files:
+                dataset.append(set_patient_to_images[patient_id][max_reps])
+                if len(dataset) == maximum_total_files:
                     break
         max_reps += 1
-    r.shuffle(train_set)
+    r.shuffle(dataset)
     # Debug print
-    set_patient_to_images = map_patient_to_files(train_set, file_to_features)
+    set_patient_to_images = map_patient_to_files(dataset, file_to_features)
     counts, number_patients = np.unique([
             len(v) for v in set_patient_to_images.values()
         ],
         return_counts=True,
     )
-    print('  %s/train_set filtering' % class_name)
+    print('  %s filtering' % class_name)
     for i in range(len(counts)):
         if i > 3:
             print('    ... up to %d samples each' % max_reps)
@@ -463,4 +461,4 @@ def modify_dataset_set(
             number_patients[i], counts[i],
         ))
     # Append some features
-    return train_set
+    return dataset
