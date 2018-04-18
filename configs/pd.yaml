@@ -6,7 +6,7 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: "Smoothed: dataset_norm_online"
+    reason: "PD_HC: PPMI data (+GenCohort) | 3DCNN"
     tags: null
   input_fn_config: # Parameters for input generation (gen_input_fn)
     data_provider: py_streaming
@@ -31,26 +31,46 @@ params:
       # image_slices:
       #   - dimension: 2
       #     value: 45
-      image_normalization:
-        enable: False
-        outlier_percentile: 99
       train_dataset_split:
         num_shards: 2
       data_sources:
         # - name: ADNI_AIBL
           # glob_pattern: /local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
           # features_from_filename:
-            # regexp: .*/([A0-9]+)_(aug_){0,1}mni_aligned\.nii\.gz
+            # regexp: .*/([A0-9]+)_mni_aligned\.nii\.gz
             # features_group:
               # image_label: 1
           # patients_features: data/raw/csv/adni_aibl.csv
+          # modifiers:
+            # - type: modify_dataset
+              # args:
+                # comment: Only take 1 image per patient
+                # max_images_per_patient: 1
+            # - type: set_dataset
+              # args:
+                # dataset: train
         - name: PPMI
-          glob_pattern: /local/PPMI/_brain_registered_2mm/I*.nii.gz
+          glob_pattern: /local/PPMI/_brain_manual_extracted_registered_2mm/I*.nii.gz
           features_from_filename:
             regexp: .*/I(\d+)\.nii\.gz
             features_group:
               study_image_id: 1
           patients_features: data/raw/csv/ppmi.csv
+          modifiers:
+            - type: update_features
+              args:
+                comment: GenCohort PD to PD
+                update_features:
+                  health_pd: 1
+                conditions:
+                  health_gencohort_pd: 1
+            - type: update_features
+              args:
+                comment: GenCohort Unaff to HC
+                update_features:
+                  healthy: 1
+                conditions:
+                  health_gencohort_unaff: 1
         # - name: KOLN_T1
         #   glob_pattern: data/raw/KOLN_T1/*/*/*.nii.gz
         #   features_from_filename:
