@@ -133,6 +133,10 @@ def modify_dataset(
     # Append some features
     agg.current_study_images += dataset
 
+def set_dataset(agg, dataset):
+    for f in agg.current_study_images:
+        agg.file_to_features[f][ft_def.DATASET] = dataset
+
 
 class DataAggregator:
     def __init__(self, config, r):
@@ -166,6 +170,7 @@ class DataAggregator:
         ALL_MODIFIERS = {
             'merge_class_into': merge_class_into,
             'modify_dataset': modify_dataset,
+            'set_dataset': set_dataset,
         }
         for m in modifiers:
             ALL_MODIFIERS[m['type']](self, **m['args'])
