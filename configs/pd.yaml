@@ -14,13 +14,9 @@ params:
     py_streaming:
       batch_size: 48
       seed: 0
-      retrieve_features:
-        patients_csv: data/raw/csv/adni_aibl.csv
-        regex_extract_image_id: (?:.*)/A?(\d+)_(?:.*)\.nii\.gz
-      #modify_train_set:
-      #  max_images_per_patient: 1
-      #modify_test_set:
-      #  max_images_per_patient: 1
+      augment_ratio:
+        test: 0
+        train: 0
       classes:
         - healthy
         - health_pd

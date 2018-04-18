@@ -20,6 +20,7 @@ class DataProvider(object):
         self.inputs = {True: None, False: None}
 
         self.config = config = input_fn_config['py_streaming']
+        self.augment_ratio = config['augment_ratio']
         self.random = random.Random()
         self.random.seed(config['seed'])
         train_files, test_files, self.file_to_features = \
@@ -98,7 +99,9 @@ class DataProvider(object):
 
         def _read_files(f, label, seed):
             ft = self.file_to_features[f]
-            ret = [DataInput.load_and_augment_file(f, seed)]
+            ret = [DataInput.load_and_augment_file(
+                f, seed, self.augment_ratio[['test', 'train'][train]],
+            )]
             ret += [
                 ft[pf]
                 for pf in port_features
@@ -359,14 +362,14 @@ class DataInput:
             return sni.shift(mri_image, [0, 0, pixels], mode='nearest')
 
     @staticmethod
-    def load_and_augment_file(filename, seed, augment=False):
+    def load_and_augment_file(filename, seed, augment_ratio=0):
         mri_image = nb.load(filename)
         mri_image = mri_image.get_data()
 
         # Data augmentation
-        if augment:
-            r = random.Random()
-            r.seed(seed)
+        r = random.Random()
+        r.seed(seed)
+        if augment_ratio > r.random():
             mri_image = DataInput.translate(mri_image, r)
             mri_image = DataInput.rotate(mri_image, r)
         return mri_image.astype(np.float16)
