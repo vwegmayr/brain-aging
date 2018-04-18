@@ -274,6 +274,7 @@ class DataInput:
             for i in range(0, self.num_classes):
                 batch_files += self.files[i]
                 batch_labels += [i] * len(self.files[i])
+            self.batch_looped = [1 for i in range(0, self.num_classes)]
             return batch_files, batch_labels
 
         # Increment batch_size/num_class for each class
