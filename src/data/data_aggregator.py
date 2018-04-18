@@ -21,6 +21,21 @@ class UniqueLogger:
         custom_print(text)
 
 
+# Data filters
+def merge_class_into(agg, from_feature, to_feature):
+    update_count = 0
+    for k in agg.file_to_features.keys():
+        if agg.file_to_features[k][from_feature]:
+            update_count += 1
+            agg.file_to_features[k].update({
+                from_feature: 0,
+                to_feature: 1,
+            })
+    print('merge_class_into(%s -> %s): %d affected' % (
+        from_feature, to_feature, update_count,
+    ))
+
+
 class DataAggregator:
     def __init__(self, config, r):
         self.config = config
@@ -49,7 +64,13 @@ class DataAggregator:
         self.train_test_split = {}
         self.total_files = total_files
 
-    def finish_study(self):
+    def finish_study(self, modifiers):
+        ALL_MODIFIERS = {
+            'merge_class_into': merge_class_into,
+        }
+        for m in modifiers:
+            ALL_MODIFIERS[m['type']](self, **m['args'])
+
         for img_data in self.current_study_images:
             if self._add_image(img_data[0], img_data[1]):
                 self.stats[self.curr_study_name]['success'] += 1

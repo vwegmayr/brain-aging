@@ -206,6 +206,7 @@ class DataSource(object):
         glob_pattern,
         patients_features,
         features_from_filename,
+        modifiers=[],
         seed=0,
     ):
         self.name = name
@@ -215,6 +216,7 @@ class DataSource(object):
             csv_file_path=patients_features,
             features_from_filename=features_from_filename,
         )
+        self.modifiers = modifiers
 
     def preprocess(self, dataset):
         dataset.begin_study(self.name, len(self.all_files))
@@ -229,7 +231,7 @@ class DataSource(object):
             except IOError as e:
                 dataset.add_error(f, 'IOError: %s' % str(e))
             dataset.add_image(f, ft)
-        dataset.finish_study()
+        dataset.finish_study(self.modifiers)
 
 
 def get_all_data_sources(config):
