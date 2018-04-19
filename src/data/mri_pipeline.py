@@ -5,6 +5,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import json
 import pickle
+import nibabel as nib
 from modules.models.utils import custom_print
 
 
@@ -126,6 +127,7 @@ class MriPreprocessingPipeline(object):
             'exec_command': self.exec_command,
             'brain_extraction': self.brain_extraction,
             'template_registration': self.template_registration,
+            'image_crop': self.image_crop,
         }
         for step in self.steps:
             self._mkdir(step['subfolder'])
@@ -156,6 +158,8 @@ class MriPreprocessingPipeline(object):
                     step['subfolder'],
                     'I{image_id}.nii.gz'.format(image_id=image_id),
                 )
+                if not os.path.exists(path_from):
+                    continue
                 if os.path.exists(path_to) and not step['overwrite']:
                     continue
                 steps_registered[step['type']](
@@ -195,6 +199,19 @@ class MriPreprocessingPipeline(object):
     # ------------------------- Pipeline main steps
     def no_operation(self, mri_image, mri_output, image_id, params):
         pass
+
+    def image_crop(self, mri_image, mri_output, image_id, params):
+        original_image = nib.load(mri_image)
+        new_img = nib.Nifti1Image(
+            original_image.get_data()[
+                params['crop_x'][0]:params['crop_x'][1],
+                params['crop_y'][0]:params['crop_y'][1],
+                params['crop_z'][0]:params['crop_z'][1],
+            ],
+            original_image.affine,
+            original_image.header,
+        )
+        nib.save(new_img, mri_output)
 
     def exec_command(self, mri_image, mri_output, image_id, params):
         cmd = params['command']

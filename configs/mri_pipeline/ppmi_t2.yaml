@@ -28,6 +28,20 @@ params:
       searchcost: normcorr
       mri_template: data/raw/templates/MNI152_T2_2mm_brain.nii.gz
       overwrite: False
+    # Substantia Nigra extraction
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn
+      crop_x:
+        - 65
+        - 115
+      crop_y:
+        - 85
+        - 125
+      crop_z:
+        - 44
+        - 71
+      overwrite: False
     # Align and then extract brain [1mm]
     - type: template_registration
       from_subfolder: raw
