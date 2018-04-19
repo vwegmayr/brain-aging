@@ -15,14 +15,19 @@ from src.data.data_aggregator import DataAggregator
 
 class DataProvider(object):
     def __init__(self, input_fn_config=None):
-        print('Data streaming option: py_streaming')
         self.input_fn_config = input_fn_config
         self.inputs = {True: None, False: None}
 
         self.config = config = input_fn_config['py_streaming']
         self.augment_ratio = config['augment_ratio']
         self.random = random.Random()
-        self.random.seed(config['seed'])
+        if 'seed' in config:
+            self.random.seed(config['seed'])
+            print('Data streaming option: py_streaming')
+        else:
+            seed = random.randint(0, 10000)
+            print('Data streaming option: py_streaming with seed=%d' % seed)
+            self.random.seed(seed)
         train_files, test_files, self.file_to_features = \
             get_train_test_filenames(
                 input_fn_config['data_generation'],
