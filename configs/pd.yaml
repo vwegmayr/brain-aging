@@ -6,17 +6,17 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: "PD_HC: PPMI data (+GenCohort) | 3DCNN"
-    tags: null
+    reason: "PD_HC: SN (dn,bn_novar,augment train) | SVM"
+    tags:
+      - pd_hc_1mm_sn
   input_fn_config: # Parameters for input generation (gen_input_fn)
     data_provider: py_streaming
-    image_shape: [91, 109, 91]
+    image_shape: [50, 40, 27]
     py_streaming:
       batch_size: 48
-      seed: 0
       augment_ratio:
         test: 0
-        train: 0
+        train: 0.5
       classes:
         - healthy
         - health_pd
@@ -50,7 +50,7 @@ params:
               # args:
                 # dataset: train
         - name: PPMI
-          glob_pattern: /local/PPMI/_brain_manual_extracted_registered_2mm/I*.nii.gz
+          glob_pattern: /local/PPMI/_brain_manual_extracted_registered_1mm_sn/I*.nii.gz
           features_from_filename:
             regexp: .*/I(\d+)\.nii\.gz
             features_group:
@@ -99,60 +99,49 @@ params:
             kernel_half_size: 10
             sigma: 0.5
         - type: batch_norm
-        - type: concat_layers
-          layers_def:
-            - type: conv_relu
-              filter_size: [5, 5, 5]
-              out_features: 15
-              name: conv1_a
-            - type: conv_relu
-              filter_size: [6, 6, 6]
-              out_features: 15
-              name: conv1_b
-            - type: conv_relu
-              filter_size: [7, 7, 7]
-              out_features: 15
-              name: conv1_c
-        - type: conv_relu
-          filter_size: [5, 5, 5]
-          out_features: 60
-          name: conv2
-        - type: conv_relu
-          filter_size: [5, 5, 5]
-          out_features: 64
-          name: conv3
-        - type: conv_relu
-          filter_size: [3, 3, 3]
-          out_features: 100
-          name: conv4
-        - type: conv_relu
-          filter_size: [3, 3, 3]
-          out_features: 128
-          name: conv5
-        - type: conv_relu
-          filter_size: [3, 3, 3]
-          out_features: 256
-          name: conv6
-        - type: conv_relu
-          filter_size: [3, 3, 3]
-          out_features: 512
-          name: conv7
+          center: False
+          scale: False
+        # - type: concat_layers
+          # layers_def:
+            # - type: conv_relu
+              # filter_size: [5, 5, 5]
+              # out_features: 15
+              # name: conv1_a
+            # - type: conv_relu
+              # filter_size: [6, 6, 6]
+              # out_features: 15
+              # name: conv1_b
+            # - type: conv_relu
+              # filter_size: [7, 7, 7]
+              # out_features: 15
+              # name: conv1_c
+        # - type: conv_relu
+          # filter_size: [5, 5, 5]
+          # out_features: 60
+          # name: conv2
+        # - type: conv_relu
+          # filter_size: [5, 5, 5]
+          # out_features: 64
+          # name: conv3
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 100
+          # name: conv4
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 128
+          # name: conv5
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 256
+          # name: conv6
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 512
+          # name: conv7
     network_heads:
-      # autoencoder:
-      #   class: src.heads.autoencoder.AutoencoderHead
-      #   loss_weight_in_global_loss: 0.5
-      #   head_l1_regularization: null
-      #   train_only_globally: True
-      # regressor:
-      #   class: src.heads.regression.RegressionHead
-      #   predict:
-      #     - feature: age
-      #       average: 75
-      #   loss_weight_in_global_loss: null
-      #   head_l1_regularization: null
-      #   train_only_globally: False
       classifier:
-        class: src.heads.classification.ClassificationHead
+        class: src.heads.classification.ClassificationSVMHead
         predict:
           - health_pd
           - healthy
@@ -160,13 +149,6 @@ params:
         loss_weight_in_global_loss: 1.0
         head_l1_regularization: null
         train_only_globally: True
-      # adversarial:
-      #   class: src.heads.categorical_variable_classification.CategoricalVariableClassificationHead
-      #   predict: study_patient_id
-      #   num_buckets: 200
-      #   loss_weight_in_global_loss: null  # <= 0 for adv network
-      #   head_l1_regularization: null
-      #   train_only_globally: False
     network_train_ops_settings:
       alternative_training_steps: 0  # 1280
       adam_aggregation_method: EXPERIMENTAL_ACCUMULATE_N
