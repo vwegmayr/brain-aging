@@ -1,0 +1,149 @@
+# rm -rf .smt /local/dhaziza && mkdir /local/dhaziza
+# smt init -e python -m run.py -c store-diff -s /local/dhaziza/records dhaziza -d /local/dhaziza/data -l cmdline
+#CUDA_VISIBLE_DEVICES=2 smt run -r "(new) AD v HC baseline" --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+#CUDA_VISIBLE_DEVICES=5 python run.py --config configs/example_config.yaml -S /local/dhaziza/data -a fit
+
+class: src.estimator.Estimator
+params:
+  sumatra_outcome_config:
+    reason: "AD_HC[ERSM]: jacobians 2mm | SVM"
+    tags:
+      - ad_hc_ersm
+  input_fn_config: # Parameters for input generation (gen_input_fn)
+    data_provider: py_streaming
+    image_shape: [91, 109, 91]
+    py_streaming:
+      batch_size: 48
+      augment_ratio:
+        test: 0
+        train: 0.5
+      classes:
+        - healthy
+        - health_ad
+    data_generation:
+      data_converted_directory: data/ready/
+      train_database_file: train_s{shard}.tfrecord
+      test_database_file: test.tfrecord
+      dataset_compression: GZIP
+      test_set_size_ratio: 0.2
+      train_test_split_on_feature: study_patient_id
+      test_set_random_seed: 0
+      # image_slices:
+      #   - dimension: 2
+      #     value: 45
+      train_dataset_split:
+        num_shards: 2
+      data_sources:
+        # - name: ADNI_AIBL
+          # glob_pattern: /local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
+          # features_from_filename:
+            # regexp: .*/([A0-9]+)_mni_aligned\.nii\.gz
+            # features_group:
+              # image_label: 1
+          # patients_features: data/raw/csv/adni_aibl.csv
+          # modifiers:
+            # - type: modify_dataset
+              # args:
+                # comment: Only take 1 image per patient
+                # max_images_per_patient: 1
+            # - type: set_dataset
+              # args:
+                # dataset: train
+        - name: ERASMUS_ADNI
+          glob_pattern: /local/ERSM/raw/*/spatialJacobian_brain_2mm.nii.gz
+          features_from_filename:
+            # Example: 031_S_4721_bl
+            regexp: .*/(([0-9]+)_S_([0-9]+))_bl/[0-9a-zA-Z_]+.nii\.gz
+            features_group:
+              image_label: 1
+          patients_features: data/raw/csv/erasmus_adni.csv
+    data_streaming:
+      dataset:
+        - call: batch
+          batch_size: 8
+  params: # Params for model (model_fn)
+    train_log_every_n_iter: 20
+    hooks:
+      - class: src.train_hooks.SessionHookFullTrace
+        params:
+            ckptdir: null
+            every_step: null
+            first_step: True
+    network_body:
+      layers_def:
+        - type: dataset_norm_online
+          smooth_params:
+            kernel_half_size: 10
+            sigma: 0.5
+        - type: batch_norm
+          center: False
+          scale: False
+        # - type: concat_layers
+          # layers_def:
+            # - type: conv_relu
+              # filter_size: [5, 5, 5]
+              # out_features: 15
+              # name: conv1_a
+            # - type: conv_relu
+              # filter_size: [6, 6, 6]
+              # out_features: 15
+              # name: conv1_b
+            # - type: conv_relu
+              # filter_size: [7, 7, 7]
+              # out_features: 15
+              # name: conv1_c
+        # - type: conv_relu
+          # filter_size: [5, 5, 5]
+          # out_features: 60
+          # name: conv2
+        # - type: conv_relu
+          # filter_size: [5, 5, 5]
+          # out_features: 64
+          # name: conv3
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 100
+          # name: conv4
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 128
+          # name: conv5
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 256
+          # name: conv6
+        # - type: conv_relu
+          # filter_size: [3, 3, 3]
+          # out_features: 512
+          # name: conv7
+    network_heads:
+      classifier:
+        class: src.heads.classification.ClassificationSVMHead
+        predict:
+          - health_ad
+          - healthy
+        num_classes_in_evaluation: null
+        loss_weight_in_global_loss: 1.0
+        head_l1_regularization: null
+        train_only_globally: True
+    network_train_ops_settings:
+      alternative_training_steps: 0  # 1280
+      adam_aggregation_method: EXPERIMENTAL_ACCUMULATE_N
+  run_config:
+    num_epochs: 15
+    validations_per_epoch: 2
+    stats_backward_compatibility:
+      eval/classifier/accuracy: accuracy
+    # Tensorflow RunConfig
+    # https://www.tensorflow.org/api_docs/python/tf/estimator/RunConfig
+    tf_estimator_run_config:
+      save_summary_steps: 10
+      tf_random_seed: 40
+      save_checkpoints_steps: 500
+      log_step_count_steps: 10
+      keep_checkpoint_max: 2
+      session_config:
+        allow_soft_placement: True
+        gpu_options:
+          per_process_gpu_memory_fraction: 0.9
+          allow_growth: False
