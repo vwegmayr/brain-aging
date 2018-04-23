@@ -32,15 +32,52 @@ params:
     - type: image_crop
       from_subfolder: _brain_manual_extracted_registered_1mm
       subfolder: _brain_manual_extracted_registered_1mm_sn
-      crop_x:
-        - 65
-        - 115
-      crop_y:
-        - 85
-        - 125
-      crop_z:
-        - 44
-        - 71
+      crop_x: [65, 115] # 50
+      crop_y: [85, 125] # 40
+      crop_z: [44, 71]  # 27
+      overwrite: False
+    # Shifted crops
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x0_y1_z1
+      crop_x: [15, 65]
+      crop_y: [85, 125]
+      crop_z: [44, 71]
+      overwrite: False
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x2_y1_z1
+      crop_x: [115, 165]
+      crop_y: [85, 125]
+      crop_z: [44, 71]
+      overwrite: False
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y0_z1
+      crop_x: [65, 115]
+      crop_y: [45, 85]
+      crop_z: [44, 71]
+      overwrite: False
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y2_z1
+      crop_x: [65, 115]
+      crop_y: [125, 165]
+      crop_z: [44, 71]
+      overwrite: False
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y1_z0
+      crop_x: [65, 115]
+      crop_y: [85, 125]
+      crop_z: [17, 44]
+      overwrite: False
+    - type: image_crop
+      from_subfolder: _brain_manual_extracted_registered_1mm
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y1_z1
+      crop_x: [65, 115]
+      crop_y: [85, 125]
+      crop_z: [71, 98]
       overwrite: False
     # Align and then extract brain [1mm]
     - type: template_registration
