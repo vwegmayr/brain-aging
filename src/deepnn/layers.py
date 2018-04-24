@@ -35,6 +35,7 @@ class DeepNNLayers(object):
             'batch_norm', 'batch_renorm',
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
+            'apply_gaussian',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -419,7 +420,11 @@ class DeepNNLayers(object):
         variance = smoothed_x2 - smoothed_x * smoothed_x
         return (x - smoothed_x) / (tf.sqrt(variance + eps))
 
-    def voxel_wide_norm_online(self, x):
+    def voxel_wide_norm_online(
+        self,
+        x,
+        compute_moments_on_smoothed=None,
+    ):
         with tf.variable_scope('voxel_wide_norm_online'):
             image_shape = x.get_shape()[1:]
             accumulated_count = tf.Variable(
@@ -440,8 +445,22 @@ class DeepNNLayers(object):
                 trainable=False,
                 name='accumulated_x2',
             )
-            x_mean = tf.reduce_mean(x, axis=[0], keep_dims=False)
-            x2_mean = tf.reduce_mean(x ** 2, axis=[0], keep_dims=False)
+            x_for_computations = x
+            if compute_moments_on_smoothed is not None:
+                x_for_computations = self.apply_gaussian(
+                    x,
+                    **compute_moments_on_smoothed
+                )
+            x_mean = tf.reduce_mean(
+                x_for_computations,
+                axis=[0],
+                keep_dims=False,
+            )
+            x2_mean = tf.reduce_mean(
+                x_for_computations ** 2,
+                axis=[0],
+                keep_dims=False,
+            )
             if self.is_training:
                 accumulated_count = accumulated_count.assign_add(1.0)
                 accumulated_x = accumulated_x.assign_add(x_mean),
@@ -451,16 +470,13 @@ class DeepNNLayers(object):
             variance -= mean ** 2
             return (x - mean) / tf.sqrt(variance + 0.001)
 
-    def dataset_norm_online(self, x, smooth_params=None):
+    def dataset_norm_online(self, x, **kwargs):
         with tf.variable_scope('dataset_norm_online'):
-            # 1. Smooth images
-            if smooth_params is not None:
-                x = self.apply_gaussian(x, **smooth_params)
-            # 2. Image normalization
+            # 1. Image normalization
             x = self.normalize_image(x)
-            # 3. Voxel normalization
-            x = self.voxel_wide_norm_online(x)
-            # 4. Image normalization again
+            # 2. Voxel normalization
+            x = self.voxel_wide_norm_online(x, **kwargs)
+            # 3. Image normalization again
             return self.normalize_image(x)
 
     def dropout(self, x, prob):
