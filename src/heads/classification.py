@@ -365,3 +365,8 @@ class ClassificationSVMHead(ClassificationHead):
         b = tf.Variable(tf.zeros([1]), name="svm_b")
         y_raw = tf.matmul(features, W) + b
         return y_raw, W
+
+    def get_tags(self):
+        tags = super(ClassificationSVMHead, self).get_tags()
+        tags.append('svm_head')
+        return tags
