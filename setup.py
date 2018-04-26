@@ -19,7 +19,8 @@ def setup(args):
 
     """
 
-    PROJECT_NAME = "entrack"
+    PROJECT_NAME = "feature-robustness"
+    CONDA_ENV = "thesis"
 
     if sys.version_info.major < 3:
         action = getattr(subprocess, "call")
@@ -33,7 +34,7 @@ def setup(args):
                 ".environment"])
 
     if args.smt or args.all:
-        action(["bash", "-c", "source activate {} && ".format(PROJECT_NAME) +
+        action(["bash", "-c", "source activate {} && ".format(CONDA_ENV) +
                 "smt init -d {datapath} -i {datapath} -e python -m run.py "
                 "-c error -l cmdline {project_name}".format(
                 datapath=normpath('./data'), project_name=PROJECT_NAME)])

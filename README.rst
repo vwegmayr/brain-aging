@@ -34,7 +34,6 @@ Contribute (Sumatra setup for experiments tracking)
 ---------------------------------------------------
 .. code-block:: shell
 
-  pip install --upgrade https://gitlab.vis.ethz.ch/vwegmayr/sumatra.git
-  smt init
-  smt configure --main run.py
-  smt configure --on-changed=store-diff
+  pip install --upgrade git+https://gitlab.vis.ethz.ch/vwegmayr/sumatra.git
+  pip install gitpython
+  smt init -d data -i data -e python -m run.py -c error -l cmdline feature-robustness
