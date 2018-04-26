@@ -145,13 +145,13 @@ class DeepNNLayers(object):
         nl=tf.nn.relu,
         strides=[2, 2, 2],
         padding='SAME',
-        scope="conv3d_layer",
+        name="conv3d_layer",
         conv_type='conv',
         bn=True,
         reversed_filters=False,
     ):
         assert(conv_type in ['conv', 'deconv'])
-        with tf.variable_scope(scope):
+        with tf.variable_scope(name):
             conv_input_shape = x.get_shape()[1:].as_list()
             input_channels = conv_input_shape[-1]
             if conv_type == 'conv':
@@ -246,7 +246,7 @@ class DeepNNLayers(object):
     def conv2d_shared_all_dims_layer(
         self,
         _input,
-        scope,
+        name,
         s=5,
         num_filters_per_dim=8,
         *args,
@@ -257,12 +257,12 @@ class DeepNNLayers(object):
                 _input,
                 num_filters=num_filters_per_dim,
                 filter_weights=filters,
-                scope='conv',
+                name='conv',
                 padding='SAME',
                 *args,
                 **kwargs
             )
-        with tf.variable_scope(scope) as tf_scope:
+        with tf.variable_scope(name) as tf_scope:
             b1 = do_c([s, s, 1], *args, **kwargs)
             tf_scope.reuse_variables()
             b2 = do_c([s, 1, s], *args, **kwargs)
@@ -325,8 +325,8 @@ class DeepNNLayers(object):
                 num_features = x.get_shape().as_list()[-1]
                 assert(num_features is not None)
             shortcut = x
-            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.nn.relu, scope='conv1')
-            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, scope='conv2')
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.nn.relu, name='conv1')
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, name='conv2')
             x += shortcut
             return tf.nn.relu(x)
 
