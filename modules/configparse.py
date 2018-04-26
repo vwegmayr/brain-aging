@@ -40,7 +40,6 @@ class ConfigParser:
             yaml_dict: Yaml-style Python dict.
         """
         if isinstance(yaml_dict, dict):
-
             # Add custom replacements here
             replace_obj_from_module([
                 "_fn",
@@ -80,7 +79,8 @@ def replace_obj_from_module(strings, dict):
                         module = importlib.import_module(module_string)
                         obj_key = dict[full_key].split(".")[-1]
                         dict[full_key] = getattr(module, obj_key)
-                    except ImportError:
+                    except ImportError as e:
+                        print(e)
                         pass
 
 

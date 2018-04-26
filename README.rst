@@ -12,7 +12,7 @@ Packages setup
 
 .. code-block:: shell
 
-  pip install scipy pandas numpy tensorflow-gpu
+  pip install scipy pandas numpy tensorflow-gpu gitpython pyyaml
 
 Data generation
 ---------------
