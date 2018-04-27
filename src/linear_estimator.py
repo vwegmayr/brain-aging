@@ -2,17 +2,47 @@ import tensorflow as tf
 
 
 from modules.models.base import BaseTF
+from modules.models.utils import custom_print
 from src.data.mnist import read as mnist_read
+from src.logging import MetricLogger
 
 
 class LogisticRegression(BaseTF):
     def __init__(self, input_fn_config, config, params, data_params):
-        super(LogisticRegression, self).__init__(input_fn_config, config, params)
+        super(LogisticRegression, self).__init__(
+            input_fn_config,
+            config,
+            params
+        )
         self.data_params = data_params
+
+    def fit_main_training_loop(self, X, y):
+        n_epochs = self.input_fn_config["num_epochs"]
+        self.input_fn_config["num_epochs"] = 1
+
+        output_dir = self.config["model_dir"]
+        metric_logger = MetricLogger(output_dir, "Evaluation metrics")
+
+        for i in range(n_epochs):
+            # train
+            self.estimator.train(
+                input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)
+            )
+
+            # evaluate
+            evaluation_fn = self.gen_input_fn(
+                X, y, False, self.input_fn_config
+            )
+            if evaluation_fn is None:
+                custom_print("No evaluation - skipping evaluation.")
+                return
+            evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
+           
+            metric_logger.add_evaluations(evaluation)
+            metric_logger.dump()
 
     def model_fn(self, features, labels, mode, params):
         # Prediction
-        print("features {}".format(features))
         input_layer = tf.reshape(
             features["X"],
             [-1, self.params["input_dim"]]
