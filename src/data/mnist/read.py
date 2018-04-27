@@ -46,6 +46,24 @@ def read_gzip_labels(file_path, n_images):
     return labels
 
 
+def load_training_labels(folder_path):
+    labels = read_gzip_labels(
+        os.path.join(folder_path, "train-labels-idx1-ubyte.gz"),
+        60000
+    )
+
+    return labels
+
+
+def load_test_labels(folder_path):
+    labels = read_gzip_labels(
+        os.path.join(folder_path, "t10k-labels-idx1-ubyte.gz"),
+        60000
+    )
+
+    return labels
+
+
 def load_mnist_training(folder_path):
     """
     Assumes data from LeCun.
@@ -94,6 +112,19 @@ def load_mnist_test(folder_path):
     )
 
     return images, labels
+
+
+def load_test_retest(data_path, test_rest_path, n_samples, train):
+    # load labels
+    if train:
+        labels = load_training_labels(data_path)
+    else:
+        labels = load_test_labels(data_path)
+
+    with open(test_rest_path, "rb") as f:
+        X = np.load(f)
+
+    return X[0, :n_samples, :, :], X[1, :n_samples, :, :], labels[:n_samples]
 
 
 def sample_test_retest(n_pairs, images):

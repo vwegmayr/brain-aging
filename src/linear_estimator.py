@@ -1,4 +1,5 @@
 import tensorflow as tf
+import sys
 
 
 from modules.models.base import BaseTF
@@ -38,6 +39,8 @@ class LogisticRegression(BaseTF):
                 return
             evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
 
+            print(evaluation)
+            sys.stdout.flush()
             metric_logger.add_evaluations(evaluation)
             metric_logger.dump()
 
@@ -80,6 +83,17 @@ class LogisticRegression(BaseTF):
             labels=labels,
             logits=logits
         )
+
+        if params["regularizer"] is None:
+            reg = 0
+        elif params["regularizer"] == "l2":
+            reg = tf.nn.l2_loss(weights)
+        else:
+            raise ValueError("Regularizer not found")
+
+        lam = params["lambda"]
+        loss += lam * reg
+
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
@@ -132,10 +146,6 @@ class TestRetestLogisticRegression(LogisticRegression):
 
         return input_layer, logits, probs, preds, accuracy
 
-    def logits_regularizer(self, logits_1, logits_2):
-        # Note that l2_loss only computes HALF the squared L2-norm
-        return tf.nn.l2_loss(logits_1 - logits_2, name="l2_logits_diff")
-
     def model_fn(self, features, labels, mode, params):
         # Prediction
         # Construct nodes to performa logistic regression on test and retest data
@@ -176,7 +186,15 @@ class TestRetestLogisticRegression(LogisticRegression):
         )
 
         # regularization
-        regularizer = self.logits_regularizer(logits_test, logits_retest)
+        if params["regularizer"] is None:
+            regularizer = 0
+        elif params["regularizer"] == "l2_logits":
+            regularizer = tf.nn.l2_loss(
+                logits_test - logits_retest,
+                name="l2_logits_diff"
+            )
+        else:
+            raise ValueError("Regularizer not found")
 
         # Training
         loss = loss_test + loss_retest + params["lambda"] * regularizer
@@ -236,29 +254,24 @@ class MnistLogisticRegression(LogisticRegression):
 
 
 class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
-    def __init__(self, sampling, *args, **kwargs):
-        self.sampling = sampling
-
-        super(MnistTestRetestLogisticRegression, self).__init__(
-            *args,
-            **kwargs
-        )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         if train:
             # load training data
-            test, retest, labels = mnist_read.sample_test_retest_training(
+            test, retest, labels = mnist_read.load_test_retest(
                 self.data_params["data_path"],
-                self.sampling["train_size"],
-                self.sampling["np_random_seed"]
+                self.data_params["train_test_retest"],
+                self.data_params["train_size"],
+                True
             )
 
         else:
             # load test/retest data
-            test, retest, labels = mnist_read.sample_test_retest_training(
+            test, retest, labels = mnist_read.load_test_retest(
                 self.data_params["data_path"],
-                self.sampling["test_size"],
-                self.sampling["np_random_seed"]
+                self.data_params["test_test_retest"],
+                self.data_params["test_size"],
+                False
             )
 
         return tf.estimator.inputs.numpy_input_fn(
