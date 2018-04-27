@@ -25,7 +25,7 @@ class MetricLogger(object):
         for k in self.metrics:
             det = {
                 "x_label": "global step",
-                "x": int(self.metrics["global_step"]),
+                "x": self.metrics["global_step"],
                 "y": self.metrics[k]
             }
             metrics[k] = det
