@@ -2,6 +2,7 @@ import gzip
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.base import TransformerMixin
 
 
 IMAGE_SIZE = 28
@@ -93,6 +94,78 @@ def load_mnist_test(folder_path):
     )
 
     return images, labels
+
+
+def sample_test_retest(n_pairs, images):
+    # sample binary images using intensities as bernoulli images
+    test = images
+    retest = np.copy(images)
+
+    for i in range(n_pairs):
+        maxi = np.max(test[i, :, :])
+        for j in range(IMAGE_SIZE):
+            for k in range(IMAGE_SIZE):
+                p = test[i, j, k] / maxi
+                s1, s2 = np.random.binomial(1, p, 2)
+                test[i, j, k] = s1
+                retest[i, j, k] = s2
+
+    return test, retest
+
+
+def sample_test_retest_training(folder_path, n_pairs, seed):
+    # Make sampling reproducible
+    np.random.seed(seed)
+
+    images, labels = load_mnist_training(folder_path)
+    n = len(images)
+
+    # sample source images
+    idx = np.random.randint(0, n, min(n_pairs, n))
+    images = images[idx]
+    labels = labels[idx]
+
+    test, retest = sample_test_retest(n_pairs, images)
+
+    return test, retest, labels
+
+
+def sample_test_retest_test(folder_path, n_pairs, seed):
+    # Make sampling reproducible
+    np.random.seed(seed)
+
+    images, labels = load_mnist_test(folder_path)
+    n = len(images)
+
+    # sample source images
+    idx = np.random.randint(0, n, min(n_pairs, n))
+    images = images[idx]
+    labels = labels[idx]
+
+    test, retest = sample_test_retest(n_pairs, images)
+
+    return test, retest, labels
+
+
+class MnistSampler(TransformerMixin):
+    def __init__(self, np_random_seed, data_path, train_data=True):
+        self.np_random_seed = np_random_seed
+        self.data_path = data_path
+        self.train_data = train_data
+
+    def fit(self, X):
+        return self
+
+    def transform(self, X, y=None):
+        if self.train_data:
+            X, _ = load_mnist_training(self.data_path)
+        else:
+            X, _ = load_mnist_test(self.data_path)
+
+        n = len(X[:10])
+        sampled = sample_test_retest(n, X[:10])
+
+        return sampled
 
 
 if __name__ == "__main__":

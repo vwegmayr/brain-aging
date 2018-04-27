@@ -6,6 +6,7 @@ class MetricLogger(object):
         self.description = description
         self.metrics = {}
         self.outdir = outdir
+        self.n_evals = 0
 
     def add_metric(self, label, value):
         if label not in self.metrics:
@@ -14,6 +15,7 @@ class MetricLogger(object):
         self.metrics[label].append(float(value))
 
     def add_evaluations(self, evaluation_dic, exclude=""):
+        self.n_evals += 1
         for k in evaluation_dic:
             if k == exclude:
                 continue
@@ -24,8 +26,8 @@ class MetricLogger(object):
         metrics = {}
         for k in self.metrics:
             det = {
-                "x_label": "global step",
-                "x": self.metrics["global_step"],
+                "x_label": "i-th evaluation",
+                "x": list(range(1, self.n_evals + 1)),
                 "y": self.metrics[k]
             }
             metrics[k] = det
