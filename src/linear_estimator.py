@@ -48,10 +48,13 @@ class LogisticRegression(BaseTF):
             [-1, self.params["input_dim"]]
         )
 
-        logits = tf.layers.dense(
-            inputs=input_layer,
-            units=self.params["n_classes"],
+        weights = tf.get_variable(
+            name="logistic_weights",
+            shape=[self.params["input_dim"], self.params["n_classes"]],
+            initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
+
+        logits = tf.matmul(input_layer, weights)
 
         probs = tf.nn.softmax(logits)
         preds = tf.argmax(input=logits, axis=1)
