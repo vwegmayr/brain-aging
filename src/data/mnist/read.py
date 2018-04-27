@@ -162,8 +162,8 @@ class MnistSampler(TransformerMixin):
         else:
             X, _ = load_mnist_test(self.data_path)
 
-        n = len(X[:10])
-        sampled = sample_test_retest(n, X[:10])
+        n = len(X)
+        sampled = sample_test_retest(n, X)
 
         return sampled
 
