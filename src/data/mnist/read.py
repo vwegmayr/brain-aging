@@ -47,6 +47,14 @@ def read_gzip_labels(file_path, n_images):
 
 
 def load_training_labels(folder_path):
+    """
+    Assumes data from LeCun.
+    Arg:
+        - folder_path: path to folder containing data
+
+    Return:
+        - labels: numpy array containing image labels
+    """
     labels = read_gzip_labels(
         os.path.join(folder_path, "train-labels-idx1-ubyte.gz"),
         60000
@@ -56,6 +64,14 @@ def load_training_labels(folder_path):
 
 
 def load_test_labels(folder_path):
+    """
+    Assumes data from LeCun.
+    Arg:
+        - folder_path: path to folder containing data
+
+    Return:
+        - labels: numpy array containing image labels
+    """
     labels = read_gzip_labels(
         os.path.join(folder_path, "t10k-labels-idx1-ubyte.gz"),
         60000
@@ -127,7 +143,20 @@ def load_test_retest(data_path, test_rest_path, n_samples, train):
     return X[0, :n_samples, :, :], X[1, :n_samples, :, :], labels[:n_samples]
 
 
-def sample_test_retest(n_pairs, images):
+def _sample_test_retest(n_pairs, images):
+    """
+    Sample MNIST images using the pixel intensities as a Bernoulli
+    distribution.
+
+    Args:
+        - n_pairs: number of test-retest image pairs that should be
+          sampled
+        - images: numpy array containing
+
+    Returns:
+        - test: numpy array containing test images
+        - retest: numpy array containing retest images
+    """
     # sample binary images using intensities as bernoulli images
     test = images
     retest = np.copy(images)
@@ -145,6 +174,21 @@ def sample_test_retest(n_pairs, images):
 
 
 def sample_test_retest_training(folder_path, n_pairs, seed):
+    """
+    Sample MNIST images using the pixel intensities as a Bernoulli
+    distribution.
+
+    Args:
+        - folder_path: path to folder containing MNIST data files
+        - n_pairs: number of test-retest image pairs that should be
+          sampled
+        - seed: numpy random seed
+
+    Returns:
+        - test: numpy array containing test images
+        - retest: numpy array containing retest images
+        - labels: numpy array containing images labels
+    """
     # Make sampling reproducible
     np.random.seed(seed)
 
@@ -156,12 +200,27 @@ def sample_test_retest_training(folder_path, n_pairs, seed):
     images = images[idx]
     labels = labels[idx]
 
-    test, retest = sample_test_retest(n_pairs, images)
+    test, retest = _sample_test_retest(n_pairs, images)
 
     return test, retest, labels
 
 
 def sample_test_retest_test(folder_path, n_pairs, seed):
+    """
+    Sample MNIST images using the pixel intensities as a Bernoulli
+    distribution.
+
+    Args:
+        - folder_path: path to folder containing MNIST data files
+        - n_pairs: number of test-retest image pairs that should be
+          sampled
+        - seed: numpy random seed
+
+    Returns:
+        - test: numpy array containing test images
+        - retest: numpy array containing retest images
+        - labels: numpy array containing images labels
+    """
     # Make sampling reproducible
     np.random.seed(seed)
 
@@ -173,13 +232,23 @@ def sample_test_retest_test(folder_path, n_pairs, seed):
     images = images[idx]
     labels = labels[idx]
 
-    test, retest = sample_test_retest(n_pairs, images)
+    test, retest = _sample_test_retest(n_pairs, images)
 
     return test, retest, labels
 
 
 class MnistSampler(TransformerMixin):
+    """
+    Transformer class to sample MNIST images from raw files.
+    """
     def __init__(self, np_random_seed, data_path, train_data=True):
+        """
+        Args:
+            - np_random_seed: numpy random seed
+            - data_path: path to MNIST data folder
+            - train_data: True if training data should be
+              sampled, False if test data should be sampled
+        """
         self.np_random_seed = np_random_seed
         self.data_path = data_path
         self.train_data = train_data
@@ -188,22 +257,22 @@ class MnistSampler(TransformerMixin):
         return self
 
     def transform(self, X, y=None):
+        """
+        Input is ignored an MNIST data is load from path
+        given to the constructor.
+
+        Return:
+            - sampled: tuple containing test and retest images
+              as numpy arrays in its first and second component
+              respectively
+        """
+        np.random.seed(self.random_seed)
         if self.train_data:
             X, _ = load_mnist_training(self.data_path)
         else:
             X, _ = load_mnist_test(self.data_path)
 
         n = len(X)
-        sampled = sample_test_retest(n, X)
+        sampled = _sample_test_retest(n, X)
 
         return sampled
-
-
-if __name__ == "__main__":
-    x_train, y_train = load_mnist_training("MNIST-data")
-    print(x_train.shape)
-    print(y_train.shape)
-
-    print(y_train[100])
-    plt.imshow(x_train[100], cmap='gray')
-    plt.show()

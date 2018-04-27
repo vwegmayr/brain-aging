@@ -9,7 +9,22 @@ from src.logging import MetricLogger
 
 
 class LogisticRegression(BaseTF):
+    """
+    Base estimator to preform logistic regression.
+    Allow the following regularization:
+        - l2: l2-norm of weights
+    """
     def __init__(self, input_fn_config, config, params, data_params):
+        """
+        Args:
+            - input_fn_config: configuration for tf input function of
+              tf estimator
+            - config: configuration for tf estimator constructor
+            - params: parameters for the model functions of the tf
+              estimator
+            - data_params: should contain information about the
+              the data location that should be read
+        """
         super(LogisticRegression, self).__init__(
             input_fn_config,
             config,
@@ -125,7 +140,12 @@ class LogisticRegression(BaseTF):
 
 
 class TestRetestLogisticRegression(LogisticRegression):
-
+    """
+    Logistic regression for test retest data.
+    Allow the following regularization:
+        - l2_logits: l2-norm of the difference between test
+          and retest logits
+    """
     def prediction_nodes(self, features_tensor, labels, params):
         # Prediction
         input_layer = tf.reshape(
@@ -232,8 +252,14 @@ class TestRetestLogisticRegression(LogisticRegression):
 
 
 class MnistLogisticRegression(LogisticRegression):
-
+    """
+    Logistic regression for the MNIST dataset.
+    """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        """
+        Loads train and test images from the MNIST root data folder
+        containing the raw MNIST files.
+        """
         if train:
             # load training data
             images, labels = mnist_read.load_mnist_training(
@@ -254,12 +280,15 @@ class MnistLogisticRegression(LogisticRegression):
 
 
 class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
-
+    """
+    MNIST logistic regression for test-retest data. Loads presampled
+    images from .npy files.
+    """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         if train:
             # load training data
             test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],
+                self.data_params["data_path"],  # path to MNIST root folder
                 self.data_params["train_test_retest"],
                 self.data_params["train_size"],
                 True
@@ -268,7 +297,7 @@ class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
         else:
             # load test/retest data
             test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],
+                self.data_params["data_path"],  # path to MNIST root folder
                 self.data_params["test_test_retest"],
                 self.data_params["test_size"],
                 False
