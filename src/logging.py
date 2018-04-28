@@ -14,13 +14,13 @@ class MetricLogger(object):
 
         self.metrics[label].append(float(value))
 
-    def add_evaluations(self, evaluation_dic, exclude=""):
+    def add_evaluations(self, namespace, evaluation_dic, exclude=""):
         self.n_evals += 1
         for k in evaluation_dic:
             if k == exclude:
                 continue
 
-            self.add_metric(k, evaluation_dic[k])
+            self.add_metric(namespace + "_" + k, evaluation_dic[k])
 
     def dump(self):
         metrics = {}
@@ -38,7 +38,7 @@ class MetricLogger(object):
         }
 
         with open("%s/sumatra_outcome.json" % (self.outdir), "w") as outfile:
-            json.dump(obj, outfile)
+            json.dump(obj, outfile, indent=2)
 
     def to_json(self):
         obj = {

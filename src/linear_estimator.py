@@ -14,7 +14,14 @@ class LogisticRegression(BaseTF):
     Allow the following regularization:
         - l2: l2-norm of weights
     """
-    def __init__(self, input_fn_config, config, params, data_params):
+    def __init__(
+        self,
+        input_fn_config,
+        config,
+        params,
+        data_params,
+        sumatra_params=None
+    ):
         """
         Args:
             - input_fn_config: configuration for tf input function of
@@ -24,6 +31,7 @@ class LogisticRegression(BaseTF):
               estimator
             - data_params: should contain information about the
               the data location that should be read
+            - sumatra_params: contains information about sumatra logging
         """
         super(LogisticRegression, self).__init__(
             input_fn_config,
@@ -31,6 +39,7 @@ class LogisticRegression(BaseTF):
             params
         )
         self.data_params = data_params
+        self.sumatra_params = sumatra_params
 
     def fit_main_training_loop(self, X, y):
         n_epochs = self.input_fn_config["num_epochs"]
@@ -38,6 +47,7 @@ class LogisticRegression(BaseTF):
 
         output_dir = self.config["model_dir"]
         metric_logger = MetricLogger(output_dir, "Evaluation metrics")
+        self.params["logger"] = metric_logger
 
         for i in range(n_epochs):
             # train
@@ -46,6 +56,7 @@ class LogisticRegression(BaseTF):
             )
 
             # evaluate
+            # evaluation on test set
             evaluation_fn = self.gen_input_fn(
                 X, y, False, self.input_fn_config
             )
@@ -53,11 +64,22 @@ class LogisticRegression(BaseTF):
                 custom_print("No evaluation - skipping evaluation.")
                 return
             evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
-
             print(evaluation)
-            sys.stdout.flush()
-            metric_logger.add_evaluations(evaluation)
+            metric_logger.add_evaluations("test", evaluation)
+
+            if (self.sumatra_params is not None) and \
+               (self.sumatra_params["log_train"]):
+                # evaluation on training set
+                evaluation_fn = self.gen_input_fn(
+                    X, y, True, self.input_fn_config
+                )
+                evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
+                print(evaluation)
+                metric_logger.add_evaluations("train", evaluation)
+
+            # persist evaluations to json file
             metric_logger.dump()
+            sys.stdout.flush()
 
     def model_fn(self, features, labels, mode, params):
         # Prediction
@@ -87,6 +109,10 @@ class LogisticRegression(BaseTF):
             "accuracy": accuracy
         }
 
+        metric_ops = {
+            'accuracy': tf.metrics.accuracy(labels=labels, predictions=preds)
+        }
+
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
@@ -102,7 +128,7 @@ class LogisticRegression(BaseTF):
         if params["regularizer"] is None:
             reg = 0
         elif params["regularizer"] == "l2":
-            reg = tf.nn.l2_loss(weights)
+            reg = tf.norm(weights, ord=2)
         else:
             raise ValueError("Regularizer not found")
 
@@ -122,14 +148,11 @@ class LogisticRegression(BaseTF):
             )
 
         # Evaluation
-        eval_metric_ops = {
-            'accuracy': tf.metrics.accuracy(labels=labels, predictions=preds)
-        }
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops
+            eval_metric_ops=metric_ops
         )
 
     def score(self, X, y):
@@ -146,17 +169,14 @@ class TestRetestLogisticRegression(LogisticRegression):
         - l2_logits: l2-norm of the difference between test
           and retest logits
     """
-    def prediction_nodes(self, features_tensor, labels, params):
+    def prediction_nodes(self, features_tensor, labels, params, weights):
         # Prediction
         input_layer = tf.reshape(
             features_tensor,
             [-1, self.params["input_dim"]]
         )
 
-        logits = tf.layers.dense(
-            inputs=input_layer,
-            units=self.params["n_classes"],
-        )
+        logits = tf.matmul(input_layer, weights)
 
         probs = tf.nn.softmax(logits)
         preds = tf.argmax(input=logits, axis=1)
@@ -169,18 +189,26 @@ class TestRetestLogisticRegression(LogisticRegression):
     def model_fn(self, features, labels, mode, params):
         # Prediction
         # Construct nodes to performa logistic regression on test and retest data
+        weights = tf.get_variable(
+            name="logistic_weights",
+            shape=[self.params["input_dim"], self.params["n_classes"]],
+            initializer=tf.contrib.layers.xavier_initializer(seed=43)
+        )
+
         input_test, logits_test, probs_test, preds_test, \
             acc_test = self.prediction_nodes(
                 features["X_test"],
                 labels,
-                params
+                params,
+                weights
             )
 
         input_retest, logits_retest, probs_retest, preds_retest, \
             acc_retest = self.prediction_nodes(
                 features["X_retest"],
                 labels,
-                params
+                params,
+                weights
             )
 
         predictions = {
@@ -206,18 +234,46 @@ class TestRetestLogisticRegression(LogisticRegression):
         )
 
         # regularization
-        if params["regularizer"] is None:
-            regularizer = 0
-        elif params["regularizer"] == "l2_logits":
-            regularizer = tf.nn.l2_loss(
+        # weights
+        if params["weight_regularizer"] is None:
+            reg_w = 0
+        elif params["weight_regularizer"] == "l2":
+            reg_w = tf.norm(weights, ord=2)
+        elif params["weight_regularizer"] == "l1":
+            reg_w = tf.norm(weights, ord=1)
+        else:
+            raise ValueError("Regularizer not found")
+
+        reg_w *= params["lambda_w"]
+
+        # output
+        if params["output_regularizer"] is None:
+            reg_out = 0
+        elif params["output_regularizer"] == "l2_logits":
+            reg_out = tf.norm(
                 logits_test - logits_retest,
+                ord=2,
                 name="l2_logits_diff"
+            )
+        elif params["output_regularizer"] == "l2_probs":
+            reg_out = tf.norm(
+                probs_test - probs_retest,
+                ord=2,
+                name="l2_probs_diff"
+            )
+        elif params["output_regularizer"] == "l1_probs":
+            reg_out = tf.norm(
+                probs_test - probs_retest,
+                ord=1,
+                name="l1_probs_diff"
             )
         else:
             raise ValueError("Regularizer not found")
 
+        reg_out *= params["lambda_o"]
+
         # Training
-        loss = loss_test + loss_retest + params["lambda"] * regularizer
+        loss = loss_test + loss_retest + reg_w + reg_out
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
@@ -277,6 +333,18 @@ class MnistLogisticRegression(LogisticRegression):
             y=labels,
             **input_fn_config
         )
+
+    def input_fn(self, X, y, batch_size=64, train=True):
+        if train:
+            # load training data
+            images, labels = mnist_read.load_mnist_training(
+                self.data_params["data_path"]
+            )
+
+            dataset = tf.data.Dataset.from_tensor_slices((images, labels))
+            dataset.shuffle(1000).batch(batch_size)
+
+        return dataset
 
 
 class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
