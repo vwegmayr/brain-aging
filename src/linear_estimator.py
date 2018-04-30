@@ -6,6 +6,7 @@ from modules.models.base import BaseTF
 from modules.models.utils import custom_print
 from src.data.mnist import read as mnist_read
 from src.logging import MetricLogger
+import src.regularizer as regularizer
 
 
 class LogisticRegression(BaseTF):
@@ -128,7 +129,7 @@ class LogisticRegression(BaseTF):
         if params["regularizer"] is None:
             reg = 0
         elif params["regularizer"] == "l2":
-            reg = tf.norm(weights, ord=2)
+            reg = regularizer.l2_squared(weights, "l2_weights")
         else:
             raise ValueError("Regularizer not found")
 
@@ -176,12 +177,13 @@ class TestRetestLogisticRegression(LogisticRegression):
             [-1, self.params["input_dim"]]
         )
 
-        logits = tf.matmul(input_layer, weights)
+        logits = tf.matmul(input_layer, weights, name="logits")
 
-        probs = tf.nn.softmax(logits)
-        preds = tf.argmax(input=logits, axis=1)
+        probs = tf.nn.softmax(logits, name="probabilities")
+        preds = tf.argmax(input=logits, axis=1, name="predictions")
         accuracy = tf.reduce_mean(
             tf.cast(tf.equal(preds, labels), tf.float32),
+            name="accuracy"
         )
 
         return input_layer, logits, probs, preds, accuracy
@@ -195,21 +197,23 @@ class TestRetestLogisticRegression(LogisticRegression):
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
-        input_test, logits_test, probs_test, preds_test, \
-            acc_test = self.prediction_nodes(
-                features["X_test"],
-                labels,
-                params,
-                weights
-            )
+        with tf.name_scope("test"):
+            input_test, logits_test, probs_test, preds_test, \
+                acc_test = self.prediction_nodes(
+                    features["X_test"],
+                    labels,
+                    params,
+                    weights
+                )
 
-        input_retest, logits_retest, probs_retest, preds_retest, \
-            acc_retest = self.prediction_nodes(
-                features["X_retest"],
-                labels,
-                params,
-                weights
-            )
+        with tf.name_scope("retest"):
+            input_retest, logits_retest, probs_retest, preds_retest, \
+                acc_retest = self.prediction_nodes(
+                    features["X_retest"],
+                    labels,
+                    params,
+                    weights
+                )
 
         predictions = {
             "classes_test": preds_test,
@@ -238,9 +242,9 @@ class TestRetestLogisticRegression(LogisticRegression):
         if params["weight_regularizer"] is None:
             reg_w = 0
         elif params["weight_regularizer"] == "l2":
-            reg_w = tf.norm(weights, ord=2)
+            reg_w = regularizer.l2_squared(weights, "l2_weights")
         elif params["weight_regularizer"] == "l1":
-            reg_w = tf.norm(weights, ord=1)
+            reg_w = regularizer.l1(weights, "l1_weights")
         else:
             raise ValueError("Regularizer not found")
 
@@ -250,21 +254,18 @@ class TestRetestLogisticRegression(LogisticRegression):
         if params["output_regularizer"] is None:
             reg_out = 0
         elif params["output_regularizer"] == "l2_logits":
-            reg_out = tf.norm(
+            reg_out = regularizer.l2_squared(
                 logits_test - logits_retest,
-                ord=2,
                 name="l2_logits_diff"
             )
         elif params["output_regularizer"] == "l2_probs":
-            reg_out = tf.norm(
+            reg_out = regularizer.l2_squared(
                 probs_test - probs_retest,
-                ord=2,
                 name="l2_probs_diff"
             )
         elif params["output_regularizer"] == "l1_probs":
-            reg_out = tf.norm(
+            reg_out = regularizer.l1(
                 probs_test - probs_retest,
-                ord=1,
                 name="l1_probs_diff"
             )
         else:
