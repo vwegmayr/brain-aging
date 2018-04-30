@@ -493,7 +493,7 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
                 name="l2_hidden_features"
             )
         elif params[param_name] == "l2_sq":
-            reg_f = regularizer.l2_sq(
+            reg_f = regularizer.l2_squared(
                 f1 - f2,
                 name="l2_sq_hidden_features"
             )
