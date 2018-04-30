@@ -129,7 +129,9 @@ class LogisticRegression(BaseTF):
         if params["regularizer"] is None:
             reg = 0
         elif params["regularizer"] == "l2":
-            reg = regularizer.l2_squared(weights, "l2_weights")
+            reg = regularizer.l2(weights, "l2_weights")
+        elif params["regularizer"] == "l2_sq":
+            reg = regularizer.l2(weights, "l2_sq_weights")
         else:
             raise ValueError("Regularizer not found")
 
@@ -242,7 +244,9 @@ class TestRetestLogisticRegression(LogisticRegression):
         if params["weight_regularizer"] is None:
             reg_w = 0
         elif params["weight_regularizer"] == "l2":
-            reg_w = regularizer.l2_squared(weights, "l2_weights")
+            reg_w = regularizer.l2(weights, "l2_weights")
+        elif params["weight_regularizer"] == "l2_sq":
+            reg_w = regularizer.l2_squared(weights, "l2_sq_weights")
         elif params["weight_regularizer"] == "l1":
             reg_w = regularizer.l1(weights, "l1_weights")
         else:
@@ -254,14 +258,24 @@ class TestRetestLogisticRegression(LogisticRegression):
         if params["output_regularizer"] is None:
             reg_out = 0
         elif params["output_regularizer"] == "l2_logits":
-            reg_out = regularizer.l2_squared(
+            reg_out = regularizer.l2(
                 logits_test - logits_retest,
                 name="l2_logits_diff"
             )
-        elif params["output_regularizer"] == "l2_probs":
+        elif params["output_regularizer"] == "l2_sq_logits":
             reg_out = regularizer.l2_squared(
+                logits_test - logits_retest,
+                name="l2_sq_logits_diff"
+            )
+        elif params["output_regularizer"] == "l2_probs":
+            reg_out = regularizer.l2(
                 probs_test - probs_retest,
                 name="l2_probs_diff"
+            )
+        elif params["output_regularizer"] == "l2_sq_probs":
+            reg_out = regularizer.l2_squared(
+                probs_test - probs_retest,
+                name="l2_sq_probs_diff"
             )
         elif params["output_regularizer"] == "l1_probs":
             reg_out = regularizer.l1(
