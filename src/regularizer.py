@@ -10,7 +10,7 @@ def l2_squared(weights, name):
 
 
 def l2(weights, name):
-    return tf.sqrt(l2_squared(weights), name=name)
+    return tf.sqrt(l2_squared(weights, None), name=name)
 
 
 def l2_mean_batch(batch, name):
