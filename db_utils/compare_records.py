@@ -1,4 +1,5 @@
-import os
+# Script can be used to compare numeric outcomes from the
+# different experiments.
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -6,21 +7,28 @@ import numpy as np
 from db_utils.db_connection import SumatraDB
 
 
+# Global configuration
+# Name of sumatra table containing records
 TABLE_NAME = "django_store_record"
-COLUMNS = ["label", "reason", "timestamp", "tags", "parameters_id", "version"] 
+# Path to sqlite file
+DB_PATH = ".smt/records"
+# Column names of record table we are interested in
+COLUMNS = ["label", "reason", "timestamp", "tags", "parameters_id", "version"]
+# Metrics we want to plot 
 METRICS = ["test_accuracy_test"]
+# Path to folder containing records
 DATA_PATH = "data"
-COLOR_MAP = 'brg'
+# Tags that should be used to label lines
 PLOT_TAG_LABEL = ["lambda_w", "lambda_f"]
 
+# Filters should be used to filter out the experiments we
+# want to compare. Can use one filter per 'type' of experiment.
+# Every filter is applied to all the records.
 filter_1 = {
     "tags": {
         "train_size": set(["2000"]),  # set of allowed values
         "weight_regularizer": set(["l2"]),
         "lambda_w": set(["0.005"]),
-    },
-    "config": {
-        "lambda_f": [0.01, 0.05, 0.1, 0.2]
     }
 }
 
@@ -32,10 +40,23 @@ filter_2 = {
 }
 
 
+# Collect all the filters we want to apply
 FILTERS = [filter_1, filter_2]
 
 
 def filter_record_by_tag(rec, f):
+    """
+    Check if record satisfies filter requirements.
+
+    Args:
+        - rec: Record object
+        - f: filter represented as dictonary (see top
+          of file for example)
+
+    Return:
+        - True if record satisfies filter, False
+          otherwise.
+    """
     if "tags" not in f:
         return True
 
@@ -61,13 +82,34 @@ def filter_record_by_tag(rec, f):
 
 
 def fits_group(rec, group):
+    """
+    Args:
+        - rec: Record object
+        - group: list of Record objects
+
+    Return:
+        - True if record matches group requirements,
+          False otherwise.
+    """
     g = group[0]
 
     return (rec.version == g.version) and (rec.config == g.config)
 
 
 def group_records(records):
-    groups = []   
+    """
+    Find records that belong together, i.e. records
+    that were executed with the same configuration
+    and the same code version.
+
+    Arg:
+        - records: list of Record objects
+
+    Return:
+        - groups: list of list of records that have
+          been grouped
+    """
+    groups = []  
 
     # Find group for each record
     for r in records:
@@ -88,6 +130,12 @@ def group_records(records):
 
 
 def plot_groups(groups):
+    """
+    Plot multiple groups on the same plot.
+
+    Arg:
+        - groups: list of grouped records
+    """
     # generate color for each group
     # color = iter(plt.cm.jet(np.linspace(0, 1, len(groups))))
     color = iter(plt.cm.tab10(np.linspace(0, 1, 11)))
@@ -135,7 +183,7 @@ def plot_groups(groups):
 
 def main():
     # TODO: data base filter query
-    db = SumatraDB()
+    db = SumatraDB(db=DB_PATH)
     records = db.get_all_records(COLUMNS)
 
     # Load config files
