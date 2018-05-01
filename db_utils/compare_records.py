@@ -15,9 +15,9 @@ PLOT_TAG_LABEL = ["lambda_w", "lambda_f"]
 
 filter_1 = {
     "tags": {
-        "train_size": set(["500"]),  # set of allowed values
+        "train_size": set(["2000"]),  # set of allowed values
         "weight_regularizer": set(["l2"]),
-        "lambda_w": set(["0.01", "0.005"]),
+        "lambda_w": set(["0.005"]),
     },
     "config": {
         "lambda_f": [0.01, 0.05, 0.1, 0.2]
@@ -26,8 +26,8 @@ filter_1 = {
 
 filter_2 = {
     "tags": {
-        "train_size": set(["500"]),
-        "lambda_f": set(["0.01", "0.05", "0.1"])
+        "train_size": set(["2000"]),
+        "lambda_f": set(["0.01", "0.05", "0.1", "0.2"])
     }
 }
 
