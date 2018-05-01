@@ -10,7 +10,8 @@ TABLE_NAME = "django_store_record"
 COLUMNS = ["label", "reason", "timestamp", "tags", "parameters_id", "version"] 
 METRICS = ["test_accuracy_test"]
 DATA_PATH = "data"
-
+COLOR_MAP = 'brg'
+PLOT_TAG_LABEL = ["lambda_o", "output_regularizer"]
 
 filter_1 = {
     "tags": {
@@ -85,7 +86,8 @@ def group_records(records):
 
 def plot_groups(groups):
     # generate color for each group
-    color = iter(plt.cm.rainbow(np.linspace(0, 1, len(groups))))
+    # color = iter(plt.cm.jet(np.linspace(0, 1, len(groups))))
+    color = iter(plt.cm.tab10(np.linspace(0, 1, 11)))
 
     for group in groups:
         for r in group:
@@ -93,12 +95,19 @@ def plot_groups(groups):
             r.load_metrics(DATA_PATH)
 
     for m in METRICS:
+        handles = []
         for group in groups:
             print("group of size {}".format(len(group)))
             print(",".join([g.label for g in group]))
             r = group[0]
+            # Extract group label
+            legend_label = ",".join([r.find_tag(x) for x in PLOT_TAG_LABEL])
+            # x-label for plot
             x_label = r.metrics[m]["x_label"]
+            # Only ticks for x values
             x = r.metrics[m]["x"]
+            plt.xticks(x)
+
             # average y values
             ys = []
             for r in group:
@@ -110,10 +119,13 @@ def plot_groups(groups):
             plt.xlabel(x_label)
             plt.ylabel(m)
             c = next(color)
-            plt.plot(x, mean, c=c)
-            plt.plot(x, mean - std, c=c)
-            plt.plot(x, mean + std, c=c)
+            line = plt.plot(x, mean, c=c, marker='o', linewidth=2,
+                            label=legend_label)
+            plt.plot(x, mean - std, c=c, linestyle="--", linewidth=0.5)
+            plt.plot(x, mean + std, c=c, linestyle="--", linewidth=0.5)
+            handles.append(line)
 
+        plt.legend(loc=4, ncol=1)
         plt.show()
 
 

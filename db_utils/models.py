@@ -23,3 +23,10 @@ class Record(object):
             data = json.load(f)
 
         self.metrics = data["numeric_outcome"]
+
+    def find_tag(self, tag):
+        for t in self.tags:
+            if tag in t:
+                return t
+        
+        return "Tag not found"
