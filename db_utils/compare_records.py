@@ -11,11 +11,13 @@ COLUMNS = ["label", "reason", "timestamp", "tags", "parameters_id", "version"]
 METRICS = ["test_accuracy_test"]
 DATA_PATH = "data"
 COLOR_MAP = 'brg'
-PLOT_TAG_LABEL = ["lambda_o", "output_regularizer"]
+PLOT_TAG_LABEL = ["lambda_w", "lambda_f"]
 
 filter_1 = {
     "tags": {
         "train_size": set(["500"]),  # set of allowed values
+        "weight_regularizer": set(["l2"]),
+        "lambda_w": set(["0.01", "0.005"]),
     },
     "config": {
         "lambda_f": [0.01, 0.05, 0.1, 0.2]
@@ -25,12 +27,12 @@ filter_1 = {
 filter_2 = {
     "tags": {
         "train_size": set(["500"]),
-        "baseline": set([]),
+        "lambda_f": set(["0.01", "0.05", "0.1"])
     }
 }
 
 
-FILTERS = [filter_1]
+FILTERS = [filter_1, filter_2]
 
 
 def filter_record_by_tag(rec, f):
@@ -52,6 +54,7 @@ def filter_record_by_tag(rec, f):
                     break
 
             if not found:
+                # print("tag {} not found in {}".format(tv, rec.tags))
                 return False
 
     return True
@@ -126,6 +129,7 @@ def plot_groups(groups):
             handles.append(line)
 
         plt.legend(loc=4, ncol=1)
+        plt.grid(True)
         plt.show()
 
 
@@ -133,19 +137,23 @@ def main():
     # TODO: data base filter query
     db = SumatraDB()
     records = db.get_all_records(COLUMNS)
+
     # Load config files
     for r in records:
         config = db.get_params_dic(r.params_id)
         r.config = config
 
     # Apply tag filters
+    remaining = []
     for f in FILTERS:
-        records = list(filter(lambda r: filter_record_by_tag(r, f), records))
+        res = list(filter(lambda r: filter_record_by_tag(r, f), records))
+        remaining.extend(res)
 
+    print("{} records after tag filtering".format(len(remaining)))
     # Apply config filters
 
     # Groupy by
-    groups = group_records(records)
+    groups = group_records(remaining)
 
     plot_groups(groups)
 

@@ -29,4 +29,4 @@ class Record(object):
             if tag in t:
                 return t
         
-        return "Tag not found"
+        return "NA"
