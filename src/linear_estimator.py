@@ -612,8 +612,7 @@ class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
 
 
 class MnistTestRetestTwoLevelLogisticRegression(
-            TestRetestTwoLevelLogisticRegression
-        ):
+        TestRetestTwoLevelLogisticRegression):
     """
     MNIST logistic regression for test-retest data. Loads presampled
     images from .npy files.
