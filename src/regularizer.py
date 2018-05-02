@@ -133,8 +133,9 @@ def ICC_batch_regularizer(test_batch, retest_batch, icc_func):
     for i in range(n_features):
         Y_1 = tf.reshape(test_batch[:, i], [-1, 1])
         Y_2 = tf.reshape(retest_batch[:, i], [-1, 1])
-        Y = tf.stack([Y_1, Y_2], axis=1)
+        Y = tf.concat([Y_1, Y_2], axis=1)
+        icc = icc_func(Y)
+        sum_icc += icc
 
-        sum_icc += icc_func(Y)
-
+    n_features = tf.cast(tf.shape(test_batch)[1], tf.float32)
     return sum_icc / n_features
