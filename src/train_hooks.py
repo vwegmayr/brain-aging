@@ -5,6 +5,43 @@ from tensorflow.python.summary import summary as core_summary
 import numpy as np
 
 
+class CollectValuesHook(tf.train.SessionRunHook):
+    """
+    Collect values and write them to sumatra_outcome.json
+    """
+    def __init__(self, tensor_dic, metric_logger):
+        """
+        Args:
+            - tensor_dic: dictionary mapping names to tensors
+            - metric_logger: src.logging.MetricLogger object
+        """
+        self.tensor_dic = tensor_dic
+        self.metric_logger = metric_logger
+
+    def before_run(self, run_context):
+        # All tensors in tensor_dic will be evaluated
+        return tf.train.SessionRunArgs(fetches=self.tensor_dic)
+
+    def after_run(self, run_context, run_values):
+        # run_values.results contains the values of the evaluated
+        # tensors
+        self.metric_logger.log_hook_results(run_values.results)
+
+    def end(self, session):
+        print("end of session")
+
+
+class ConfusionMatrixHook(tf.train.SessionRunHook):
+    def __init__(self, pred_1, pred_2, n_classes, out_path):
+        self.pred_1 = pred_1
+        self.pred_2 = pred_2
+        self.n_classes = n_classes
+
+    def before_run(self, run_c):
+        pass
+
+
+
 class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
     def __init__(
         self,
@@ -84,6 +121,7 @@ class SessionHookFullTrace(tf.train.SessionRunHook):
             self._trace = True
         if self.first_step and global_step == 1:
             self._trace = True
+
 
 class SessionHookDumpTensors(tf.train.SessionRunHook):
     """ Dumps tensors to file """

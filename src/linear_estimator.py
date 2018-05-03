@@ -7,9 +7,11 @@ from modules.models.utils import custom_print
 from src.data.mnist import read as mnist_read
 from src.logging import MetricLogger
 import src.regularizer as regularizer
+from src.train_hooks import CollectValuesHook
 
 
-def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest, probs_test, probs_retest, params, mode):
+def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
+                                probs_test, probs_retest, params, mode, metric_logger):
     # Evaluation
     eval_acc_test = tf.metrics.accuracy(
         labels=labels,
@@ -66,10 +68,16 @@ def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest, probs_te
         'js_std': eval_js_std
     }
 
+    hook_tensors = {
+        "test_predictions": preds_test,
+        "retest_predictions": preds_retest
+    }
+    hook = CollectValuesHook(hook_tensors, metric_logger)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=loss,
-        eval_metric_ops=eval_metric_ops
+        eval_metric_ops=eval_metric_ops,
+        evaluation_hooks=[hook]
     )
 
 
@@ -111,8 +119,7 @@ class LogisticRegression(BaseTF):
         self.input_fn_config["num_epochs"] = 1
 
         output_dir = self.config["model_dir"]
-        metric_logger = MetricLogger(output_dir, "Evaluation metrics")
-        self.params["logger"] = metric_logger
+        self.metric_logger = MetricLogger(output_dir, "Evaluation metrics")
 
         for i in range(n_epochs):
             # train
@@ -130,7 +137,7 @@ class LogisticRegression(BaseTF):
                 return
             evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
             print(evaluation)
-            metric_logger.add_evaluations("test", evaluation)
+            self.metric_logger.add_evaluations("test", evaluation)
 
             if (self.sumatra_params is not None) and \
                (self.sumatra_params["log_train"]):
@@ -140,10 +147,10 @@ class LogisticRegression(BaseTF):
                 )
                 evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
                 print(evaluation)
-                metric_logger.add_evaluations("train", evaluation)
+                self.metric_logger.add_evaluations("train", evaluation)
 
             # persist evaluations to json file
-            metric_logger.dump()
+            self.metric_logger.dump()
             sys.stdout.flush()
 
     def model_fn(self, features, labels, mode, params):
@@ -424,7 +431,8 @@ class TestRetestLogisticRegression(LogisticRegression):
             probs_test=probs_test,
             probs_retest=probs_retest,
             params=params,
-            mode=mode
+            mode=mode,
+            metric_logger=self.metric_logger
         )
 
 

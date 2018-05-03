@@ -40,6 +40,14 @@ class MetricLogger(object):
         with open("%s/sumatra_outcome.json" % (self.outdir), "w") as outfile:
             json.dump(obj, outfile, indent=2)
 
+    def log_hook_results(self, dic_vals):
+        for name in dic_vals:
+            if name not in self.metrics:
+                self.metrics[name] = []
+
+            dic_vals[name] = list(map(lambda x: float(x), dic_vals[name]))
+            self.metrics[name].extend(dic_vals[name])
+
     def to_json(self):
         obj = {
             "text_outcome": self.description,
