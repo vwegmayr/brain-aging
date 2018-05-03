@@ -9,6 +9,70 @@ from src.logging import MetricLogger
 import src.regularizer as regularizer
 
 
+def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest, probs_test, probs_retest, params, mode):
+    # Evaluation
+    eval_acc_test = tf.metrics.accuracy(
+        labels=labels,
+        predictions=preds_test
+    )
+    eval_acc_retest = tf.metrics.accuracy(
+        labels=labels,
+        predictions=preds_retest
+    )
+    # Compute KL-divergence between test and retest probs
+    kl_divergences = regularizer.batch_divergence(
+        probs_test,
+        probs_retest,
+        params["n_classes"],
+        regularizer.kl_divergence
+    )
+
+    # mean KL-divergence
+    eval_kl_mean = tf.metrics.mean(
+        values=kl_divergences
+    )
+
+    # std KL-divergence
+    _, kl_std = tf.nn.moments(kl_divergences, axes=[0])
+    eval_kl_std = tf.metrics.mean(
+        values=kl_std
+    )
+
+    # Compute KL-divergence between test and retest probs
+    js_divergences = regularizer.batch_divergence(
+        probs_test,
+        probs_retest,
+        params["n_classes"],
+        regularizer.js_divergence
+    )
+
+    # mean KL-divergence
+    eval_js_mean = tf.metrics.mean(
+        values=js_divergences
+    )
+
+    # std KL-divergence
+    _, js_std = tf.nn.moments(js_divergences, axes=[0])
+    eval_js_std = tf.metrics.mean(
+        values=js_std
+    )
+
+    eval_metric_ops = {
+        'accuracy_test': eval_acc_test,
+        'accuracy_retest': eval_acc_retest,
+        'kl_mean': eval_kl_mean,
+        'kl_std': eval_kl_std,
+        'js_mean': eval_js_mean,
+        'js_std': eval_js_std
+    }
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=loss,
+        eval_metric_ops=eval_metric_ops
+    )
+
+
 class LogisticRegression(BaseTF):
     """
     Base estimator to preform logistic regression.
@@ -288,33 +352,50 @@ class TestRetestLogisticRegression(LogisticRegression):
         reg_w *= params["lambda_w"]
 
         # output
-        if params["output_regularizer"] is None:
+        key = "output_regularizer"
+        if params[key] is None:
             reg_out = 0
-        elif params["output_regularizer"] == "l2_logits":
+        elif params[key] == "l2_logits":
             reg_out = regularizer.l2(
                 logits_test - logits_retest,
                 name="l2_logits_diff"
             )
-        elif params["output_regularizer"] == "l2_sq_logits":
+        elif params[key] == "l2_sq_logits":
             reg_out = regularizer.l2_squared(
                 logits_test - logits_retest,
                 name="l2_sq_logits_diff"
             )
-        elif params["output_regularizer"] == "l2_probs":
+        elif params[key] == "l2_probs":
             reg_out = regularizer.l2(
                 probs_test - probs_retest,
                 name="l2_probs_diff"
             )
-        elif params["output_regularizer"] == "l2_sq_probs":
+        elif params[key] == "l2_sq_probs":
             reg_out = regularizer.l2_squared(
                 probs_test - probs_retest,
                 name="l2_sq_probs_diff"
             )
-        elif params["output_regularizer"] == "l1_probs":
+        elif params[key] == "l1_probs":
             reg_out = regularizer.l1(
                 probs_test - probs_retest,
                 name="l1_probs_diff"
             )
+        elif params[key] == "kl_divergence":
+            reg_out = regularizer.batch_divergence(
+                probs_test,
+                probs_retest,
+                params["n_classes"],
+                regularizer.kl_divergence
+            )
+            reg_out = tf.reduce_mean(reg_out)
+        elif params[key] == "js_divergence":
+            reg_out = regularizer.batch_divergence(
+                probs_test,
+                probs_retest,
+                params["n_classes"],
+                regularizer.kl_divergence
+            )
+            reg_out = tf.reduce_mean(reg_out)
         else:
             raise ValueError("Regularizer not found")
 
@@ -335,23 +416,15 @@ class TestRetestLogisticRegression(LogisticRegression):
             )
 
         # Evaluation
-        eval_acc_test = tf.metrics.accuracy(
+        return test_retest_evaluation_spec(
             labels=labels,
-            predictions=preds_test
-        )
-        eval_acc_retest = tf.metrics.accuracy(
-            labels=labels,
-            predictions=preds_retest
-        )
-        eval_metric_ops = {
-            'accuracy_test': eval_acc_test,
-            'accuracy_retest': eval_acc_retest
-        }
-
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops
+            preds_test=preds_test,
+            preds_retest=preds_retest,
+            probs_test=probs_test,
+            probs_retest=probs_retest,
+            params=params,
+            mode=mode
         )
 
 
@@ -517,23 +590,15 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             )
 
         # Evaluation
-        eval_acc_test = tf.metrics.accuracy(
+        return test_retest_evaluation_spec(
             labels=labels,
-            predictions=preds_test
-        )
-        eval_acc_retest = tf.metrics.accuracy(
-            labels=labels,
-            predictions=preds_retest
-        )
-        eval_metric_ops = {
-            'accuracy_test': eval_acc_test,
-            'accuracy_retest': eval_acc_retest
-        }
-
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops
+            preds_test=preds_test,
+            preds_retest=preds_retest,
+            probs_test=probs_test,
+            probs_retest=probs_retest,
+            params=params,
+            mode=mode
         )
 
 

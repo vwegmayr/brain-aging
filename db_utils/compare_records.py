@@ -43,9 +43,10 @@ def filter_record_by_tag(rec, f):
 
     for t in f["tags"]:
         vals = f["tags"][t]
-        if (len(vals) == 0) and (t not in rec.tags):
-            # no value necessary
-            return False
+        if len(vals) == 0:
+            if t not in rec.tags:
+                # no value necessary
+                return False
         else:
             # multiple values for this tag allowed
             found = False

@@ -1,13 +1,7 @@
 import tensorflow as tf
 
 
-def get_batch_dimensions(X):
-    d = tf.cast(tf.shape(X)[1], tf.float32)
-    n = tf.cast(tf.shape(X)[0], tf.float32)
-
-    return n, d
-
-
+# Traditional norm regularizers
 def l1(weights, name):
     return tf.reduce_sum(tf.abs(weights), name=name)
 
@@ -25,11 +19,76 @@ def l2_mean_batch(batch, name):
     return tf.reduce_mean(sq_norms, name=name)
 
 
-def icc_vals(test_batch, retest_batch):
-    n_features = test_batch.get_shape()[0]
+# Distribution divergence measures
+def kl_divergence(p, q, eps=0.000001):
+    """
+    Kullback-Leibler divergence.
+
+    Args:
+        - p: vector containing P(i) in its i-th component
+        - q: vector containing Q(i) in its i-th component
+
+    Return:
+        - kl: KL-divergence between p and q
+    """
+    # Add small value to p to avoid division by 0
+    c_p = p + eps
+    c_p = c_p / tf.reduce_sum(c_p)
+
+    # Add small value to q to avoid log of 0
+    c_q = q + eps
+    c_q = c_q / tf.reduce_sum(c_q)
+
+    div = c_q / c_p
+    kl = - tf.reduce_sum(c_p * tf.log(div))
+    return kl
 
 
-## Reliability measures for ICC computation
+def js_divergence(p, q, eps=0.000001):
+    """
+    Jensen-Shannon divergence.
+
+    Args:
+        - p: vector containing P(i) in its i-th component
+        - q: vector containing Q(i) in its i-th component
+
+    Return:
+        - js: JS-divergence between p and q    
+    """
+    m = 0.5 * (p + q)
+    js = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+
+    return js
+
+
+def batch_divergence(batch_p, batch_q, n, div_fn):
+    """
+    Computes divergence per sample between two batches containing
+    probability distributions in each row. The divergence is computed
+    between the i-th row of the first batch and the i-th row of the
+    second batch for every i.
+
+    Args:
+        - batch_p: tensor of size [batch_size, n_classes]
+        - batch_q: tensor of size [batch_size, n_classes]
+        - n: the number of probabilities per row
+        - div_fn: divergence function to be used
+    """
+    all_probs = tf.concat([batch_p, batch_q], axis=1)
+    fn = (lambda x: div_fn(x[:n], x[n:]))
+    divergences = tf.map_fn(fn, all_probs)
+
+    return divergences
+
+
+# Reliability measures for ICC computation
+def get_batch_dimensions(X):
+    d = tf.cast(tf.shape(X)[1], tf.float32)
+    n = tf.cast(tf.shape(X)[0], tf.float32)
+
+    return n, d
+
+
 def MSR(Y):
     n, k = get_batch_dimensions(Y)
     df = n - 1
