@@ -1,5 +1,6 @@
 import tensorflow as tf
 import sys
+import os
 
 
 from modules.models.base import BaseTF
@@ -7,11 +8,12 @@ from modules.models.utils import custom_print
 from src.data.mnist import read as mnist_read
 from src.logging import MetricLogger
 import src.regularizer as regularizer
-from src.train_hooks import CollectValuesHook
+from src.train_hooks import ConfusionMatrixHook, ICCHook
 
 
 def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
-                                probs_test, probs_retest, params, mode, metric_logger):
+                                probs_test, probs_retest, params, mode,
+                                evaluation_hooks):
     # Evaluation
     eval_acc_test = tf.metrics.accuracy(
         labels=labels,
@@ -68,16 +70,11 @@ def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
         'js_std': eval_js_std
     }
 
-    hook_tensors = {
-        "test_predictions": preds_test,
-        "retest_predictions": preds_retest
-    }
-    hook = CollectValuesHook(hook_tensors, metric_logger)
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=loss,
         eval_metric_ops=eval_metric_ops,
-        evaluation_hooks=[hook]
+        evaluation_hooks=evaluation_hooks
     )
 
 
@@ -422,6 +419,12 @@ class TestRetestLogisticRegression(LogisticRegression):
                 train_op=train_op
             )
 
+        confusion_hook = ConfusionMatrixHook(
+            preds_test,
+            preds_retest,
+            params["n_classes"],
+            os.path.join(self.save_path, "confusion")
+        )
         # Evaluation
         return test_retest_evaluation_spec(
             labels=labels,
@@ -432,7 +435,7 @@ class TestRetestLogisticRegression(LogisticRegression):
             probs_retest=probs_retest,
             params=params,
             mode=mode,
-            metric_logger=self.metric_logger
+            evaluation_hooks=[confusion_hook]
         )
 
 
@@ -489,6 +492,8 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
         return input_layer, hidden_features, logits, probs, preds, accuracy
 
     def model_fn(self, features, labels, mode, params):
+        print(features["X_test"])
+        exit()
         # Construct first-layer weights
         hidden_weights = tf.get_variable(
             name="hidden_weights",
@@ -598,6 +603,23 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             )
 
         # Evaluation
+        confusion_hook = ConfusionMatrixHook(
+            preds_test,
+            preds_retest,
+            params["n_classes"],
+            os.path.join(self.save_path, "confusion")
+        )
+
+        icc_hook = ICCHook(
+            icc_op=regularizer.per_feature_batch_ICC(
+                hidden_features_test,
+                hidden_features_retest,
+                regularizer.ICC_C1
+            ),
+            out_dir=os.path.join(self.save_path, "icc"),
+            icc_name="ICC_C1"
+        )
+
         return test_retest_evaluation_spec(
             labels=labels,
             loss=loss,
@@ -606,7 +628,8 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             probs_test=probs_test,
             probs_retest=probs_retest,
             params=params,
-            mode=mode
+            mode=mode,
+            evaluation_hooks=[confusion_hook, icc_hook]
         )
 
 

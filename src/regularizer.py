@@ -182,19 +182,22 @@ def ICC_C1(Y):
     return (msr - mse) / (msr + (k - 1) * mse)
 
 
-def ICC_batch_regularizer(test_batch, retest_batch, icc_func):
+def per_feature_batch_ICC(test_batch, retest_batch, icc_func):
     """
-    Compute the mean ICC over all the features.
+    Args:
+
+    Return:
+        iccs: tensor containg the ICC value for each feature
     """
     n_features = test_batch.get_shape()[1]
-    sum_icc = 0
+    iccs = []
 
     for i in range(n_features):
         Y_1 = tf.reshape(test_batch[:, i], [-1, 1])
         Y_2 = tf.reshape(retest_batch[:, i], [-1, 1])
         Y = tf.concat([Y_1, Y_2], axis=1)
         icc = icc_func(Y)
-        sum_icc += icc
+        iccs.append(icc)
 
-    n_features = tf.cast(tf.shape(test_batch)[1], tf.float32)
-    return sum_icc / n_features
+    iccs = tf.stack(iccs)
+    return iccs

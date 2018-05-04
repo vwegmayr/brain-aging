@@ -32,14 +32,67 @@ class CollectValuesHook(tf.train.SessionRunHook):
 
 
 class ConfusionMatrixHook(tf.train.SessionRunHook):
-    def __init__(self, pred_1, pred_2, n_classes, out_path):
+    def __init__(self, pred_1, pred_2, n_classes, out_dir):
         self.pred_1 = pred_1
         self.pred_2 = pred_2
         self.n_classes = n_classes
+        self.out_dir = out_dir
+        self.confusion = np.zeros((n_classes, n_classes))
 
-    def before_run(self, run_c):
-        pass
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(fetches=[self.pred_1, self.pred_2])
 
+    def after_run(self, run_context, run_values):
+        pred_1 = run_values.results[0]
+        pred_2 = run_values.results[1]
+
+        # Update counts in confusion matrix
+        n = len(pred_1)
+        for k in range(n):
+            i = pred_1[k]
+            j = pred_2[k]
+
+            self.confusion[i, j] += 1
+
+    def end(self, session):
+        """
+        Dump the confusion matrix.
+        """
+        if not os.path.exists(self.out_dir):
+            os.mkdir(self.out_dir)
+        # Check how many confusion matrices there are in the folder
+        names = os.listdir(self.out_dir)
+        count = len(list(filter(lambda x: "confusion" in x, names)))
+        out_file = os.path.join(self.out_dir, "confusion_" + str(count) + ".npy")
+
+        np.save(out_file, self.confusion.astype(int))
+
+
+class ICCHook(tf.train.SessionRunHook):
+    def __init__(self, icc_op, out_dir, icc_name):
+        self.icc_op = icc_op
+        self.out_dir = out_dir
+        self.icc_name = icc_name
+        self.batch_iccs = []
+
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(fetches=self.icc_op)
+
+    def after_run(self, run_context, run_values):
+        feature_iccs = run_values.results
+        self.batch_iccs.append(feature_iccs)
+
+    def end(self, session):
+        X = np.array(self.batch_iccs)
+
+        if not os.path.exists(self.out_dir):
+            os.mkdir(self.out_dir)
+        # Check how many confusion matrices there are in the folder
+        names = os.listdir(self.out_dir)
+        count = len(list(filter(lambda x: self.icc_name in x, names)))
+        out_file = os.path.join(self.out_dir, self.icc_name + "_" + str(count) + ".npy")
+
+        np.save(out_file, X)
 
 
 class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
