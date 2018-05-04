@@ -12,6 +12,7 @@ METRICS = ["test_accuracy_test"]
 DATA_PATH = "data"
 COLOR_MAP = 'brg'
 PLOT_TAG_LABEL = ["lambda_f", "lambda_w", "hidden_features_regularizer"]
+RECORD_LABEL = "20180427"
 
 filter_1 = {
     "tags": {
@@ -139,7 +140,11 @@ def plot_groups(groups):
 def main():
     # TODO: data base filter query
     db = SumatraDB()
-    records = db.get_all_records(COLUMNS)
+    if RECORD_LABEL is None:
+        records = db.get_all_records(COLUMNS)
+    else:
+        records = db.get_filtered_by_label(COLUMNS, RECORD_LABEL)
+    # print([str(r) for r in records])
 
     # Load config files
     for r in records:

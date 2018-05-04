@@ -61,3 +61,6 @@ class Record(object):
                 return t
 
         return "NA"
+
+    def __str__(self):
+        return self.label

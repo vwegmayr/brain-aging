@@ -84,3 +84,26 @@ class SumatraDB(object):
         res = c.fetchall()
 
         return list(map(lambda x: Record(x), res))
+
+    def get_filtered_by_label(self, columns, record_label):
+        """
+        Queries all the records whose label starts with
+        'records_label'.
+
+        Arg:
+            - columns: list of column names that are selected
+
+        Return:
+            - list of Record objects
+        """
+        c = self.get_cursor()
+        col_s = ",".join(columns)
+
+        q = "select {} from {} where label like '{}%'".format(
+            col_s, self.record_table, record_label
+        )
+        c.execute(q)
+
+        res = c.fetchall()
+
+        return list(map(lambda x: Record(x), res))
