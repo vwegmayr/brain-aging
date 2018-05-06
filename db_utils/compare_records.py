@@ -4,38 +4,18 @@ import numpy as np
 
 
 from db_utils.db_connection import SumatraDB
+import db_utils.compare_config as config
 
 
-TABLE_NAME = "django_store_record"
-COLUMNS = ["label", "reason", "timestamp", "tags", "parameters_id", "version"] 
-METRICS = ["test_accuracy_test"]
-DATA_PATH = "data"
-COLOR_MAP = 'brg'
-PLOT_TAG_LABEL = ["lambda_f", "lambda_w", "hidden_features_regularizer"]
-RECORD_LABEL = "20180427"
+TABLE_NAME = config.TABLE_NAME
+DB_PATH = config.DB_PATH
+COLUMNS = config.COLUMNS
+METRICS = config.METRICS
+DATA_PATH = config.DATA_PATH
+PLOT_TAG_LABEL = config.PLOT_TAG_LABEL
+RECORD_LABEL = config.RECORD_LABEL
 
-filter_1 = {
-    "tags": {
-        "train_size": set(["10000"]),  # set of allowed values
-        "weight_regularizer": set(["l2"]),
-        "lambda_w": set(["0.005"]),
-    },
-    "config": {
-        "lambda_f": [0.01, 0.05, 0.1, 0.2]
-    }
-}
-
-filter_2 = {
-    "tags": {
-        "train_size": set(["10000"]),
-        "lambda_f": set(["0.01", "0.005"]),
-        "hidden_dim": set(["150"]),
-        "hidden_features_regularizer": ["l2", "l2_sq"],
-    }
-}
-
-
-FILTERS = [filter_1, filter_2]
+FILTERS = config.FILTERS
 
 
 def filter_record_by_tag(rec, f):
@@ -139,7 +119,7 @@ def plot_groups(groups):
 
 def main():
     # TODO: data base filter query
-    db = SumatraDB()
+    db = SumatraDB(db=DB_PATH)
     if RECORD_LABEL is None:
         records = db.get_all_records(COLUMNS)
     else:
