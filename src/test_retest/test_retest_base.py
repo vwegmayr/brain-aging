@@ -6,6 +6,7 @@ from modules.models.base import BaseTF
 from modules.models.utils import custom_print
 from src.logging import MetricLogger
 import src.test_retest.regularizer as regularizer
+from src.data.mnist import read as mnist_read
 
 
 def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
@@ -73,6 +74,90 @@ def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
         eval_metric_ops=eval_metric_ops,
         evaluation_hooks=evaluation_hooks
     )
+
+
+def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
+                               input_fn_config={}):
+    """
+    MNIST logistic regression for test-retest data. Loads presampled
+    images from .npy files.
+    """
+    if train:
+        # load training data
+        test, retest, labels = mnist_read.load_test_retest(
+            data_params["data_path"],  # path to MNIST root folder
+            data_params["train_test_retest"],
+            data_params["train_size"],
+            True
+        )
+
+    else:
+        # load test/retest data
+        test, retest, labels = mnist_read.load_test_retest(
+            data_params["data_path"],  # path to MNIST root folder
+            data_params["test_test_retest"],
+            data_params["test_size"],
+            False
+        )
+
+    return tf.estimator.inputs.numpy_input_fn(
+        x={
+            "X_test": test,
+            "X_retest": retest
+        },
+        y=labels,
+        **input_fn_config
+    )
+
+
+def linear_trafo(self, X, out_dim, names):
+    input_dim = X.get_shape()[1]
+    w = tf.get_variable(
+        name=names[0],
+        shape=[input_dim, out_dim],
+        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+    )
+
+    b = tf.get_variable(
+        name=names[1],
+        shape=[1, self.n_classes],
+        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+    )
+
+    Y = tf.add(
+        tf.matmul(X, w),
+        b,
+        name=names[2]
+    )
+
+    return w, b, Y
+
+
+def linear_trafo_multiple_input_tensors(self, Xs, out_dim, weight_names,
+                                        output_names):
+    input_dim = Xs[0].get_shape()[1]
+    w = tf.get_variable(
+        name=weight_names[0],
+        shape=[input_dim, out_dim],
+        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+    )
+
+    b = tf.get_variable(
+        name=weight_names[1],
+        shape=[1, self.n_classes],
+        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+    )
+
+    Ys = []
+    for i, X in enumerate(Xs):
+        Y = tf.add(
+            tf.matmul(X, w),
+            b,
+            name=output_names[i]
+        )
+        Ys.append(Y)
+
+    return w, b, Ys
 
 
 class EvaluateEpochsBaseTF(BaseTF):
@@ -144,3 +229,6 @@ class EvaluateEpochsBaseTF(BaseTF):
             # persist evaluations to json file
             self.metric_logger.dump()
             sys.stdout.flush()
+
+    def score(self, X, y):
+        pass

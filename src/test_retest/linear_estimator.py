@@ -7,6 +7,7 @@ from src.train_hooks import ConfusionMatrixHook, ICCHook
 import src.test_retest.regularizer as regularizer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.test_retest.test_retest_base import test_retest_evaluation_spec
+from src.test_retest.test_retest_base import mnist_test_retest_input_fn
 
 
 class LogisticRegression(EvaluateEpochsBaseTF):
@@ -14,7 +15,7 @@ class LogisticRegression(EvaluateEpochsBaseTF):
     Base estimator to preform logistic regression.
     Allow the following regularization:
         - l2: l2-norm of weights
-    """    
+    """
     def model_fn(self, features, labels, mode, params):
         # Prediction
         input_layer = tf.reshape(
@@ -358,8 +359,6 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
         return input_layer, hidden_features, logits, probs, preds, accuracy
 
     def model_fn(self, features, labels, mode, params):
-        print(features["X_test"])
-        exit()
         # Construct first-layer weights
         hidden_weights = tf.get_variable(
             name="hidden_weights",
@@ -371,7 +370,7 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             name="hidden_bias",
             shape=[1, self.params["hidden_dim"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
-        )        
+        )
 
         # Construct second-layer weights
         logistic_weights = tf.get_variable(
@@ -545,31 +544,12 @@ class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
     images from .npy files.
     """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        if train:
-            # load training data
-            test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],  # path to MNIST root folder
-                self.data_params["train_test_retest"],
-                self.data_params["train_size"],
-                True
-            )
-
-        else:
-            # load test/retest data
-            test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],  # path to MNIST root folder
-                self.data_params["test_test_retest"],
-                self.data_params["test_size"],
-                False
-            )
-
-        return tf.estimator.inputs.numpy_input_fn(
-            x={
-                "X_test": test,
-                "X_retest": retest
-            },
-            y=labels,
-            **input_fn_config
+        return mnist_test_retest_input_fn(
+            X=X,
+            y=y,
+            data_params=self.data_params,
+            train=train,
+            input_fn_config=input_fn_config
         )
 
 
@@ -580,29 +560,10 @@ class MnistTestRetestTwoLevelLogisticRegression(
     images from .npy files.
     """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        if train:
-            # load training data
-            test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],  # path to MNIST root folder
-                self.data_params["train_test_retest"],
-                self.data_params["train_size"],
-                True
-            )
-
-        else:
-            # load test/retest data
-            test, retest, labels = mnist_read.load_test_retest(
-                self.data_params["data_path"],  # path to MNIST root folder
-                self.data_params["test_test_retest"],
-                self.data_params["test_size"],
-                False
-            )
-
-        return tf.estimator.inputs.numpy_input_fn(
-            x={
-                "X_test": test,
-                "X_retest": retest
-            },
-            y=labels,
-            **input_fn_config
+        return mnist_test_retest_input_fn(
+            X=X,
+            y=y,
+            data_params=self.data_params,
+            train=train,
+            input_fn_config=input_fn_config
         )
