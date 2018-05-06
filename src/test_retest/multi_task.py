@@ -1,6 +1,7 @@
 import tensorflow as tf
 import abc
 import six
+import copy
 
 
 from src.test_retest.test_retest_base import \
@@ -21,7 +22,7 @@ class SoftTask(object):
         self.prediction_op = None
 
     @abc.abstractmethod
-    def loss(self, last_hidden_layer, targets, params):
+    def compute_loss(self, last_hidden_layer, targets, params):
         """
         Define output layer, loss and predictions. This method
         should also set the operation which outputs predictions.
@@ -52,8 +53,8 @@ class CrossEntropyTask(SoftTask):
         self.n_classes = n_classes
         self.name = "CrossEntropy"
 
-    def loss(self, last_hidden_layer, targets, params):
-        with tf.name_scope("CrossEntropyTask"):
+    def compute_loss(self, last_hidden_layer, targets, params):
+        with tf.variable_scope("CrossEntropyTask"):
             _, _, logits = linear_trafo(
                 last_hidden_layer,
                 self.n_classes,
@@ -71,9 +72,7 @@ class CrossEntropyTask(SoftTask):
                 logits
             )
 
-            self.loss = loss
-
-        return self.loss
+        return loss
 
 
 class TestRetestCrossEntropyTask(SoftTask):
@@ -89,9 +88,9 @@ class TestRetestCrossEntropyTask(SoftTask):
         self.n_classes = n_classes
         self.name = "TestRetestCrossEntropy"
 
-    def loss(self, last_hidden_layer_test, last_hidden_layer_retest,
-             targets, params):
-        with tf.name_scope("TestRetestCrossEntropy"):
+    def compute_loss(self, last_hidden_layer_test, last_hidden_layer_retest,
+                     targets, params):
+        with tf.variable_scope("TestRetestCrossEntropy"):
             w, b, logits = linear_trafo_multiple_input_tensors(
                 [last_hidden_layer_test, last_hidden_layer_retest],
                 self.n_classes,
@@ -100,21 +99,21 @@ class TestRetestCrossEntropyTask(SoftTask):
             )
             logits_test, logits_retest = logits
 
-            self.prediction_test = tf.argmax(
+            prediction_test = tf.argmax(
                 input=logits_test,
                 axis=1,
                 name="predictions_test"
             )
 
-            self.prediction_retest = tf.argmax(
+            prediction_retest = tf.argmax(
                 input=logits_retest,
                 axis=1,
                 name="predictions_retest"
             )
 
-            self.predictions_op = {
-                "preds_test": self.prediction_test,
-                "preds_retest": self.prediction_retest
+            self.prediction_op = {
+                "preds_test": prediction_test,
+                "preds_retest": prediction_retest
             }
 
             loss_test = tf.losses.sparse_softmax_cross_entropy(
@@ -126,9 +125,9 @@ class TestRetestCrossEntropyTask(SoftTask):
                 logits_retest
             )
 
-            self.loss = loss_test + loss_retest
+            loss = loss_test + loss_retest
 
-        return self.loss
+        return loss
 
 
 class TestRetestProbabilityTask(SoftTask):
@@ -144,9 +143,9 @@ class TestRetestProbabilityTask(SoftTask):
         self.name = "TestRetestProbabilityTask"
         self.divergence_func = divergence_func
 
-    def loss(self, last_hidden_layer_test, last_hidden_layer_retest,
-             targets, params):
-        with tf.name_scope("ProbabilityRegularizer"):
+    def compute_loss(self, last_hidden_layer_test, last_hidden_layer_retest,
+                     targets, params):
+        with tf.variable_scope(self.__class__.__name__):
             w, b, logits = linear_trafo_multiple_input_tensors(
                 [last_hidden_layer_test, last_hidden_layer_retest],
                 self.n_classes,
@@ -155,36 +154,42 @@ class TestRetestProbabilityTask(SoftTask):
             )
             logits_test, logits_retest = logits
 
-            self.prediction_test = tf.argmax(
+            prediction_test = tf.argmax(
                 input=logits_test,
                 axis=1,
                 name="predictions_test"
             )
 
-            self.prediction_retest = tf.argmax(
+            prediction_retest = tf.argmax(
                 input=logits_retest,
                 axis=1,
                 name="predictions_retest"
             )
 
-            self.predictions_op = {
-                "preds_test": self.prediction_test,
-                "preds_retest": self.prediction_retest
+            self.prediction_op = {
+                "preds_test": prediction_test,
+                "preds_retest": prediction_retest
             }
 
-            self.probs_test = tf.nn.softmax(logits_test, "probs_test")
-            self.probs_retest = tf.nn.softmax(logits_retest, "probs_retest")
+            probs_test = tf.nn.softmax(
+                logits_test,
+                name="probs_test"
+            )
+            probs_retest = tf.nn.softmax(
+                logits_retest,
+                name="probs_retest"
+            )
 
-            self.loss = regularizer.batch_divergence(
-                self.probs_test,
-                self.probs_retest,
+            loss = regularizer.batch_divergence(
+                probs_test,
+                probs_retest,
                 self.n_classes,
                 self.divergence_func
             )
 
-            self.loss = tf.reduce_mean(self.loss)
+            loss = tf.reduce_mean(loss)
 
-        return self.loss
+        return loss
 
 
 class TestRetestJSDivergenceTask(TestRetestProbabilityTask):
@@ -209,7 +214,7 @@ class MTLSoftSharing(EvaluateEpochsBaseTF):
             *args,
             **kwargs
         )
-        self.tasks = self.define_tasks(tasks)
+        self.task_list = self.define_tasks(tasks)
 
     def define_tasks(self, tasks):
         """
@@ -244,8 +249,17 @@ class MTLSoftSharing(EvaluateEpochsBaseTF):
 
         # Prediction
         predictions = {}
-        for t in self.tasks:
-            predictions[t.name] = t.prediction()
+        for t in self.task_list:
+            dic = t.prediction()
+            t.prediction_op = None  # Make object pickable
+            for k in dic:
+                predictions[t.name + "_" + k] = dic[k]
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -272,9 +286,18 @@ class MTLSoftSharing(EvaluateEpochsBaseTF):
             )
 
         # Evaluation
+        # Accuracy metrics
+        eval_metric_ops = {}
+        for k in predictions:
+            eval_metric_ops["acc_" + k] = tf.metrics.accuracy(
+                labels,
+                predictions[k]
+            )
+
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=loss
+            loss=loss,
+            eval_metric_ops=eval_metric_ops
         )
 
 
@@ -284,17 +307,17 @@ class MLTSoftTestRetest(MTLSoftSharing):
         layers = self.shared_layers(features, params)
         last_shared_layer_test, last_shared_layer_retest = layers[-1]
 
-        losses = [t.loss(last_shared_layer_test, last_shared_layer_retest,
-                  labels, params) for t in self.tasks]
+        losses = [task.compute_loss(last_shared_layer_test,
+                  last_shared_layer_retest, labels, params)
+                  for task in self.task_list]
 
         # Prediction
         predictions = {}
-        for t in self.tasks:
+        for t in self.task_list:
             dic = t.prediction()
+            t.prediction_op = None  # Make object pickable
             for k in dic:
-                k = t.name + "_" + k
-
-            predictions.update(predictions)
+                predictions[t.name + "_" + k] = dic[k]
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -321,16 +344,34 @@ class MLTSoftTestRetest(MTLSoftSharing):
             )
 
         # Evaluation
+        # Accuracy metrics
+        eval_metric_ops = {}
+        for k in predictions:
+            eval_metric_ops["acc_" + k] = tf.metrics.accuracy(
+                labels,
+                predictions[k]
+            )
+
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=loss
+            loss=loss,
+            eval_metric_ops=eval_metric_ops
         )
 
 
-class MnistMLTSoftTestRetest(MLTSoftTestRetest):
+class MnistMLTSoftTestRetestNoBody(MLTSoftTestRetest):
     def shared_layers(self, features, params):
-        exit("Not implemented")
-        pass
+        input_layer_test = tf.reshape(
+            features["X_test"],
+            [-1, self.params["input_dim"]]
+        )
+
+        input_layer_retest = tf.reshape(
+            features["X_retest"],
+            [-1, self.params["input_dim"]]
+        )
+
+        return [(input_layer_test, input_layer_retest)]
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return mnist_test_retest_input_fn(

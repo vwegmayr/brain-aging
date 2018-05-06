@@ -110,7 +110,7 @@ def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
     )
 
 
-def linear_trafo(self, X, out_dim, names):
+def linear_trafo(X, out_dim, names):
     input_dim = X.get_shape()[1]
     w = tf.get_variable(
         name=names[0],
@@ -120,7 +120,7 @@ def linear_trafo(self, X, out_dim, names):
 
     b = tf.get_variable(
         name=names[1],
-        shape=[1, self.n_classes],
+        shape=[1, out_dim],
         initializer=tf.contrib.layers.xavier_initializer(seed=43)
     )
 
@@ -133,8 +133,22 @@ def linear_trafo(self, X, out_dim, names):
     return w, b, Y
 
 
-def linear_trafo_multiple_input_tensors(self, Xs, out_dim, weight_names,
+def linear_trafo_multiple_input_tensors(Xs, out_dim, weight_names,
                                         output_names):
+    """
+    Performs a linear transformation with bias on all the input tensors.
+
+    Args:
+        - Xs: list of input tensors
+        - out_dim: dimensionality of output
+        - weight_names: names assigned to created weights
+        - output_names: names assigned to output tensors
+
+    Return:
+        - w: created weighted matrix
+        - b: created bias
+        - Ys: list of output tensors
+    """
     input_dim = Xs[0].get_shape()[1]
     w = tf.get_variable(
         name=weight_names[0],
@@ -144,7 +158,7 @@ def linear_trafo_multiple_input_tensors(self, Xs, out_dim, weight_names,
 
     b = tf.get_variable(
         name=weight_names[1],
-        shape=[1, self.n_classes],
+        shape=[1, out_dim],
         initializer=tf.contrib.layers.xavier_initializer(seed=43)
     )
 
@@ -231,4 +245,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             sys.stdout.flush()
 
     def score(self, X, y):
+        pass
+
+    def export_estimator(self):
         pass
