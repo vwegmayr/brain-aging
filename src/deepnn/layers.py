@@ -35,7 +35,7 @@ class DeepNNLayers(object):
             'batch_norm', 'batch_renorm',
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
-            'apply_gaussian',
+            'apply_gaussian', 'conv2d_shared_all_dims_layer',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
