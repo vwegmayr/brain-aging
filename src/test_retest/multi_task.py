@@ -1,7 +1,7 @@
 import tensorflow as tf
 import abc
 import six
-import copy
+import os
 
 
 from src.test_retest.test_retest_base import \
@@ -10,6 +10,7 @@ from src.test_retest.test_retest_base import \
     linear_trafo_multiple_input_tensors, \
     mnist_test_retest_input_fn
 import src.test_retest.regularizer as regularizer
+from src.train_hooks import ConfusionMatrixHook
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -87,6 +88,7 @@ class TestRetestCrossEntropyTask(SoftTask):
         )
         self.n_classes = n_classes
         self.name = "TestRetestCrossEntropy"
+        self.hooks = None
 
     def compute_loss(self, last_hidden_layer_test, last_hidden_layer_retest,
                      targets, params):
@@ -132,9 +134,13 @@ class TestRetestCrossEntropyTask(SoftTask):
 
 class TestRetestProbabilityTask(SoftTask):
     """
-    Computes some loss on predicted probabilities
+    Computes some loss on predicted probabilities. Also provides the
+    addition of the cross-entropy loss and thereby forcing to output
+    'correct' probabilities. Otherwise this task may predict probabilities
+    independent of the true labels.
     """
-    def __init__(self, n_classes, divergence_func, *args, **kwargs):
+    def __init__(self, n_classes, divergence_func, cross_entropy=True,
+                 cross_entropy_weight=0.2, *args, **kwargs):
         super(TestRetestProbabilityTask, self).__init__(
             *args,
             **kwargs
@@ -142,6 +148,8 @@ class TestRetestProbabilityTask(SoftTask):
         self.n_classes = n_classes
         self.name = "TestRetestProbabilityTask"
         self.divergence_func = divergence_func
+        self.cross_entropy = cross_entropy
+        self.cross_entropy_weight = cross_entropy_weight
 
     def compute_loss(self, last_hidden_layer_test, last_hidden_layer_retest,
                      targets, params):
@@ -188,6 +196,18 @@ class TestRetestProbabilityTask(SoftTask):
             )
 
             loss = tf.reduce_mean(loss)
+
+            if self.cross_entropy:
+                cross_test = tf.losses.sparse_softmax_cross_entropy(
+                    targets,
+                    logits_test
+                )
+                cross_retest = tf.losses.sparse_softmax_cross_entropy(
+                    targets,
+                    logits_retest
+                )
+
+                loss += self.cross_entropy_weight * (cross_test + cross_retest)
 
         return loss
 
@@ -244,7 +264,7 @@ class MTLSoftSharing(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
         layers = self.shared_layers(features, params)
         last_shared_layer = layers[-1]
-        losses = [t.loss(last_shared_layer, labels, params)
+        losses = [t.weight * t.loss(last_shared_layer, labels, params)
                   for t in self.tasks]
 
         # Prediction
@@ -307,17 +327,26 @@ class MLTSoftTestRetest(MTLSoftSharing):
         layers = self.shared_layers(features, params)
         last_shared_layer_test, last_shared_layer_retest = layers[-1]
 
-        losses = [task.compute_loss(last_shared_layer_test,
+        losses = [t.weight * t.compute_loss(last_shared_layer_test,
                   last_shared_layer_retest, labels, params)
-                  for task in self.task_list]
+                  for t in self.task_list]
 
         # Prediction
         predictions = {}
+        cross_entropy_predictions = []
         for t in self.task_list:
+
             dic = t.prediction()
             t.prediction_op = None  # Make object pickable
             for k in dic:
                 predictions[t.name + "_" + k] = dic[k]
+            if isinstance(t, TestRetestCrossEntropyTask):
+                keys = list(dic.keys())
+                assert len(keys) == 2
+                if keys[0].endswith("retest"):
+                    cross_entropy_predictions = [dic[keys[1]], dic[keys[0]]]
+                else:
+                    cross_entropy_predictions = [dic[keys[0]], dic[keys[1]]]
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -351,11 +380,22 @@ class MLTSoftTestRetest(MTLSoftSharing):
                 labels,
                 predictions[k]
             )
+        # Confusion matrix hook
+        eval_hooks = []
+        if len(cross_entropy_predictions) > 0:
+            confusion_hook = ConfusionMatrixHook(
+                cross_entropy_predictions[0],
+                cross_entropy_predictions[1],
+                params["n_classes"],
+                os.path.join(self.save_path, "confusion")
+            )
+            eval_hooks.append(confusion_hook)
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops
+            eval_metric_ops=eval_metric_ops,
+            evaluation_hooks=eval_hooks
         )
 
 
@@ -381,3 +421,25 @@ class MnistMLTSoftTestRetestNoBody(MLTSoftTestRetest):
             train=train,
             input_fn_config=input_fn_config
         )
+
+
+class MnistMLTSoftTestRetestLinearBody(MnistMLTSoftTestRetestNoBody):
+    def shared_layers(self, features, params):
+        input_layer_test = tf.reshape(
+            features["X_test"],
+            [-1, self.params["input_dim"]]
+        )
+
+        input_layer_retest = tf.reshape(
+            features["X_retest"],
+            [-1, self.params["input_dim"]]
+        )
+
+        w, b, hidden = linear_trafo_multiple_input_tensors(
+            Xs=[input_layer_test, input_layer_retest],
+            out_dim=params["hidden_dim"],
+            weight_names=["weight", "bias"],
+            output_names=["hidden_test", "hidden_retest"]
+        )
+
+        return [(input_layer_test, input_layer_retest), (hidden[0], hidden[1])]
