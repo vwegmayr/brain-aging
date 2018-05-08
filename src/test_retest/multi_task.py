@@ -206,7 +206,6 @@ class TestRetestProbabilityTask(SoftTask):
                     targets,
                     logits_retest
                 )
-
                 loss += self.cross_entropy_weight * (cross_test + cross_retest)
 
         return loss

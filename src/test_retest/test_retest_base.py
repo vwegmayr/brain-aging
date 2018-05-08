@@ -40,7 +40,7 @@ def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
         values=kl_std
     )
 
-    # Compute KL-divergence between test and retest probs
+    # Compute JS-divergence between test and retest probs
     js_divergences = regularizer.batch_divergence(
         probs_test,
         probs_retest,
@@ -48,12 +48,12 @@ def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
         regularizer.js_divergence
     )
 
-    # mean KL-divergence
+    # mean JS-divergence
     eval_js_mean = tf.metrics.mean(
         values=js_divergences
     )
 
-    # std KL-divergence
+    # std JS-divergence
     _, js_std = tf.nn.moments(js_divergences, axes=[0])
     eval_js_std = tf.metrics.mean(
         values=js_std
