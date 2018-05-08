@@ -1,5 +1,4 @@
 import tensorflow as tf
-#from tensorflow.contrib.layers import xavier_initializer
 import os
 
 
@@ -25,13 +24,16 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
         f_retest = input_retest
         hidden_sizes = params["hidden_layer_sizes"]
 
+        predictions = {}
+
         for i, s in enumerate(hidden_sizes):
+            name = "layer_" + str(i)
             f_test = tf.layers.dense(
                 f_test,
                 units=s,
                 activation=tf.nn.relu,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
-                name="layer_" + str(i)
+                name=name
             )
 
             f_retest = tf.layers.dense(
@@ -39,9 +41,14 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 units=s,
                 activation=tf.nn.relu,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
-                name="layer_" + str(i),
+                name=name,
                 reuse=True
             )
+
+            predictions.update({
+                "hidden_features_test_" + name: f_test,
+                "hidden_features_retest_" + name: f_retest
+            })
 
         n_classes = params["n_classes"]
         logits_test = tf.layers.dense(
@@ -61,13 +68,13 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
         preds_test = tf.argmax(logits_test, axis=1, name="pred_test")
         preds_retest = tf.argmax(logits_retest, axis=1, name="pred_retest")
 
-        probs_test = tf.nn.softmax(logits_test, name="probs_test")
-        probs_retest = tf.nn.softmax(logits_retest, name="probs_retest")
-
-        predictions = {
+        predictions.update({
             "classes_test": preds_test,
             "classes_retest": preds_retest
-        }
+        })
+
+        probs_test = tf.nn.softmax(logits_test, name="probs_test")
+        probs_retest = tf.nn.softmax(logits_retest, name="probs_retest")
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
