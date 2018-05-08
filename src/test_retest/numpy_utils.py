@@ -55,6 +55,8 @@ def ICC_C1(Y):
     k = Y.shape[1]
     MSR = MS_R(Y)
     MSE = MS_E(Y)
+    if MSR == 0 and MSE == 0:
+        return 1
 
     return (MSR - MSE) / (MSR + (k - 1) * MSE)
 
