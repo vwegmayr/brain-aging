@@ -346,8 +346,6 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
         return input_layer, hidden_features, logits, probs, preds
 
     def model_fn(self, features, labels, mode, params):
-        print(labels)
-        print(features)
         # Construct first-layer weights
         hidden_weights = tf.get_variable(
             name="hidden_weights",
@@ -444,8 +442,25 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
 
         reg_f *= params["lambda_f"]
 
+        # output regularization
+        key = "output_regularizer"
+        if params[key] is None:
+            reg_out = 0
+        elif params[key] == "js_divergence":
+            reg_out = regularizer.batch_divergence(
+                probs_test,
+                probs_retest,
+                params["n_classes"],
+                regularizer.kl_divergence
+            )
+            reg_out = tf.reduce_mean(reg_out)
+        else:
+            raise ValueError("Regularizer not found")
+
+        reg_out *= params["lambda_o"]
+
         # Training
-        loss = loss_test + loss_retest + reg_f
+        loss = loss_test + loss_retest + reg_f + reg_out
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
