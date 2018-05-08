@@ -315,6 +315,16 @@ class ClassificationHead(NetworkHeadBase):
 
 
 class ClassificationSVMHead(ClassificationHead):
+    def __init__(
+        self,
+        svm_reg_coeff=5.0,
+        svm_force_w_symmetry_axis=[],
+        **kwargs
+    ):
+        self.svm_reg_coeff = svm_reg_coeff
+        self.svm_force_w_symmetry_axis = svm_force_w_symmetry_axis
+        super(ClassificationSVMHead, self).__init__(**kwargs)
+
     """
     Does one-versus-rest classification using SVM loss
     """
@@ -323,11 +333,7 @@ class ClassificationSVMHead(ClassificationHead):
         last_layer,
         weights_per_class,
     ):
-        SVM_C_CONST = 5 #0.00001
-
-        # Get features
-        ft_in = np.prod(last_layer.get_shape().as_list()[1:])
-        features = tf.reshape(last_layer, [tf.shape(last_layer)[0], ft_in])
+        SVM_REG_CONST = self.svm_reg_coeff
 
         all_predictions = []
         all_loss = tf.constant(0.0)
@@ -335,17 +341,17 @@ class ClassificationSVMHead(ClassificationHead):
             ft_shortname = all_features.feature_info[ft_name]['shortname']
             with tf.variable_scope('%s_vs_rest' % (ft_shortname)):
                 # Prediction and loss
-                predictions, W = self.build_svm_layer(features)
+                predictions, W = self.build_svm_layer(last_layer)
                 weighted_loss_per_sample = tf.losses.hinge_loss(
                     tf.cast(self.labels[:, i], tf.float32),
                     tf.reshape(predictions, [-1]),
                     reduction=tf.losses.Reduction.NONE,
-                    weights=tf.reduce_sum(
-                        tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                    weights=tf.reduce_sum(tf.cast(
+                        self.labels, tf.float32) * weights_per_class, 1,
                     ),
                 )
                 w_l2 = 0.5 * tf.reduce_sum(tf.square(W))
-                reg_loss = SVM_C_CONST * w_l2
+                reg_loss = SVM_REG_CONST * w_l2
                 hinge_loss = tf.reduce_mean(weighted_loss_per_sample)
                 loss = hinge_loss + reg_loss
                 self.metrics.update({
@@ -359,12 +365,15 @@ class ClassificationSVMHead(ClassificationHead):
                 all_loss += loss
         return tf.concat(all_predictions, 1), all_loss, None
 
-    def build_svm_layer(self, features):
-        ft_in = features.get_shape().as_list()[1]
-        W = tf.Variable(tf.zeros([ft_in, 1]), name="svm_w")
+    def build_svm_layer(self, last_layer):
+        in_shape = last_layer.get_shape().as_list()[1:]
+        W = tf.Variable(tf.zeros(in_shape), name="svm_w")
         b = tf.Variable(tf.zeros([1]), name="svm_b")
-        y_raw = tf.matmul(features, W) + b
-        return y_raw, W
+        if len(self.svm_force_w_symmetry_axis) > 0:
+            W = 0.5 * (W + tf.reverse(W, self.svm_force_w_symmetry_axis))
+        reduction_axis = range(1, len(in_shape) + 1)
+        y_raw = tf.reduce_sum(last_layer * W, axis=reduction_axis) + b
+        return tf.reshape(y_raw, [-1, 1]), W
 
     def get_tags(self):
         tags = super(ClassificationSVMHead, self).get_tags()
