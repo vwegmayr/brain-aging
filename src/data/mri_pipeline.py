@@ -9,8 +9,10 @@ import nibabel as nib
 from modules.models.utils import custom_print
 
 
-def xml_elem_unique(root, path):
+def xml_elem_unique(root, path, allowNone=False):
     e = root.findall(path)
+    if len(e) == 0 and allowNone:
+        return None
     assert(len(e) == 1)
     return e[0].text
 
@@ -91,7 +93,7 @@ class MriPreprocessingPipeline(object):
 
             pass_all_filters = True
             for filter in filters:
-                value = xml_elem_unique(root, filter['key'])
+                value = xml_elem_unique(root, filter['key'], allowNone=True)
                 if not filters_match(value, filter['value']):
                     pass_all_filters = False
                     break
