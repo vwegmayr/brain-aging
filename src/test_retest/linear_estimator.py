@@ -39,19 +39,10 @@ class LogisticRegression(EvaluateEpochsBaseTF):
 
         probs = tf.nn.softmax(logits)
         preds = tf.argmax(input=logits, axis=1)
-        accuracy = tf.reduce_mean(
-            tf.cast(tf.equal(preds, labels), tf.float32),
-            name="acc_tensor"
-        )
 
         predictions = {
             "classes": preds,
-            "probs": probs,
-            "accuracy": accuracy
-        }
-
-        metric_ops = {
-            'accuracy': tf.metrics.accuracy(labels=labels, predictions=preds)
+            "probs": probs
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -59,6 +50,10 @@ class LogisticRegression(EvaluateEpochsBaseTF):
                 mode=mode,
                 predictions=predictions
             )
+
+        metric_ops = {
+            'accuracy': tf.metrics.accuracy(labels=labels, predictions=preds)
+        }
 
         # Training
         loss = tf.losses.sparse_softmax_cross_entropy(
@@ -142,12 +137,8 @@ class TestRetestLogisticRegression(LogisticRegression):
 
         probs = tf.nn.softmax(logits, name="probabilities")
         preds = tf.argmax(input=logits, axis=1, name="predictions")
-        accuracy = tf.reduce_mean(
-            tf.cast(tf.equal(preds, labels), tf.float32),
-            name="accuracy"
-        )
 
-        return input_layer, logits, probs, preds, accuracy
+        return input_layer, logits, probs, preds
 
     def model_fn(self, features, labels, mode, params):
         # Prediction
@@ -166,8 +157,8 @@ class TestRetestLogisticRegression(LogisticRegression):
         )
 
         with tf.name_scope("test"):
-            input_test, logits_test, probs_test, preds_test, \
-                acc_test = self.prediction_nodes(
+            input_test, logits_test, probs_test, preds_test = \
+                self.prediction_nodes(
                     features["X_test"],
                     labels,
                     params,
@@ -176,8 +167,8 @@ class TestRetestLogisticRegression(LogisticRegression):
                 )
 
         with tf.name_scope("retest"):
-            input_retest, logits_retest, probs_retest, preds_retest, \
-                acc_retest = self.prediction_nodes(
+            input_retest, logits_retest, probs_retest, preds_retest = \
+                self.prediction_nodes(
                     features["X_retest"],
                     labels,
                     params,
@@ -335,7 +326,7 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
         """
         input_layer = tf.reshape(
             features_tensor,
-            [-1, self.params["input_dim"]]
+            [-1, params["input_dim"]]
         )
 
         hidden_features = tf.add(
@@ -351,43 +342,41 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
 
         probs = tf.nn.softmax(logits, name="probabilities")
         preds = tf.argmax(input=logits, axis=1, name="predictions")
-        accuracy = tf.reduce_mean(
-            tf.cast(tf.equal(preds, labels), tf.float32),
-            name="accuracy"
-        )
 
-        return input_layer, hidden_features, logits, probs, preds, accuracy
+        return input_layer, hidden_features, logits, probs, preds
 
     def model_fn(self, features, labels, mode, params):
+        print(labels)
+        print(features)
         # Construct first-layer weights
         hidden_weights = tf.get_variable(
             name="hidden_weights",
-            shape=[self.params["input_dim"], self.params["hidden_dim"]],
+            shape=[params["input_dim"], params["hidden_dim"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
         hidden_bias = tf.get_variable(
             name="hidden_bias",
-            shape=[1, self.params["hidden_dim"]],
+            shape=[1, params["hidden_dim"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
         # Construct second-layer weights
         logistic_weights = tf.get_variable(
             name="logistic_weights",
-            shape=[self.params["hidden_dim"], self.params["n_classes"]],
+            shape=[params["hidden_dim"], params["n_classes"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
         logistic_bias = tf.get_variable(
             name="logistic_bias",
-            shape=[1, self.params["n_classes"]],
+            shape=[1, params["n_classes"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
         with tf.name_scope("test"):
             input_test, hidden_features_test, logits_test, probs_test, \
-                preds_test, acc_test = self.prediction_nodes(
+                preds_test = self.prediction_nodes(
                     features["X_test"],
                     labels,
                     params,
@@ -399,7 +388,7 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
 
         with tf.name_scope("retest"):
             input_retest, hidden_features_retest, logits_retest, probs_retest,\
-                preds_retest, acc_retest = self.prediction_nodes(
+                preds_retest = self.prediction_nodes(
                     features["X_retest"],
                     labels,
                     params,
@@ -411,7 +400,9 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
 
         predictions = {
             "classes_test": preds_test,
-            "classes_retest": preds_retest
+            "classes_retest": preds_retest,
+            "hidden_features_test": hidden_features_test,
+            "hidden_features_retest": hidden_features_retest
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
