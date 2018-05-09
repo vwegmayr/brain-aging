@@ -442,3 +442,35 @@ class MnistMLTSoftTestRetestLinearBody(MnistMLTSoftTestRetestNoBody):
         )
 
         return [(input_layer_test, input_layer_retest), (hidden[0], hidden[1])]
+
+
+class MnistMLTSoftTestRetestNonLinearBody(MnistMLTSoftTestRetestNoBody):
+    def shared_layers(self, features, params):
+        input_layer_test = tf.reshape(
+            features["X_test"],
+            [-1, self.params["input_dim"]]
+        )
+
+        input_layer_retest = tf.reshape(
+            features["X_retest"],
+            [-1, self.params["input_dim"]]
+        )
+
+        f_test = tf.layers.dense(
+            input_layer_test,
+            units=self.params["hidden_dim"],
+            activation=tf.nn.relu,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
+            name="layer_0"
+        )
+
+        f_retest = tf.layers.dense(
+            input_layer_retest,
+            units=self.params["hidden_dim"],
+            activation=tf.nn.relu,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
+            name="layer_0",
+            reuse=True
+        )
+
+        return [(input_layer_test, input_layer_retest), (f_test, f_retest)]
