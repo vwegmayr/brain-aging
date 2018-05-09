@@ -1,5 +1,6 @@
 import tensorflow as tf
 import sys
+import os
 
 
 from modules.models.base import BaseTF
@@ -7,6 +8,7 @@ from modules.models.utils import custom_print
 from src.logging import MetricLogger
 import src.test_retest.regularizer as regularizer
 from src.data.mnist import read as mnist_read
+from src.train_hooks import ConfusionMatrixHook, ICCHook
 
 
 def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
@@ -184,7 +186,8 @@ class EvaluateEpochsBaseTF(BaseTF):
         config,
         params,
         data_params,
-        sumatra_params=None
+        sumatra_params=None,
+        hooks=None
     ):
         """
         Args:
@@ -204,6 +207,7 @@ class EvaluateEpochsBaseTF(BaseTF):
         )
         self.data_params = data_params
         self.sumatra_params = sumatra_params
+        self.hooks = hooks
 
     def fit_main_training_loop(self, X, y):
         n_epochs = self.input_fn_config["num_epochs"]
@@ -243,6 +247,37 @@ class EvaluateEpochsBaseTF(BaseTF):
             # persist evaluations to json file
             self.metric_logger.dump()
             sys.stdout.flush()
+
+    def get_hooks(self, preds_test, preds_retest, features_test,
+                  features_retest):
+        hooks = []
+
+        if self.hooks is None:
+            return hooks
+
+        if ("icc_c1" in self.hooks) and (self.hooks["icc_c1"]):
+            hook = ICCHook(
+                icc_op=regularizer.per_feature_batch_ICC(
+                    features_test,
+                    features_retest,
+                    regularizer.ICC_C1
+                ),
+                out_dir=os.path.join(self.save_path, "icc"),
+                icc_name="ICC_C1"
+            )
+            hooks.append(hook)
+
+        if ("confusion_matrix" in self.hooks) and \
+                (self.hooks["confusion_matrix"]):
+            hook = ConfusionMatrixHook(
+                preds_test,
+                preds_retest,
+                self.params["n_classes"],
+                os.path.join(self.save_path, "confusion")
+            )
+            hooks.append(hook)
+
+        return hooks
 
     def score(self, X, y):
         pass

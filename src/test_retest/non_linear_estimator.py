@@ -26,6 +26,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
 
         predictions = {}
 
+        # Construct hidden layers
         for i, s in enumerate(hidden_sizes):
             name = "layer_" + str(i)
             f_test = tf.layers.dense(
@@ -45,11 +46,13 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 reuse=True
             )
 
+            # Allows computation of activations when loading a trained model
             predictions.update({
                 "hidden_features_test_" + name: f_test,
                 "hidden_features_retest_" + name: f_retest
             })
 
+        # Compute logits and predictions
         n_classes = params["n_classes"]
         logits_test = tf.layers.dense(
             f_test,
@@ -70,11 +73,16 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
 
         predictions.update({
             "classes_test": preds_test,
-            "classes_retest": preds_retest
+            "classes_retest": preds_retest,
         })
 
         probs_test = tf.nn.softmax(logits_test, name="probs_test")
         probs_retest = tf.nn.softmax(logits_retest, name="probs_retest")
+
+        predictions.update({
+            "probs_test": probs_test,
+            "probs_retest": probs_retest 
+        })
 
         if mode == tf.estimator.ModeKeys.PREDICT:
             return tf.estimator.EstimatorSpec(
@@ -133,14 +141,12 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
             )
 
         # Evaluation
-        eval_hooks = []
-        confusion_hook = ConfusionMatrixHook(
-            preds_test,
-            preds_retest,
-            params["n_classes"],
-            os.path.join(self.save_path, "confusion")
+        eval_hooks = self.get_hooks(
+            preds_test=preds_test,
+            preds_retest=preds_retest,
+            features_test=f_test,
+            features_retest=f_retest
         )
-        eval_hooks.append(confusion_hook)
 
         return test_retest_evaluation_spec(
             labels=labels,

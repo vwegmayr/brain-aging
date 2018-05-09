@@ -277,11 +277,12 @@ class TestRetestLogisticRegression(LogisticRegression):
                 train_op=train_op
             )
 
-        confusion_hook = ConfusionMatrixHook(
-            preds_test,
-            preds_retest,
-            params["n_classes"],
-            os.path.join(self.save_path, "confusion")
+        # Evaluation
+        eval_hooks = self.get_hooks(
+            preds_test=preds_test,
+            preds_retest=preds_retest,
+            features_test=None,
+            features_retest=None
         )
         # Evaluation
         return test_retest_evaluation_spec(
@@ -293,7 +294,7 @@ class TestRetestLogisticRegression(LogisticRegression):
             probs_retest=probs_retest,
             params=params,
             mode=mode,
-            evaluation_hooks=[confusion_hook]
+            evaluation_hooks=eval_hooks
         )
 
 
@@ -474,21 +475,11 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             )
 
         # Evaluation
-        confusion_hook = ConfusionMatrixHook(
-            preds_test,
-            preds_retest,
-            params["n_classes"],
-            os.path.join(self.save_path, "confusion")
-        )
-
-        icc_hook = ICCHook(
-            icc_op=regularizer.per_feature_batch_ICC(
-                hidden_features_test,
-                hidden_features_retest,
-                regularizer.ICC_C1
-            ),
-            out_dir=os.path.join(self.save_path, "icc"),
-            icc_name="ICC_C1"
+        eval_hooks = self.get_hooks(
+            preds_test=preds_test,
+            preds_retest=preds_retest,
+            features_test=hidden_features_test,
+            features_retest=hidden_features_retest
         )
 
         return test_retest_evaluation_spec(
@@ -500,7 +491,7 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             probs_retest=probs_retest,
             params=params,
             mode=mode,
-            evaluation_hooks=[confusion_hook, icc_hook]
+            evaluation_hooks=eval_hooks
         )
 
 

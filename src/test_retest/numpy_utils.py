@@ -82,3 +82,20 @@ def per_feature_ICC(test, retest, icc_func):
         iccs.append(icc)
 
     return np.array(iccs)
+
+
+def kl_divergence(p, q, eps=0.000001):
+    p += eps
+    p = p / np.sum(p)
+
+    q += eps
+    q = q / np.sum(q)
+
+    return - np.sum(p * np.log(q / p))
+
+
+def js_divergence(p, q, eps=0.000001):
+    m = 0.5 * (p + q)
+    js = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+
+    return js
