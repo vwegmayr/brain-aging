@@ -9,6 +9,26 @@ from src.train_hooks import ConfusionMatrixHook
 from src.test_retest.test_retest_base import mnist_test_retest_input_fn
 
 
+def name_to_regularization(layer_id, reg_name, activations_test,
+                           activations_retest):
+    if reg_name == regularizer.JS_DIVERGENCE_LABEL:
+        s_test = tf.nn.softmax(
+            activations_test,
+            name=str(layer_id) + "_softmax_test"
+        )
+        s_retest = tf.nn.softmax(
+            activations_retest,
+            name=str(layer_id) + "_softmax_retest"
+        )
+        return regularizer.js_divergence(s_test, s_retest)
+    elif reg_name == regularizer.L2_SQUARED_LABEL:
+        return regularizer.l2_squared_mean_batch(
+                    activations_test - activations_retest
+               )
+    else:
+        raise ValueError("regularization name '{}' is unknown".format(reg_name))
+
+
 class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
         input_test = tf.reshape(
@@ -23,9 +43,12 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
         f_test = input_test
         f_retest = input_retest
         hidden_sizes = params["hidden_layer_sizes"]
+        hidden_regs = params["hidden_layer_regularizers"]
+        hidden_lambdas = params["hidden_lambdas"]
 
         predictions = {}
 
+        loss_f = 0
         # Construct hidden layers
         for i, s in enumerate(hidden_sizes):
             name = "layer_" + str(i)
@@ -45,6 +68,17 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 name=name,
                 reuse=True
             )
+
+            # Optional Regularization
+            if hidden_lambdas[i] != 0:
+                print("regularization on layer {}".format(i))
+                hidden_loss = name_to_regularization(
+                    layer_id=i,
+                    reg_name=hidden_regs[i],
+                    activations_test=f_test,
+                    activations_retest=f_retest
+                )
+                loss_f += hidden_lambdas[i] * hidden_loss
 
             # Allows computation of activations when loading a trained model
             predictions.update({
@@ -126,7 +160,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
 
         loss_o = params["lambda_o"] * loss_o
 
-        loss = loss_test + loss_retest + loss_o
+        loss = loss_test + loss_retest + loss_o + loss_f
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]

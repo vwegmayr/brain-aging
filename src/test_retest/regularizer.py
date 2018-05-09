@@ -1,6 +1,11 @@
 import tensorflow as tf
 
 
+# Labels for regularizers
+JS_DIVERGENCE_LABEL = "js_divergence"
+L2_SQUARED_LABEL = "l2_sq"
+
+
 # Traditional norm regularizers
 def l1(weights, name):
     return tf.reduce_sum(tf.abs(weights), name=name)
@@ -8,6 +13,10 @@ def l1(weights, name):
 
 def l2_squared(weights, name):
     return tf.reduce_sum(tf.square(weights), name=name)
+
+
+def l2_squared_mean_batch(weights, name):
+    return tf.reduce_mean(tf.reduce_sum(tf.square(weights), axis=1), name=name)
 
 
 def l2(weights, name):
