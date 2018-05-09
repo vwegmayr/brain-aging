@@ -75,6 +75,7 @@ def plot_groups(groups):
     # generate color for each group
     # color = iter(plt.cm.jet(np.linspace(0, 1, len(groups))))
     color = iter(plt.cm.tab10(np.linspace(0, 1, 11)))
+    plt.figure(figsize=(6,4))
 
     for group in groups:
         for r in group:
@@ -87,6 +88,10 @@ def plot_groups(groups):
             print("group of size {}".format(len(group)))
             print(",".join([g.label for g in group]))
             r = group[0]
+            
+            if m not in r.metrics:
+                continue
+            
             # Extract group label
             legend_label = ",".join([r.find_tag(x) for x in PLOT_TAG_LABEL])
             # x-label for plot
@@ -112,9 +117,9 @@ def plot_groups(groups):
             plt.plot(x, mean + std, c=c, linestyle="--", linewidth=0.5)
             handles.append(line)
 
-        plt.legend(loc=4, ncol=1)
-        plt.grid(True)
-        plt.show()
+    plt.legend(loc=4, ncol=1)
+    plt.grid(True)
+    plt.show()
 
 
 def main():
