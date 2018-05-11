@@ -36,7 +36,7 @@ class DeepNNLayers(object):
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
             'apply_gaussian', 'conv2d_shared_all_dims_layer',
-            'random_crop',
+            'random_crop', 'local_norm_image',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -405,6 +405,27 @@ class DeepNNLayers(object):
             padding='SAME',
         )
 
+    def dropout(self, x, prob):
+        if not self.is_training:
+            return x
+        return tf.nn.dropout(x, keep_prob=prob)
+
+    def random_crop(self, x, new_shape=None, new_shape_ratio=None):
+        if new_shape is not None:
+            assert(new_shape_ratio is None)
+        elif new_shape_ratio is not None:
+            new_shape = x.get_shape().as_list()
+            for i, ratio in enumerate(new_shape_ratio):
+                new_shape[-i-1] = int(new_shape[-i-1] * ratio)
+        else:
+            assert(False)
+
+        return tf.random_crop(
+            x,
+            new_shape,
+        )
+
+    # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
         smoothed_x = self.apply_gaussian(
             x,
@@ -480,26 +501,13 @@ class DeepNNLayers(object):
             # 3. Image normalization again
             return self.normalize_image(x)
 
-    def dropout(self, x, prob):
-        if not self.is_training:
-            return x
-        return tf.nn.dropout(x, keep_prob=prob)
-
-    def random_crop(self, x, new_shape=None, new_shape_ratio=None):
-        if new_shape is not None:
-            assert(new_shape_ratio is None)
-        elif new_shape_ratio is not None:
-            new_shape = x.get_shape().as_list()
-            for i, ratio in enumerate(new_shape_ratio):
-                new_shape[-i-1] = int(new_shape[-i-1] * ratio)
-        else:
-            assert(False)
-
-        return tf.random_crop(
-            x,
-            new_shape,
-        )
-
     def normalize_image(self, x):
         mean, var = tf.nn.moments(x, axes=[1, 2, 3, 4], keep_dims=True)
         return (x - mean) / tf.sqrt(var + 0.0001)
+
+    def local_norm_image(self, x, gaussian_params={}, div_eps=1.):
+        # Increase 'div_eps' to hide noisy details in smooth areas
+        img_gauss = self.apply_gaussian(x, gaussian_params)
+        img_sq_gauss = self.apply_gaussian(x ** 2, gaussian_params)
+        img_std = img_sq_gauss - img_gauss ** 2
+        return (x - img_gauss) / tf.sqrt(img_std + div_eps)
