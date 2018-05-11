@@ -23,7 +23,7 @@ class Model(DeepNNLayers):
             filter_size,
             strides=[2, 2, 2],
             bn=False,
-            scope=name,
+            name=name,
             padding='SAME',
         )
         if log:

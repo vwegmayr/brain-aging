@@ -386,7 +386,9 @@ class DeepNNLayers(object):
             **kwargs
         )
 
-    def apply_gaussian(self, x, kernel_half_size, sigma):
+    def apply_gaussian(self, x, sigma, kernel_half_size=None):
+        if kernel_half_size is None:
+            kernel_half_size = int(4 * sigma)
         dim_size = kernel_half_size * 2 + 1
         fx, fy, fz = np.mgrid[
             -kernel_half_size:kernel_half_size+1,
@@ -414,16 +416,23 @@ class DeepNNLayers(object):
         if new_shape is not None:
             assert(new_shape_ratio is None)
         elif new_shape_ratio is not None:
-            new_shape = x.get_shape().as_list()
+            new_shape = x.get_shape().as_list()[1:]
             for i, ratio in enumerate(new_shape_ratio):
-                new_shape[-i-1] = int(new_shape[-i-1] * ratio)
+                new_shape[i] = int(new_shape[i] * ratio)
         else:
             assert(False)
+        new_shape = tf.convert_to_tensor(new_shape)
+        new_shape = tf.concat([[tf.shape(x)[0]], new_shape], 0)
 
-        return tf.random_crop(
+        out = tf.random_crop(
             x,
             new_shape,
         )
+        self.print_shape('%s -> [random_crop] -> %s' % (
+            x.get_shape().as_list()[1:],
+            out.get_shape().as_list()[1:],
+        ))
+        return out
 
     # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
@@ -507,7 +516,7 @@ class DeepNNLayers(object):
 
     def local_norm_image(self, x, gaussian_params={}, div_eps=1.):
         # Increase 'div_eps' to hide noisy details in smooth areas
-        img_gauss = self.apply_gaussian(x, gaussian_params)
-        img_sq_gauss = self.apply_gaussian(x ** 2, gaussian_params)
+        img_gauss = self.apply_gaussian(x, **gaussian_params)
+        img_sq_gauss = self.apply_gaussian(x ** 2, **gaussian_params)
         img_std = img_sq_gauss - img_gauss ** 2
         return (x - img_gauss) / tf.sqrt(img_std + div_eps)
