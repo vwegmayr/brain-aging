@@ -36,6 +36,7 @@ class DeepNNLayers(object):
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
             'apply_gaussian', 'conv2d_shared_all_dims_layer',
+            'random_crop',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -483,6 +484,21 @@ class DeepNNLayers(object):
         if not self.is_training:
             return x
         return tf.nn.dropout(x, keep_prob=prob)
+
+    def random_crop(self, x, new_shape=None, new_shape_ratio=None):
+        if new_shape is not None:
+            assert(new_shape_ratio is None)
+        elif new_shape_ratio is not None:
+            new_shape = x.get_shape().as_list()
+            for i, ratio in enumerate(new_shape_ratio):
+                new_shape[-i-1] = int(new_shape[-i-1] * ratio)
+        else:
+            assert(False)
+
+        return tf.random_crop(
+            x,
+            new_shape,
+        )
 
     def normalize_image(self, x):
         mean, var = tf.nn.moments(x, axes=[1, 2, 3, 4], keep_dims=True)
