@@ -7,16 +7,22 @@ from src.features import all_features
 
 class LoopBufferManager:
     def __init__(self, size, default_value=0.0, name='loop_buffer'):
-        self.cursor_pos = tf.Variable(
-            0,
-            trainable=False,
-            name='%s/cursor_pos' % name,
-        )
-        self.buffer = tf.Variable(
-            [default_value] * size,
-            name='%s/buffer' % name,
-            trainable=False,
-        )
+        with tf.name_scope(name):
+            self.cursor_pos = tf.Variable(
+                0,
+                trainable=False,
+                name='cursor_pos',
+            )
+            self.total_written = tf.Variable(
+                0,
+                trainable=False,
+                name='total_written',
+            )
+            self.buffer = tf.Variable(
+                [default_value] * size,
+                name='buffer',
+                trainable=False,
+            )
         self.buffer_size = size
         self.name = name
 
@@ -27,25 +33,18 @@ class LoopBufferManager:
             self.cursor_pos + num_values,
             self.buffer_size,
         )
+
+        buf = self.buffer.assign(
+            tf.concat([
+                self.buffer[:self.cursor_pos],
+                values[:write_pos_last - self.cursor_pos],
+                self.buffer[write_pos_last:],
+            ], 0),
+        )
         with tf.control_dependencies([
-            # self.buffer[:self.cursor_pos]
-            tf.assert_less_equal(self.cursor_pos, self.buffer_size),
-            tf.assert_greater_equal(self.cursor_pos, 0),
-            # values[:write_pos_last - self.cursor_pos]
-            tf.assert_less_equal(write_pos_last - self.cursor_pos, num_values),
-            tf.assert_greater_equal(write_pos_last - self.cursor_pos, 0),
-            # self.buffer[write_pos_last:]
-            tf.assert_less_equal(write_pos_last, self.buffer_size),
-            tf.assert_greater_equal(write_pos_last, 0),
+            buf,
+            self.total_written.assign_add(num_values),
         ]):
-            buf = self.buffer.assign(
-                tf.concat([
-                    self.buffer[:self.cursor_pos],
-                    values[:write_pos_last - self.cursor_pos],
-                    self.buffer[write_pos_last:],
-                ], 0),
-            )
-        with tf.control_dependencies([buf]):
             return self.cursor_pos.assign(tf.cond(
                 self.cursor_pos + num_values >= self.buffer_size,
                 lambda: 0,
@@ -53,7 +52,7 @@ class LoopBufferManager:
             ))
 
     def get_buffer(self):
-        return self.buffer
+        return self.buffer[0:self.total_written]
 
 
 def accumulated_histogram(variable, accumulate_size, name):
