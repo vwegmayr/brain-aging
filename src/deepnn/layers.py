@@ -36,7 +36,7 @@ class DeepNNLayers(object):
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
             'apply_gaussian', 'conv2d_shared_all_dims_layer',
-            'random_crop', 'local_norm_image',
+            'random_crop', 'local_norm_image', 'random_rot',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -433,6 +433,44 @@ class DeepNNLayers(object):
             out.get_shape().as_list()[1:],
         ))
         return out
+
+    def random_rot(self, x, max_angle=0.2):
+
+        def rotate_single_image(rotate_dim, img):
+            num_images = img.get_shape().as_list()[0]
+            angle = tf.random_uniform(
+                [],
+                minval=-max_angle,
+                maxval=+max_angle,
+                dtype=tf.float32,
+            )
+            # TODO: Also support rotation of other axis
+            result = tf.contrib.image.rotate(
+                img,
+                [angle] * num_images,
+                interpolation='NEAREST',
+                name='rotate_single_image',
+            )
+            return tf.expand_dims(result, 0)
+
+        def body(i, r):
+            return [
+                tf.add(i, 1),
+                tf.concat([r, rotate_single_image(i, x[i])], 0),
+            ]
+        batch_size = tf.shape(x)[0]
+        i = tf.constant(1)
+        result = rotate_single_image(0, x[0])
+        r = tf.while_loop(
+            lambda i, _: tf.less(i, batch_size),
+            body,
+            [i, result],
+            shape_invariants=[
+                i.get_shape(),
+                tf.TensorShape([None] + x.get_shape().as_list()[1:]),
+            ]
+        )
+        return r[1]
 
     # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
