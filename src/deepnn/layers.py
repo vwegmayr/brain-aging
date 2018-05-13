@@ -37,6 +37,7 @@ class DeepNNLayers(object):
             'dataset_norm_online', 'voxel_wide_norm_online',
             'apply_gaussian', 'conv2d_shared_all_dims_layer',
             'random_crop', 'local_norm_image', 'random_rot',
+            'image_summary',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -135,6 +136,13 @@ class DeepNNLayers(object):
                 name,
                 tf.reshape(img, [1] + img.get_shape().as_list()[0:3]),
             )
+
+    def image_summary(self, x, name="image_summary"):
+        tf.summary.image(
+            name,
+            x[:, :, :, int(x.get_shape().as_list()[3]/2), 0:1],
+        )
+        return x
 
     # ================= Generic ConvNets =================
     def conv_layer_wrapper(
