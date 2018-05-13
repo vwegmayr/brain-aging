@@ -138,10 +138,11 @@ class DeepNNLayers(object):
             )
 
     def image_summary(self, x, name="image_summary"):
-        tf.summary.image(
-            name,
-            x[:, :, :, int(x.get_shape().as_list()[3]/2), 0:1],
-        )
+        with tf.name_scope(name):
+            tf.summary.image(
+                'image',
+                x[:, :, :, int(x.get_shape().as_list()[3]/2), 0:1],
+            )
         return x
 
     # ================= Generic ConvNets =================
@@ -442,21 +443,21 @@ class DeepNNLayers(object):
         ))
         return out
 
-    def random_rot(self, x, max_angle=0.2):
+    def random_rot(self, x, max_angle=0.2, axis=0):
+        batch_size = tf.shape(x)[0]
+        angles = tf.random_uniform(
+            [batch_size],
+            minval=-max_angle,
+            maxval=+max_angle,
+            dtype=tf.float32,
+        )
+        tf.summary.histogram('random_rot/angles', angles)
 
-        def rotate_single_image(rotate_dim, img):
-            num_images = img.get_shape().as_list()[0]
-            angle = tf.random_uniform(
-                [],
-                minval=-max_angle,
-                maxval=+max_angle,
-                dtype=tf.float32,
-            )
-            # TODO: Also support rotation of other axis
+        def rotate_single_image(angle, img):
             result = tf.contrib.image.rotate(
                 img,
-                [angle] * num_images,
-                interpolation='NEAREST',
+                angle,
+                interpolation='BILINEAR',
                 name='rotate_single_image',
             )
             return tf.expand_dims(result, 0)
@@ -464,11 +465,16 @@ class DeepNNLayers(object):
         def body(i, r):
             return [
                 tf.add(i, 1),
-                tf.concat([r, rotate_single_image(i, x[i])], 0),
+                tf.concat([r, rotate_single_image(angles[i], x[i])], 0),
             ]
-        batch_size = tf.shape(x)[0]
+        assert(axis in [0, 1, 2])
+        axis += 1
+        perm = [0, 1, 2, 3, 4]
+        perm[1] = axis
+        perm[axis] = 1
+        x = tf.transpose(x, perm)
         i = tf.constant(1)
-        result = rotate_single_image(0, x[0])
+        result = rotate_single_image(angles[0], x[0])
         r = tf.while_loop(
             lambda i, _: tf.less(i, batch_size),
             body,
@@ -478,7 +484,7 @@ class DeepNNLayers(object):
                 tf.TensorShape([None] + x.get_shape().as_list()[1:]),
             ]
         )
-        return r[1]
+        return tf.transpose(r[1], perm)
 
     # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
