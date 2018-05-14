@@ -27,7 +27,7 @@ class DeepNNLayers(object):
         self.enable_print_shapes = print_shapes
         self.parse_layers_defs = {
             'concat_layers': self._parse_concat_layers,
-            'conditionnal_branch': self.conditionnal_branch,
+            'condition': self._parse_condition,
             'conv2d': func_fwd_input(self.conv2d_layer),
             'conv3d': func_fwd_input(self.conv3d_layer),
         }
@@ -42,6 +42,28 @@ class DeepNNLayers(object):
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
     # ================= Parsing of CNN architecture =================
+    def _parse_condition(
+        self,
+        context,
+        input,
+        condition_type,
+        true_layers=[],
+        false_layers=[],
+        **kwargs
+    ):
+        conditions_defs = {
+            'is_training': lambda: tf.convert_to_tensor(self.is_training),
+            'global_step_under': lambda t: tf.train.get_global_step() < t,
+        }
+        tf_cond = conditions_defs[condition_type](**kwargs)
+        true_output = self.parse_layers(context, input, true_layers)
+        false_output = self.parse_layers(context, input, false_layers)
+        return tf.cond(
+            tf_cond,
+            lambda: true_output,
+            lambda: false_output,
+        )
+
     def _parse_concat_layers(self, context, input, layers_def):
         layers_out = []
         for l in layers_def:
@@ -328,7 +350,6 @@ class DeepNNLayers(object):
             ))
         return out
 
-
     def residual_block(self, x, name, num_features=None):
         with tf.variable_scope(name):
             if num_features is None:
@@ -339,15 +360,6 @@ class DeepNNLayers(object):
             x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, name='conv2')
             x += shortcut
             return tf.nn.relu(x)
-
-    def conditionnal_branch(self, context, x, global_step_threshold, before_threshold, after_threshold):
-        output_before_threshold = self.parse_layers(context, x, before_threshold)
-        output_after_threshold = self.parse_layers(context, x, after_threshold)
-        return tf.cond(
-            tf.train.get_global_step() < global_step_threshold,
-            lambda: output_before_threshold,
-            lambda: output_after_threshold,
-        )
 
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
