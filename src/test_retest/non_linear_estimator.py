@@ -1,16 +1,14 @@
 import tensorflow as tf
-import os
 
 
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 import src.test_retest.regularizer as regularizer
 from src.test_retest.test_retest_base import test_retest_evaluation_spec
-from src.train_hooks import ConfusionMatrixHook
 from src.test_retest.test_retest_base import mnist_test_retest_input_fn
 
 
-def name_to_regularization(layer_id, reg_name, activations_test,
-                           activations_retest):
+def name_to_hidden_regularization(layer_id, reg_name, activations_test,
+                                  activations_retest):
     if reg_name == regularizer.JS_DIVERGENCE_LABEL:
         s_test = tf.nn.softmax(
             activations_test,
@@ -23,10 +21,12 @@ def name_to_regularization(layer_id, reg_name, activations_test,
         return regularizer.js_divergence(s_test, s_retest)
     elif reg_name == regularizer.L2_SQUARED_LABEL:
         return regularizer.l2_squared_mean_batch(
-                    activations_test - activations_retest
+                    activations_test - activations_retest,
+                    name=str(layer_id) + "_l2_activations"
                )
     else:
-        raise ValueError("regularization name '{}' is unknown".format(reg_name))
+        raise ValueError("regularization name '{}' is unknown".format(
+                         reg_name))
 
 
 class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
@@ -56,7 +56,9 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 f_test,
                 units=s,
                 activation=tf.nn.relu,
-                kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
+                kernel_initializer=tf.contrib.layers.xavier_initializer(
+                    seed=43
+                ),
                 name=name
             )
 
@@ -64,7 +66,9 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 f_retest,
                 units=s,
                 activation=tf.nn.relu,
-                kernel_initializer=tf.contrib.layers.xavier_initializer(seed=43),
+                kernel_initializer=tf.contrib.layers.xavier_initializer(
+                    seed=43
+                ),
                 name=name,
                 reuse=True
             )
@@ -72,7 +76,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
             # Optional Regularization
             if hidden_lambdas[i] != 0:
                 print("regularization on layer {}".format(i))
-                hidden_loss = name_to_regularization(
+                hidden_loss = name_to_hidden_regularization(
                     layer_id=i,
                     reg_name=hidden_regs[i],
                     activations_test=f_test,
@@ -81,6 +85,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 loss_f += hidden_lambdas[i] * hidden_loss
 
             # Allows computation of activations when loading a trained model
+            # and executing it in prediction mode
             predictions.update({
                 "hidden_features_test_" + name: f_test,
                 "hidden_features_retest_" + name: f_retest
@@ -160,6 +165,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
 
         loss_o = params["lambda_o"] * loss_o
 
+        # Sum up different regularizations
         loss = loss_test + loss_retest + loss_o + loss_f
 
         optimizer = tf.train.AdamOptimizer(
