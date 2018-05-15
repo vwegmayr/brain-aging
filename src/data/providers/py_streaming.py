@@ -22,37 +22,50 @@ class DataProvider(object):
         self.augment_ratio = config['augment_ratio']
         self.random = random.Random()
         if 'seed' in config:
-            self.random.seed(config['seed'])
-            print('Data streaming option: py_streaming')
+            self.seed = config['seed']
         else:
-            seed = random.randint(0, 10000)
-            print('Data streaming option: py_streaming with seed=%d' % seed)
-            self.random.seed(seed)
-        train_files, test_files, self.file_to_features = \
+            self.seed = random.randint(0, 10000)
+        print('Data streaming option: py_streaming with seed=%d' % self.seed)
+        self.random.seed(self.seed)
+        self.train_files, self.test_files, self.file_to_features = \
             get_train_test_filenames(
                 input_fn_config['data_generation'],
                 config['classes'],
                 self.random,
             )
         modify_files_if_needed(
-            train_files,
-            test_files,
+            self.train_files,
+            self.test_files,
             config,
             self.file_to_features,
             self.random,
         )
-        test_files = [t for t in test_files if len(t) > 0]
-        self.display_dataset_stats("Train", train_files)
+        test_files = [t for t in self.test_files if len(t) > 0]
+        self.display_dataset_stats("Train", self.train_files)
         self.display_dataset_stats("Valid", test_files)
 
-        for train, files in [(True, train_files), (False, test_files)]:
+        for train, files in [(True, self.train_files), (False, test_files)]:
             self.inputs[train] = DataInput(
                 config,
-                train_files if train else test_files,
+                files,
                 balance_minibatches=train,
             )
             self.inputs[train].shuffle(self.random)
-        self.mri_shape = nb.load(train_files[0][0]).get_data().shape
+        self.mri_shape = nb.load(self.train_files[0][0]).get_data().shape
+
+    def export_dataset(self):
+        return {
+            'train': {
+                k: [f for f in self.train_files[k_id]]
+                for k_id, k in enumerate(self.config['classes'])
+            },
+            'test': {
+                k: [f for f in self.test_files[k_id]]
+                for k_id, k in enumerate(self.config['classes'])
+            },
+            'file_to_features': self.file_to_features,
+            'seed': self.seed,
+        }
 
     def display_dataset_stats(self, train_or_test, dataset):
         for i in range(len(dataset)):

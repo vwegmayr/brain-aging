@@ -73,8 +73,17 @@ class Estimator(TensorflowBaseEstimator):
         custom_print('[INFO] Main training loop. Model dir is %s' % (
             self.config["model_dir"]))
         if 'reason' in self.sumatra_outcome_config:
-            custom_print('[INFO] Provided run reason in config: %s' %
-                self.sumatra_outcome_config['reason'])
+            custom_print('[INFO] Provided run reason in config: %s' % (
+                self.sumatra_outcome_config['reason'],
+            ))
+
+        # Dump list of train/test images
+        dataset = self.data_provider.export_dataset()
+        if dataset is not None:
+            with open('%s/dataset.json' % (
+                self.config["model_dir"]
+            ), 'w') as outfile:
+                json.dump(dataset, outfile)
 
         printed_count = [0]  # Workaround to modify variable inside nested func
 
