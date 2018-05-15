@@ -552,7 +552,7 @@ class DeepNNLayers(object):
                 gauss_filter = (coords[0] - centers[0][b, i]) ** 2
                 gauss_filter += (coords[1] - centers[1][b, i]) ** 2
                 gauss_filter += (coords[2] - centers[2][b, i]) ** 2
-                gauss_filter = tf.exp(-gauss_filter/(s[i] * s[i] * 2))
+                gauss_filter = tf.exp(-gauss_filter/(s * s * 2))
                 gauss_filter *= gaussian_multipliers[b, i]
                 if distortion_type == 'mult':
                     img_modifier *= 1 + gauss_filter
