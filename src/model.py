@@ -9,14 +9,28 @@ class ModelLayerContext:
 
 
 class Model(DeepNNLayers):
-    def __init__(self, is_training, **kwargs):
+    def __init__(
+        self,
+        is_training_bool,
+        is_training_placeholder,
+        **kwargs
+    ):
         super(Model, self).__init__(**kwargs)
-        self.is_training = is_training
+        self.is_training_bool = is_training_bool
+        self.is_training_placeholder = is_training_placeholder
         self.parse_layers_defs.update({
             'conv_relu': self._parse_conv_relu,
         })
 
-    def _parse_conv_relu(self, context, input, filter_size, out_features, name, log=True):
+    def _parse_conv_relu(
+        self,
+        context,
+        input,
+        filter_size,
+        out_features,
+        name,
+        log=True,
+    ):
         out = self.conv3d_layer(
             input,
             out_features,
@@ -47,7 +61,10 @@ class Model(DeepNNLayers):
         fc = tf.reshape(fc, [tf.shape(fc)[0], ft_in])
         fc = self.fc_layer(fc, num_classes, nl=tf.identity, name='logits')
         fc = self.batch_norm(fc)
-        return tf.verify_tensor_all_finite(fc, "gen_head returns non finite values!")
+        return tf.verify_tensor_all_finite(
+            fc,
+            "gen_head returns non finite values!",
+        )
 
     def gen_deconv_head(self, fc):
         assert(len(self.cnn_layers_shapes) > 0)

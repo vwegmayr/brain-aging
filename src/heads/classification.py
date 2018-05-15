@@ -77,7 +77,6 @@ class ClassificationHead(NetworkHeadBase):
         model,
         last_layer,
         features,
-        is_training,
         # Custom arguments (from config file)
         predict,
         loss_classes_weights={},
@@ -185,7 +184,7 @@ class ClassificationHead(NetworkHeadBase):
         # Histogram summaries
         self.probas = tf.nn.softmax(self.predictions)
         control_deps = []
-        if is_training:
+        if model.is_training_bool:
             HISTOGRAM_NUMBER_VALUES_TRAIN_SET = 350
             for p_idx, p_ft_name in enumerate(self.predict_feature_names):
                 summary, update_op = accumulated_histogram(
@@ -211,7 +210,6 @@ class ClassificationHead(NetworkHeadBase):
             model=model,
             last_layer=last_layer,
             features=features,
-            is_training=is_training,
             **kwargs
         )
 
@@ -299,7 +297,7 @@ class ClassificationHead(NetworkHeadBase):
         return tags
 
     def get_tensors_to_dump(self):
-        if self.is_training:
+        if self.model.is_training_bool:
             return {}
         return {
             'proba': self.probas,

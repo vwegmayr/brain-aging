@@ -151,12 +151,19 @@ class Estimator(TensorflowBaseEstimator):
         NETWORK_BODY_SCOPE = 'network_body'
         network_heads = params['network_heads']
 
+        is_training_placeholder = tf.placeholder(tf.bool, [], 'is_training')
+        is_training_bool = (mode == tf.estimator.ModeKeys.TRAIN)
+        set_is_training_placeholder_hook = tf.train.FeedFnHook(
+            lambda: {is_training_placeholder: is_training_bool},
+        )
+
         if mode == tf.estimator.ModeKeys.PREDICT:
             features = self.data_provider.predict_features(features)
 
         with tf.variable_scope(NETWORK_BODY_SCOPE):
             m = Model(
-                is_training=(mode == tf.estimator.ModeKeys.TRAIN),
+                is_training_bool=is_training_bool,
+                is_training_placeholder=is_training_placeholder,
                 print_shapes=self.is_model_first_run,
             )
             self.is_model_first_run = False
@@ -173,7 +180,6 @@ class Estimator(TensorflowBaseEstimator):
                     model=m,
                     last_layer=last_layer,
                     features=features,
-                    is_training=(mode == tf.estimator.ModeKeys.TRAIN),
                     **h
                 )
                 self.sumatra_add_tags(head.get_tags())
@@ -243,14 +249,14 @@ class Estimator(TensorflowBaseEstimator):
         )
 
         # Evaluation hooks
-        evaluation_hooks = []
+        evaluation_hooks = [set_is_training_placeholder_hook]
         all_summaries = tf.summary.merge_all()
         if all_summaries is not None:
-            evaluation_hooks = [tf.train.SummarySaverHook(
+            evaluation_hooks.append(tf.train.SummarySaverHook(
                 save_steps=1,
                 output_dir=self.config["model_dir"] + "/eval",
                 summary_op=tf.summary.merge_all(),
-            )]
+            ))
         tensors_to_dump = {}
         for head in heads:
             with tf.variable_scope(head.get_name()):
@@ -259,10 +265,10 @@ class Estimator(TensorflowBaseEstimator):
                     head.name + '/' + var_name: var_value
                     for var_name, var_value in variables.items()
                 })
-        evaluation_hooks += [SessionHookDumpTensors(
+        evaluation_hooks.append(SessionHookDumpTensors(
             self.save_path,
             tensors_to_dump,
-        )]
+        ))
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
@@ -272,7 +278,7 @@ class Estimator(TensorflowBaseEstimator):
             training_hooks=self.get_training_hooks(
                 params,
                 log_variables=train_log_variables,
-            ),
+            ) + [set_is_training_placeholder_hook],
             evaluation_hooks=evaluation_hooks,
         )
 

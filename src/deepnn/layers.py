@@ -21,7 +21,6 @@ def func_fwd_input(fn):
 
 class DeepNNLayers(object):
     def __init__(self, print_shapes=True):
-        self.is_training = True
         self.debug_summaries = False
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
@@ -52,7 +51,7 @@ class DeepNNLayers(object):
         **kwargs
     ):
         conditions_defs = {
-            'is_training': lambda: tf.convert_to_tensor(self.is_training),
+            'is_training': lambda: self.is_training_placeholder,
             'global_step_under': lambda t: tf.train.get_global_step() < t,
         }
         tf_cond = conditions_defs[condition_type](**kwargs)
@@ -364,7 +363,7 @@ class DeepNNLayers(object):
     # ================= Regularization =================
     def batch_norm(self, x, decay=0.9, **kwargs):
         if 'training' not in kwargs:
-            kwargs['training'] = self.is_training
+            kwargs['training'] = self.is_training_placeholder
         return tf.layers.batch_normalization(
             x,
             momentum=decay,
@@ -400,7 +399,7 @@ class DeepNNLayers(object):
         }
         return tf.layers.batch_normalization(
             x,
-            training=self.is_training,
+            training=self.is_training_placeholder,
             momentum=decay,
             renorm=True,
             renorm_clipping=renorm_clipping,
@@ -434,9 +433,11 @@ class DeepNNLayers(object):
         )
 
     def dropout(self, x, prob):
-        if not self.is_training:
-            return x
-        return tf.nn.dropout(x, keep_prob=prob)
+        return tf.layers.dropout(
+            x,
+            training=self.is_training_placeholder,
+            rate=prob,
+        )
 
     def random_crop(self, x, new_shape=None, new_shape_ratio=None):
         if new_shape is not None:
@@ -644,10 +645,21 @@ class DeepNNLayers(object):
                 axis=[0],
                 keep_dims=False,
             )
-            if self.is_training:
-                accumulated_count = accumulated_count.assign_add(1.0)
-                accumulated_x = accumulated_x.assign_add(x_mean),
-                accumulated_x2 = accumulated_x2.assign_add(x2_mean)
+            accumulated_count = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_count.assign_add(1.0),
+                lambda: accumulated_count,
+            )
+            accumulated_x = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_x.assign_add(x_mean),
+                lambda: accumulated_x,
+            )
+            accumulated_x2 = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_x2.assign_add(x2_mean),
+                lambda: accumulated_x2,
+            )
             mean = accumulated_x / accumulated_count
             variance = accumulated_x2 / accumulated_count
             variance -= mean ** 2
