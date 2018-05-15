@@ -37,7 +37,7 @@ class DeepNNLayers(object):
             'dataset_norm_online', 'voxel_wide_norm_online',
             'apply_gaussian', 'conv2d_shared_all_dims_layer',
             'random_crop', 'local_norm_image', 'random_rot',
-            'image_summary',
+            'image_summary', 'random_distort_gaussians',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
@@ -407,23 +407,28 @@ class DeepNNLayers(object):
             **kwargs
         )
 
-    def apply_gaussian(self, x, sigma, kernel_half_size=None):
+    def get_gaussian_filter(self, sigma, kernel_half_size=None):
         if kernel_half_size is None:
             kernel_half_size = int(4 * sigma)
-        dim_size = kernel_half_size * 2 + 1
-        fx, fy, fz = np.mgrid[
+        coords = np.mgrid[
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
         ]
-        gauss_filter = np.exp(-(fx**2 + fy**2 + fz**2)/float(sigma*sigma*2))
-        gauss_filter = gauss_filter / gauss_filter.sum()
-        gauss_filter = gauss_filter.reshape(
-            [dim_size, dim_size, dim_size, 1, 1],
-        )
+        sigma = tf.convert_to_tensor(sigma, dtype=tf.float64)
+        for i in range(len(coords)):
+            coords[i] = tf.convert_to_tensor(coords[i], dtype=tf.float64)
+        gauss_filter = coords[0] ** 2 + coords[1] ** 2 + coords[2] ** 2
+        gauss_filter = tf.exp(-gauss_filter/(sigma * sigma * 2))
+        gauss_filter = gauss_filter / tf.reduce_sum(gauss_filter)
+        return gauss_filter
+
+    def apply_gaussian(self, x, **kwargs):
+        f = self.get_gaussian_filter(**kwargs)
+        f = tf.reshape(f, f.get_shape().as_list() + [1, 1])
         return tf.nn.conv3d(
             x,
-            gauss_filter,
+            f,
             strides=[1, 1, 1, 1, 1],
             padding='SAME',
         )
@@ -497,6 +502,89 @@ class DeepNNLayers(object):
             ]
         )
         return tf.transpose(r[1], perm)
+
+    def random_distort_gaussians(
+        self,
+        x,
+        min_sigma=30.0,
+        max_sigma=50.0,
+        num_gaussians_per_image=5,
+        gaussian_mult_min=0.2,
+        gaussian_mult_max=0.2,
+        distortion_type='add',
+    ):
+        assert(distortion_type in ['add', 'mult'])
+        batch_size = tf.shape(x)[0]
+        x_shape = x.get_shape().as_list()[1:4]
+        sigmas = tf.random_uniform(
+            [batch_size, num_gaussians_per_image],
+            minval=min_sigma,
+            maxval=max_sigma,
+            dtype=tf.float32,
+        )
+        gaussian_multipliers = tf.random_uniform(
+            [batch_size, num_gaussians_per_image],
+            minval=gaussian_mult_min,
+            maxval=gaussian_mult_max,
+            dtype=tf.float32,
+        )
+        centers = [
+            tf.random_uniform(
+                [batch_size, num_gaussians_per_image],
+                minval=0,
+                maxval=dim_max,
+                dtype=tf.float32,
+            )
+            for dim_max in x_shape
+        ]
+        coords_np = np.mgrid[0:x_shape[0], 0:x_shape[1], 0:x_shape[2], 0:1]
+        coords = []
+        for i in range(len(coords_np)):
+            coords.append(tf.convert_to_tensor(coords_np[i], dtype=tf.float32))
+
+        def process_single_image(b, img):
+            if distortion_type == 'mult':
+                img_modifier = tf.ones_like(img)
+            else:
+                img_modifier = tf.zeros_like(img)
+            for i in range(num_gaussians_per_image):
+                s = sigmas[b, i]
+                gauss_filter = (coords[0] - centers[0][b, i]) ** 2
+                gauss_filter += (coords[1] - centers[1][b, i]) ** 2
+                gauss_filter += (coords[2] - centers[2][b, i]) ** 2
+                gauss_filter = tf.exp(-gauss_filter/(s[i] * s[i] * 2))
+                gauss_filter *= gaussian_multipliers[b, i]
+                if distortion_type == 'mult':
+                    img_modifier *= 1 + gauss_filter
+                else:
+                    img_modifier += gauss_filter
+            if distortion_type == 'mult':
+                img *= img_modifier
+            else:
+                img += img_modifier
+            return tf.expand_dims(img, 0)
+
+        def body(i, r):
+            return [
+                tf.add(i, 1),
+                tf.concat([
+                        r,
+                        process_single_image(i, x[i]),
+                    ], 0
+                ),
+            ]
+
+        i = tf.constant(1)
+        r = tf.while_loop(
+            lambda i, _: tf.less(i, batch_size),
+            body,
+            [i, process_single_image(0, x[0])],
+            shape_invariants=[
+                i.get_shape(),
+                tf.TensorShape([None] + x.get_shape().as_list()[1:]),
+            ]
+        )
+        return r[1]
 
     # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
