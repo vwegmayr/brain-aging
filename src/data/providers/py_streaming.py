@@ -248,8 +248,6 @@ class DataInput:
         self.batch_index = [0 for i in range(0, self.num_classes)]
         self.batch_looped = [0 for i in range(0, self.num_classes)]
         self.balance_minibatches = balance_minibatches
-        self.mean = mean
-        self.var = var
 
     def all_classes_looped(self):
         return all([l > 0 for l in self.batch_looped])
