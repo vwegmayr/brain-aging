@@ -78,7 +78,7 @@ class DeepNNLayers(object):
             layers_out = []
             for l in layers_def:
                 layers_out.append(self.parse_single_layer(context, input, l))
-            return tf.concat(layers_out, 4)
+            return tf.identity(tf.concat(layers_out, 4), name='output')
 
     def parse_layers(self, context, input, layers_def):
         assert(isinstance(layers_def, list))
