@@ -43,8 +43,15 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
         f_test = input_test
         f_retest = input_retest
         hidden_sizes = params["hidden_layer_sizes"]
-        hidden_regs = params["hidden_layer_regularizers"]
-        hidden_lambdas = params["hidden_lambdas"]
+
+        if "hidden_layer_regularizers" in params:
+            hidden_regs = params["hidden_layer_regularizers"]
+        else:
+            hidden_regs = None
+        if "hidden_lambdas" in params:
+            hidden_lambdas = params["hidden_lambdas"]
+        else:
+            hidden_lambdas = None
 
         predictions = {}
 
@@ -74,7 +81,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
             )
 
             # Optional Regularization
-            if hidden_lambdas[i] != 0:
+            if (hidden_lambdas is not None) and (hidden_lambdas[i] != 0):
                 print("regularization on layer {}".format(i))
                 hidden_loss = name_to_hidden_regularization(
                     layer_id=i,
