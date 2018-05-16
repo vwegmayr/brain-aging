@@ -151,6 +151,12 @@ class Estimator(TensorflowBaseEstimator):
         NETWORK_BODY_SCOPE = 'network_body'
         network_heads = params['network_heads']
 
+        # Give input feature tensors a fixed name independant of the
+        #  input pipeline (for when loading the network)
+        with tf.variable_scope('input_features'):
+            for k, v in features.items():
+                features[k] = tf.identity(v, name=k)
+
         is_training_placeholder = tf.placeholder(tf.bool, [], 'is_training')
         is_training_bool = (mode == tf.estimator.ModeKeys.TRAIN)
         set_is_training_placeholder_hook = tf.train.FeedFnHook(

@@ -249,7 +249,7 @@ class DeepNNLayers(object):
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape()[1:].as_list()
             ))
-        return out
+        return tf.identity(out, name='output')
 
     # ================= 2D ConvNets =================
     def conv2d_layer(self, *args, **kwargs):
@@ -372,14 +372,15 @@ class DeepNNLayers(object):
             return tf.nn.relu(x)
 
     # ================= Regularization =================
-    def batch_norm(self, x, decay=0.9, **kwargs):
+    def batch_norm(self, x, decay=0.9, name='bn', **kwargs):
         if 'training' not in kwargs:
             kwargs['training'] = self.is_training_placeholder
-        return tf.layers.batch_normalization(
-            x,
-            momentum=decay,
-            **kwargs
-        )
+        with tf.variable_scope(name):
+            return tf.identity(tf.layers.batch_normalization(
+                x,
+                momentum=decay,
+                **kwargs
+            ), name='output')
 
     def batch_renorm(
         self,
@@ -479,7 +480,7 @@ class DeepNNLayers(object):
                 x.get_shape().as_list()[1:],
                 out.get_shape().as_list()[1:],
             ))
-            return out
+            return tf.identity(out, name='identity')
 
     def random_rot(self, x, max_angle=0.2, axis=0, name='random_rot'):
         with tf.variable_scope(name):
@@ -523,7 +524,7 @@ class DeepNNLayers(object):
                     tf.TensorShape([None] + x.get_shape().as_list()[1:]),
                 ]
             )
-            return tf.transpose(r[1], perm)
+            return tf.identity(tf.transpose(r[1], perm), name='output')
 
     def random_distort_gaussians(
         self,
@@ -609,7 +610,7 @@ class DeepNNLayers(object):
                     tf.TensorShape([None] + x.get_shape().as_list()[1:]),
                 ]
             )
-            return r[1]
+            return tf.identity(r[1], name='output')
 
     # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
@@ -696,7 +697,7 @@ class DeepNNLayers(object):
             # 2. Voxel normalization
             x = self.voxel_wide_norm_online(x, **kwargs)
             # 3. Image normalization again
-            return self.normalize_image(x)
+            return tf.identity(self.normalize_image(x), name='output')
 
     def normalize_image(self, x):
         mean, var = tf.nn.moments(x, axes=[1, 2, 3, 4], keep_dims=True)
