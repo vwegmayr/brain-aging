@@ -249,7 +249,7 @@ class DeepNNLayers(object):
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape()[1:].as_list()
             ))
-        return tf.identity(out, name='output')
+            return tf.identity(out, name='output')
 
     # ================= 2D ConvNets =================
     def conv2d_layer(self, *args, **kwargs):
