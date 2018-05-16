@@ -239,20 +239,20 @@ class Estimator(TensorflowBaseEstimator):
                 })
 
         # Optimizer
-        train_vars = tf.get_collection(
-            tf.GraphKeys.TRAINABLE_VARIABLES,
-            scope=NETWORK_BODY_SCOPE,
-        )
-        for head in heads:
-            head.register_globally_trained_variables(train_vars)
-
-        train_ops = self.generate_train_ops(
-            train_log_variables,
-            global_loss,
-            train_vars,
-            heads,
-            **params['network_train_ops_settings']
-        )
+        with tf.variable_scope('train_ops'):
+            train_vars = tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES,
+                scope=NETWORK_BODY_SCOPE,
+            )
+            for head in heads:
+                head.register_globally_trained_variables(train_vars)
+            train_ops = self.generate_train_ops(
+                train_log_variables,
+                global_loss,
+                train_vars,
+                heads,
+                **params['network_train_ops_settings']
+            )
 
         # Evaluation hooks
         evaluation_hooks = [set_is_training_placeholder_hook]

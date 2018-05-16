@@ -108,13 +108,25 @@ class ClassificationHead(NetworkHeadBase):
         ])
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
-        labels_float = tf.cast(self.labels, tf.float32)
         self.predictions, self.loss, weighted_loss_per_sample = \
             self.compute_prediction_and_loss(
                 last_layer,
                 weights_per_class,
             )
+        self.predictions = tf.identity(self.predictions, name='logits')
 
+        with tf.variable_scope('metrics'):
+            self.compute_metrics(weighted_loss_per_sample)
+
+        super(ClassificationHead, self).__init__(
+            name=name,
+            model=model,
+            last_layer=last_layer,
+            features=features,
+            **kwargs
+        )
+
+    def compute_metrics(self, weighted_loss_per_sample):
         # Metrics for training/eval
         batch_size = tf.cast(tf.shape(self.labels)[0], tf.float32)
         accuracy = tf.cast(
@@ -131,13 +143,13 @@ class ClassificationHead(NetworkHeadBase):
             'labels/%s_ratio' % class_name: tf.reduce_mean(
                 tf.cast(self.labels[:, i], tf.float32),
             )
-            for i, class_name in enumerate(predict)
+            for i, class_name in enumerate(self.predict_feature_names)
         })
         self.metrics.update({
             'logits/%s' % class_name: tf.reduce_mean(
                 tf.cast(self.predictions[:, i], tf.float32),
             )
-            for i, class_name in enumerate(predict)
+            for i, class_name in enumerate(self.predict_feature_names)
         })
         self.metrics.update({
             'predicted_%s_ratio' % ft_name:
@@ -162,29 +174,30 @@ class ClassificationHead(NetworkHeadBase):
             return class_acc, tf.reduce_sum(weights)
         self.classes_accuracy = {
             'accuracy_on_%s' % c: accuracy_on_class(i)
-            for i, c in enumerate(predict)
+            for i, c in enumerate(self.predict_feature_names)
         }
         self.metrics.update({
             name: v[0]
             for name, v in self.classes_accuracy.items()
         })
         if weighted_loss_per_sample is not None:
+            labels_float = tf.cast(self.labels, tf.float32)
             loss_contribution_ratio = [
                 tf.reduce_sum(
                     weighted_loss_per_sample * labels_float[:, i] / batch_size
                 )
-                for i, _ in enumerate(predict)
+                for i, _ in enumerate(self.predict_feature_names)
             ]
             self.metrics.update({
                 'loss_contribution_ratio/%s' % class_name:
                     loss_contribution_ratio[i] / self.loss
-                for i, class_name in enumerate(predict)
+                for i, class_name in enumerate(self.predict_feature_names)
             })
 
         # Histogram summaries
         self.probas = tf.nn.softmax(self.predictions)
         control_deps = []
-        if model.is_training_bool:
+        if self.model.is_training_bool:
             HISTOGRAM_NUMBER_VALUES_TRAIN_SET = 350
             for p_idx, p_ft_name in enumerate(self.predict_feature_names):
                 summary, update_op = accumulated_histogram(
@@ -205,37 +218,31 @@ class ClassificationHead(NetworkHeadBase):
         with tf.control_dependencies(control_deps):
             self.loss = tf.identity(self.loss)
 
-        super(ClassificationHead, self).__init__(
-            name=name,
-            model=model,
-            last_layer=last_layer,
-            features=features,
-            **kwargs
-        )
-
     def compute_prediction_and_loss(
         self,
         last_layer,
         weights_per_class,
     ):
-        predictions = self.model.gen_head(
-            last_layer,
-            len(self.predict_feature_names),
-        )
-        weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
-            self.labels,
-            predictions,
-            reduction=tf.losses.Reduction.NONE,
-            weights=tf.reduce_sum(
-                tf.cast(self.labels, tf.float32) * weights_per_class, 1,
-            ),
-        )
-        loss = tf.reduce_mean(weighted_loss_per_sample)
-        return predictions, loss, weighted_loss_per_sample
+        with tf.variable_scope('prediction'):
+            predictions = self.model.gen_head(
+                last_layer,
+                len(self.predict_feature_names),
+            )
+        with tf.variable_scope('loss'):
+            weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
+                self.labels,
+                predictions,
+                reduction=tf.losses.Reduction.NONE,
+                weights=tf.reduce_sum(
+                    tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                ),
+            )
+            loss = tf.reduce_mean(weighted_loss_per_sample)
+            return predictions, loss, weighted_loss_per_sample
 
-    def get_evaluated_metrics(self):
+    def _get_evaluated_metrics(self):
         evaluation_metrics = \
-            super(ClassificationHead, self).get_evaluated_metrics()
+            super(ClassificationHead, self)._get_evaluated_metrics()
 
         predicted = tf.argmax(
             self.predictions[:, 0:self.num_classes_in_evaluation],

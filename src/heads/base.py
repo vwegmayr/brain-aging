@@ -50,9 +50,12 @@ class NetworkHeadBase(object):
             tf.GraphKeys.TRAINABLE_VARIABLES,
             tf.get_variable_scope().name,
         )
-        self._set_regularization_loss()
-        self.head_training_loss = self._get_head_training_loss()
-        self.global_loss_contribution = self._get_global_loss_contribution()
+        with tf.variable_scope('regularization_loss'):
+            self._set_regularization_loss()
+        with tf.variable_scope('head_loss'):
+            self.head_training_loss = self._get_head_training_loss()
+        with tf.variable_scope('global_loss_contribution'):
+            self.global_loss_contribution = self._get_global_loss_contribution()
 
         # Setup summary for metrics
         self.metrics.update({'loss': self.loss})
@@ -60,6 +63,9 @@ class NetworkHeadBase(object):
         if model.is_training_bool:
             for name, value in self.metrics.items():
                 tf.summary.scalar(name, value)
+
+        with tf.variable_scope('evaluated_metrics'):
+            self._evaluated_metrics = self._get_evaluated_metrics()
 
     # -------------------------- Evaluation/training metrics
     def get_logged_training_variables(self):
@@ -80,6 +86,9 @@ class NetworkHeadBase(object):
         return train_variables
 
     def get_evaluated_metrics(self):
+        return self._evaluated_metrics
+
+    def _get_evaluated_metrics(self):
         metric_ops = {
             name: tf.metrics.mean(value, name=name)
             for name, value in self.metrics.items()
