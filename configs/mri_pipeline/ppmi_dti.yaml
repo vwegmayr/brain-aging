@@ -1,0 +1,28 @@
+# smt run -r "PPMI DTI conversion" --config configs/mri_pipeline/ppmi_dti.yaml -a transform
+class: src.data.mri_pipeline.MriPreprocessingPipeline
+params:
+  path: /local/PPMI
+  files_glob: /local/PPMI/raw/*/*/*/*/I*.nii.gz
+  extract_image_id_regexp: .*I(\d+)\.nii\.gz
+  regexp_image_id_group: 1
+  steps:
+    - type: eddy_correct
+      from_subfolder: raw
+      subfolder: _dti_eddy_corrected
+      overwrite: False
+    - type: dtifit
+      from_subfolder: _dti_eddy_corrected
+      subfolder: _dti_fitted
+      overwrite: False
+  filter_xml:
+    files: /local/PPMI/raw/*_I*.xml
+    xml_image_id: ./project/subject/study/imagingProtocol/imageUID
+    xml_class: ./project/subject/researchGroup
+    xml_patient_id: ./project/subject/subjectIdentifier
+    filters:
+      - key: ./project/subject/study/series/modality
+        value:
+            eq: DTI
+  shard:
+    num_workers: 1
+    worker_index: 0

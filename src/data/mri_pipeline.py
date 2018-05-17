@@ -5,6 +5,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import json
 import pickle
+from shutil import copyfile
 import nibabel as nib
 from modules.models.utils import custom_print
 
@@ -130,6 +131,8 @@ class MriPreprocessingPipeline(object):
             'brain_extraction': self.brain_extraction,
             'template_registration': self.template_registration,
             'image_crop': self.image_crop,
+            'eddy_correct': self.eddy_correct,
+            'dtifit': self.dtifit,
         }
         for step in self.steps:
             self._mkdir(step['subfolder'])
@@ -351,12 +354,55 @@ class MriPreprocessingPipeline(object):
             open(os.path.join(self.path, '%slabels.pkl' % pkl_prefix), 'wb'),
         )
 
+    def eddy_correct(self, mri_image, mri_output, image_id, params):
+        bvecs_old, bvals_old = self._get_bvecs_bvals(mri_image)
+        bvecs_new, bvals_new = self._get_bvecs_bvals(mri_output)
+        copyfile(bvecs_old, bvecs_new)
+        copyfile(bvals_old, bvals_new)
+        cmd = 'eddy_correct {mri_image} {mri_output} 0'.format(
+            mri_image=mri_image,
+            mri_output=mri_output,
+        )
+        self._exec(cmd)
+
+    def dtifit(self, mri_image, mri_output, image_id, params):
+        bvecs, bvals = self._get_bvecs_bvals(mri_image)
+        mri_output_base_name = mri_output.split('.nii.gz')[0]
+        brain_extracted_base_name = mri_output_base_name + '_brain'
+        brain_mask_file_name = mri_output_base_name + '_brain_mask'
+
+        # Extract the brain
+        cmd = 'bet2 {mri_image} {brain_extracted_base_name} -m -f 0.1'
+        cmd = cmd.format(
+            mri_image=mri_image,
+            brain_extracted_base_name=brain_extracted_base_name,
+        )
+        self._exec(cmd)
+
+        # Then dtifit
+        cmd = 'dtifit -k {mri_image} -o {mri_output_base_name} '
+        cmd += '-m {brain_mask_file_name}.nii.gz -r {bvecs} -b {bvals}'
+        cmd = cmd.format(
+            mri_image=mri_image,
+            mri_output_base_name=mri_output_base_name,
+            brain_mask_file_name=brain_mask_file_name,
+            bvecs=bvecs,
+            bvals=bvals,
+        )
+        self._exec(cmd)
+
     # ------------------------- Utils and wrappers
     def _exec(self, cmd):
         custom_print('[Exec] ' + cmd)
         os.environ['FSLOUTPUTTYPE'] = 'NIFTI_GZ'
         os.environ['FSLDIR'] = '/local/fsl'
         subprocess.call(cmd, shell=True)
+
+    def _get_bvecs_bvals(self, mri):
+        return [
+            '%s_bvecs' % mri.split('.nii.gz')[0],
+            '%s_bvals' % mri.split('.nii.gz')[0],
+        ]
 
     def _mkdir(self, directory):
         try:
