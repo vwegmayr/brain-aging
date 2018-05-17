@@ -107,7 +107,7 @@ class DataProvider(object):
         ]
         return (all_files, all_labels, all_seeds)
 
-    def get_input_fn(self, train, shard):
+    def get_input_fn(self, train, shard=[0, 1]):
         ft_info = ft_def.all_features.feature_info
         port_features = [
             k
