@@ -21,13 +21,12 @@ def func_fwd_input(fn):
 
 class DeepNNLayers(object):
     def __init__(self, print_shapes=True):
-        self.is_training = True
         self.debug_summaries = False
         self.cnn_layers_shapes = []
         self.enable_print_shapes = print_shapes
         self.parse_layers_defs = {
             'concat_layers': self._parse_concat_layers,
-            'conditionnal_branch': self.conditionnal_branch,
+            'condition': self._parse_condition,
             'conv2d': func_fwd_input(self.conv2d_layer),
             'conv3d': func_fwd_input(self.conv3d_layer),
         }
@@ -35,15 +34,51 @@ class DeepNNLayers(object):
             'batch_norm', 'batch_renorm',
             'normalize_image', 'residual_block', 'localized_batch_norm',
             'dataset_norm_online', 'voxel_wide_norm_online',
+            'apply_gaussian', 'conv2d_shared_all_dims_layer',
+            'random_crop', 'local_norm_image', 'random_rot',
+            'image_summary', 'random_distort_gaussians',
         ]:
             self.parse_layers_defs[f] = func_fwd_input(getattr(self, f))
 
     # ================= Parsing of CNN architecture =================
-    def _parse_concat_layers(self, context, input, layers_def):
-        layers_out = []
-        for l in layers_def:
-            layers_out.append(self.parse_single_layer(context, input, l))
-        return tf.concat(layers_out, 4)
+    def _parse_condition(
+        self,
+        context,
+        input,
+        condition_type,
+        true_layers=[],
+        false_layers=[],
+        name=None,
+        **kwargs
+    ):
+        conditions_defs = {
+            'is_training': lambda: self.is_training_placeholder,
+            'global_step_under': lambda t: tf.train.get_global_step() < t,
+        }
+        if name is None:
+            name = 'cond__%s' % condition_type
+        with tf.variable_scope(name):
+            tf_cond = conditions_defs[condition_type](**kwargs)
+            true_output = self.parse_layers(context, input, true_layers)
+            false_output = self.parse_layers(context, input, false_layers)
+            return tf.cond(
+                tf_cond,
+                lambda: true_output,
+                lambda: false_output,
+            )
+
+    def _parse_concat_layers(
+        self,
+        context,
+        input,
+        layers_def,
+        name='concat_layers'
+    ):
+        with tf.variable_scope(name):
+            layers_out = []
+            for l in layers_def:
+                layers_out.append(self.parse_single_layer(context, input, l))
+            return tf.identity(tf.concat(layers_out, 4), name='output')
 
     def parse_layers(self, context, input, layers_def):
         assert(isinstance(layers_def, list))
@@ -80,7 +115,7 @@ class DeepNNLayers(object):
 
     def variable_summaries(self, var, name, fullcontent=True):
         """Attach a lot of summaries to a Tensor."""
-        with tf.name_scope('%s_summary' % name):
+        with tf.variable_scope('%s_summary' % name):
             mean = tf.reduce_mean(var)
             tf.summary.scalar('mean', mean)
             stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
@@ -99,7 +134,7 @@ class DeepNNLayers(object):
         """
         w_shape = w.get_shape().as_list()
         assert(w_shape[2] in [1, 3])
-        with tf.name_scope(name):
+        with tf.variable_scope(name):
             output_filters = w_shape[3]
             num_rows = int(math.ceil(math.sqrt(output_filters)))
             num_cols = int(math.ceil(output_filters/float(num_rows)))
@@ -134,6 +169,14 @@ class DeepNNLayers(object):
                 tf.reshape(img, [1] + img.get_shape().as_list()[0:3]),
             )
 
+    def image_summary(self, x, name="image_summary"):
+        with tf.variable_scope(name):
+            tf.summary.image(
+                'image',
+                x[:, :, :, int(x.get_shape().as_list()[3]/2), 0:1],
+            )
+        return x
+
     # ================= Generic ConvNets =================
     def conv_layer_wrapper(
         self,
@@ -144,13 +187,13 @@ class DeepNNLayers(object):
         nl=tf.nn.relu,
         strides=[2, 2, 2],
         padding='SAME',
-        scope="conv3d_layer",
+        name="conv3d_layer",
         conv_type='conv',
         bn=True,
         reversed_filters=False,
     ):
         assert(conv_type in ['conv', 'deconv'])
-        with tf.variable_scope(scope):
+        with tf.variable_scope(name):
             conv_input_shape = x.get_shape()[1:].as_list()
             input_channels = conv_input_shape[-1]
             if conv_type == 'conv':
@@ -206,7 +249,7 @@ class DeepNNLayers(object):
                 tf.contrib.framework.get_name_scope(),
                 out.get_shape()[1:].as_list()
             ))
-        return out
+            return tf.identity(out, name='output')
 
     # ================= 2D ConvNets =================
     def conv2d_layer(self, *args, **kwargs):
@@ -245,7 +288,7 @@ class DeepNNLayers(object):
     def conv2d_shared_all_dims_layer(
         self,
         _input,
-        scope,
+        name,
         s=5,
         num_filters_per_dim=8,
         *args,
@@ -256,12 +299,12 @@ class DeepNNLayers(object):
                 _input,
                 num_filters=num_filters_per_dim,
                 filter_weights=filters,
-                scope='conv',
+                name='conv',
                 padding='SAME',
                 *args,
                 **kwargs
             )
-        with tf.variable_scope(scope) as tf_scope:
+        with tf.variable_scope(name) as tf_scope:
             b1 = do_c([s, s, 1], *args, **kwargs)
             tf_scope.reuse_variables()
             b2 = do_c([s, 1, s], *args, **kwargs)
@@ -317,36 +360,27 @@ class DeepNNLayers(object):
             ))
         return out
 
-
     def residual_block(self, x, name, num_features=None):
         with tf.variable_scope(name):
             if num_features is None:
                 num_features = x.get_shape().as_list()[-1]
                 assert(num_features is not None)
             shortcut = x
-            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.nn.relu, scope='conv1')
-            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, scope='conv2')
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.nn.relu, name='conv1')
+            x = self.conv3d_layer(x, num_features, strides=[1, 1, 1], bn=True, nl=tf.identity, name='conv2')
             x += shortcut
             return tf.nn.relu(x)
 
-    def conditionnal_branch(self, context, x, global_step_threshold, before_threshold, after_threshold):
-        output_before_threshold = self.parse_layers(context, x, before_threshold)
-        output_after_threshold = self.parse_layers(context, x, after_threshold)
-        return tf.cond(
-            tf.train.get_global_step() < global_step_threshold,
-            lambda: output_before_threshold,
-            lambda: output_after_threshold,
-        )
-
     # ================= Regularization =================
-    def batch_norm(self, x, decay=0.9, **kwargs):
+    def batch_norm(self, x, decay=0.9, name='bn', **kwargs):
         if 'training' not in kwargs:
-            kwargs['training'] = self.is_training
-        return tf.layers.batch_normalization(
-            x,
-            momentum=decay,
-            **kwargs
-        )
+            kwargs['training'] = self.is_training_placeholder
+        with tf.variable_scope(name):
+            return tf.identity(tf.layers.batch_normalization(
+                x,
+                momentum=decay,
+                **kwargs
+            ), name='output')
 
     def batch_renorm(
         self,
@@ -357,52 +391,228 @@ class DeepNNLayers(object):
         transition_r_end_iter=1500,
         max_r=3,
         max_d=5,
+        name='batch_renorm',
         **kwargs
     ):
-        max_r = tf.cast(max_r, tf.float32)
-        max_d = tf.cast(max_d, tf.float32)
-        step = tf.cast(tf.train.get_global_step(), tf.float32)
-        r = (step - transition_begin_iter) * max_r / \
-            (transition_r_end_iter - transition_begin_iter)
-        r += (step - transition_r_end_iter) * 1.0 / \
-            (transition_begin_iter - transition_r_end_iter)
-        r = tf.clip_by_value(r, 1.0, max_r)
-        d = (step - transition_begin_iter) * max_d / \
-            (transition_d_end_iter - transition_begin_iter)
-        d = tf.clip_by_value(d, 0.0, max_d)
-        renorm_clipping = {
-            'rmin': 1./r,
-            'rmax': r,
-            'dmax': d,
-        }
-        return tf.layers.batch_normalization(
-            x,
-            training=self.is_training,
-            momentum=decay,
-            renorm=True,
-            renorm_clipping=renorm_clipping,
-            **kwargs
-        )
+        with tf.variable_scope(name):
+            max_r = tf.cast(max_r, tf.float32)
+            max_d = tf.cast(max_d, tf.float32)
+            step = tf.cast(tf.train.get_global_step(), tf.float32)
+            r = (step - transition_begin_iter) * max_r / \
+                (transition_r_end_iter - transition_begin_iter)
+            r += (step - transition_r_end_iter) * 1.0 / \
+                (transition_begin_iter - transition_r_end_iter)
+            r = tf.clip_by_value(r, 1.0, max_r)
+            d = (step - transition_begin_iter) * max_d / \
+                (transition_d_end_iter - transition_begin_iter)
+            d = tf.clip_by_value(d, 0.0, max_d)
+            renorm_clipping = {
+                'rmin': 1./r,
+                'rmax': r,
+                'dmax': d,
+            }
+            return tf.layers.batch_normalization(
+                x,
+                training=self.is_training_placeholder,
+                momentum=decay,
+                renorm=True,
+                renorm_clipping=renorm_clipping,
+                **kwargs
+            )
 
-    def apply_gaussian(self, x, kernel_half_size, sigma):
-        dim_size = kernel_half_size * 2 + 1
-        fx, fy, fz = np.mgrid[
+    def get_gaussian_filter(self, sigma, kernel_half_size=None):
+        if kernel_half_size is None:
+            kernel_half_size = int(4 * sigma)
+        coords = np.mgrid[
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
         ]
-        gauss_filter = np.exp(-(fx**2 + fy**2 + fz**2)/float(sigma*sigma*2))
-        gauss_filter = gauss_filter / gauss_filter.sum()
-        gauss_filter = gauss_filter.reshape(
-            [dim_size, dim_size, dim_size, 1, 1],
-        )
+        sigma = tf.convert_to_tensor(sigma, dtype=tf.float64)
+        for i in range(len(coords)):
+            coords[i] = tf.convert_to_tensor(coords[i], dtype=tf.float64)
+        gauss_filter = coords[0] ** 2 + coords[1] ** 2 + coords[2] ** 2
+        gauss_filter = tf.exp(-gauss_filter/(sigma * sigma * 2))
+        gauss_filter = gauss_filter / tf.reduce_sum(gauss_filter)
+        return gauss_filter
+
+    def apply_gaussian(self, x, **kwargs):
+        f = self.get_gaussian_filter(**kwargs)
+        f = tf.reshape(f, f.get_shape().as_list() + [1, 1])
         return tf.nn.conv3d(
             x,
-            gauss_filter,
+            f,
             strides=[1, 1, 1, 1, 1],
             padding='SAME',
         )
 
+    def dropout(self, x, prob):
+        return tf.layers.dropout(
+            x,
+            training=self.is_training_placeholder,
+            rate=prob,
+        )
+
+    def random_crop(
+        self,
+        x,
+        new_shape=None,
+        new_shape_ratio=None,
+        name='random_crop',
+    ):
+        with tf.variable_scope(name):
+            if new_shape is not None:
+                assert(new_shape_ratio is None)
+            elif new_shape_ratio is not None:
+                new_shape = x.get_shape().as_list()[1:]
+                for i, ratio in enumerate(new_shape_ratio):
+                    new_shape[i] = int(new_shape[i] * ratio)
+            else:
+                assert(False)
+            new_shape = tf.convert_to_tensor(new_shape)
+            new_shape = tf.concat([[tf.shape(x)[0]], new_shape], 0)
+
+            out = tf.random_crop(
+                x,
+                new_shape,
+            )
+            self.print_shape('%s -> [random_crop] -> %s' % (
+                x.get_shape().as_list()[1:],
+                out.get_shape().as_list()[1:],
+            ))
+            return tf.identity(out, name='identity')
+
+    def random_rot(self, x, max_angle=0.2, axis=0, name='random_rot'):
+        with tf.variable_scope(name):
+            batch_size = tf.shape(x)[0]
+            angles = tf.random_uniform(
+                [batch_size],
+                minval=-max_angle,
+                maxval=+max_angle,
+                dtype=tf.float32,
+            )
+            tf.summary.histogram('random_rot/angles', angles)
+
+            def rotate_single_image(angle, img):
+                result = tf.contrib.image.rotate(
+                    img,
+                    angle,
+                    interpolation='BILINEAR',
+                    name='rotate_single_image',
+                )
+                return tf.expand_dims(result, 0)
+
+            def body(i, r):
+                return [
+                    tf.add(i, 1),
+                    tf.concat([r, rotate_single_image(angles[i], x[i])], 0),
+                ]
+            assert(axis in [0, 1, 2])
+            axis += 1
+            perm = [0, 1, 2, 3, 4]
+            perm[1] = axis
+            perm[axis] = 1
+            x = tf.transpose(x, perm)
+            i = tf.constant(1)
+            result = rotate_single_image(angles[0], x[0])
+            r = tf.while_loop(
+                lambda i, _: tf.less(i, batch_size),
+                body,
+                [i, result],
+                shape_invariants=[
+                    i.get_shape(),
+                    tf.TensorShape([None] + x.get_shape().as_list()[1:]),
+                ]
+            )
+            return tf.identity(tf.transpose(r[1], perm), name='output')
+
+    def random_distort_gaussians(
+        self,
+        x,
+        min_sigma=30.0,
+        max_sigma=50.0,
+        num_gaussians_per_image=5,
+        gaussian_mult_min=0.2,
+        gaussian_mult_max=0.2,
+        distortion_type='add',
+        name='random_distort_gaussians',
+    ):
+        with tf.variable_scope(name):
+            assert(distortion_type in ['add', 'mult'])
+            batch_size = tf.shape(x)[0]
+            x_shape = x.get_shape().as_list()[1:4]
+            sigmas = tf.random_uniform(
+                [batch_size, num_gaussians_per_image],
+                minval=min_sigma,
+                maxval=max_sigma,
+                dtype=tf.float32,
+            )
+            gaussian_multipliers = tf.random_uniform(
+                [batch_size, num_gaussians_per_image],
+                minval=gaussian_mult_min,
+                maxval=gaussian_mult_max,
+                dtype=tf.float32,
+            )
+            centers = [
+                tf.random_uniform(
+                    [batch_size, num_gaussians_per_image],
+                    minval=0,
+                    maxval=dim_max,
+                    dtype=tf.float32,
+                )
+                for dim_max in x_shape
+            ]
+            coords_np = np.mgrid[0:x_shape[0], 0:x_shape[1], 0:x_shape[2], 0:1]
+            coords = []
+            for i in range(len(coords_np)):
+                coords.append(tf.convert_to_tensor(
+                    coords_np[i], dtype=tf.float32))
+
+            def process_single_image(b, img):
+                if distortion_type == 'mult':
+                    img_modifier = tf.ones_like(img)
+                else:
+                    img_modifier = tf.zeros_like(img)
+                for i in range(num_gaussians_per_image):
+                    s = sigmas[b, i]
+                    gauss_filter = (coords[0] - centers[0][b, i]) ** 2
+                    gauss_filter += (coords[1] - centers[1][b, i]) ** 2
+                    gauss_filter += (coords[2] - centers[2][b, i]) ** 2
+                    gauss_filter = tf.exp(-gauss_filter/(s * s * 2))
+                    gauss_filter *= gaussian_multipliers[b, i]
+                    if distortion_type == 'mult':
+                        img_modifier *= 1 + gauss_filter
+                    else:
+                        img_modifier += gauss_filter
+                if distortion_type == 'mult':
+                    img *= img_modifier
+                else:
+                    img += img_modifier
+                return tf.expand_dims(img, 0)
+
+            def body(i, r):
+                return [
+                    tf.add(i, 1),
+                    tf.concat([
+                            r,
+                            process_single_image(i, x[i]),
+                        ], 0
+                    ),
+                ]
+
+            i = tf.constant(1)
+            r = tf.while_loop(
+                lambda i, _: tf.less(i, batch_size),
+                body,
+                [i, process_single_image(0, x[0])],
+                shape_invariants=[
+                    i.get_shape(),
+                    tf.TensorShape([None] + x.get_shape().as_list()[1:]),
+                ]
+            )
+            return tf.identity(r[1], name='output')
+
+    # ================= Images Normalization =================
     def localized_batch_norm(self, x, kernel_half_size, sigma, eps=0.001):
         smoothed_x = self.apply_gaussian(
             x,
@@ -419,7 +629,11 @@ class DeepNNLayers(object):
         variance = smoothed_x2 - smoothed_x * smoothed_x
         return (x - smoothed_x) / (tf.sqrt(variance + eps))
 
-    def voxel_wide_norm_online(self, x):
+    def voxel_wide_norm_online(
+        self,
+        x,
+        compute_moments_on_smoothed=None,
+    ):
         with tf.variable_scope('voxel_wide_norm_online'):
             image_shape = x.get_shape()[1:]
             accumulated_count = tf.Variable(
@@ -440,34 +654,65 @@ class DeepNNLayers(object):
                 trainable=False,
                 name='accumulated_x2',
             )
-            x_mean = tf.reduce_mean(x, axis=[0], keep_dims=False)
-            x2_mean = tf.reduce_mean(x ** 2, axis=[0], keep_dims=False)
-            if self.is_training:
-                accumulated_count = accumulated_count.assign_add(1.0)
-                accumulated_x = accumulated_x.assign_add(x_mean),
-                accumulated_x2 = accumulated_x2.assign_add(x2_mean)
+            x_for_computations = x
+            if compute_moments_on_smoothed is not None:
+                x_for_computations = self.apply_gaussian(
+                    x,
+                    **compute_moments_on_smoothed
+                )
+            x_mean = tf.reduce_mean(
+                x_for_computations,
+                axis=[0],
+                keep_dims=False,
+            )
+            x2_mean = tf.reduce_mean(
+                x_for_computations ** 2,
+                axis=[0],
+                keep_dims=False,
+            )
+            accumulated_count = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_count.assign_add(1.0),
+                lambda: accumulated_count,
+            )
+            accumulated_x = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_x.assign_add(x_mean),
+                lambda: accumulated_x,
+            )
+            accumulated_x2 = tf.cond(
+                self.is_training_placeholder,
+                lambda: accumulated_x2.assign_add(x2_mean),
+                lambda: accumulated_x2,
+            )
             mean = accumulated_x / accumulated_count
             variance = accumulated_x2 / accumulated_count
             variance -= mean ** 2
             return (x - mean) / tf.sqrt(variance + 0.001)
 
-    def dataset_norm_online(self, x, smooth_params=None):
+    def dataset_norm_online(self, x, **kwargs):
         with tf.variable_scope('dataset_norm_online'):
-            # 1. Smooth images
-            if smooth_params is not None:
-                x = self.apply_gaussian(x, **smooth_params)
-            # 2. Image normalization
+            # 1. Image normalization
             x = self.normalize_image(x)
-            # 3. Voxel normalization
-            x = self.voxel_wide_norm_online(x)
-            # 4. Image normalization again
-            return self.normalize_image(x)
-
-    def dropout(self, x, prob):
-        if not self.is_training:
-            return x
-        return tf.nn.dropout(x, keep_prob=prob)
+            # 2. Voxel normalization
+            x = self.voxel_wide_norm_online(x, **kwargs)
+            # 3. Image normalization again
+            return tf.identity(self.normalize_image(x), name='output')
 
     def normalize_image(self, x):
         mean, var = tf.nn.moments(x, axes=[1, 2, 3, 4], keep_dims=True)
         return (x - mean) / tf.sqrt(var + 0.0001)
+
+    def local_norm_image(
+        self,
+        x,
+        gaussian_params={},
+        div_eps=1.,
+        name='local_norm_image',
+    ):
+        with tf.variable_scope(name):
+            # Increase 'div_eps' to hide noisy details in smooth areas
+            img_gauss = self.apply_gaussian(x, **gaussian_params)
+            img_sq_gauss = self.apply_gaussian(x ** 2, **gaussian_params)
+            img_std = img_sq_gauss - img_gauss ** 2
+            return (x - img_gauss) / tf.sqrt(img_std + div_eps)

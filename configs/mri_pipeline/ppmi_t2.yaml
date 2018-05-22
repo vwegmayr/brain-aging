@@ -74,7 +74,7 @@ params:
       overwrite: False
     - type: image_crop
       from_subfolder: _brain_manual_extracted_registered_1mm
-      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y1_z1
+      subfolder: _brain_manual_extracted_registered_1mm_sn_x1_y1_z2
       crop_x: [65, 115]
       crop_y: [85, 125]
       crop_z: [71, 98]

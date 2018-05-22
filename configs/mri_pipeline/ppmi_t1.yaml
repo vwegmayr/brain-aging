@@ -5,15 +5,35 @@ params:
   files_glob: /local/PPMI/raw/*/*/*/*/*.nii
   extract_image_id_regexp: .*S(\d+)_I(\d+)\.nii
   regexp_image_id_group: 2
-  params:
-    brain_extraction:
+  steps:
+    # Manual brain extraction and then align [1mm]
+    - type: brain_extraction
+      from_subfolder: raw
+      subfolder: _t1_brain_extracted
       options: '-f 0.35 -B'
       overwrite: False
-    template_registration:
+    - type: template_registration
+      from_subfolder: _t1_brain_extracted
+      subfolder: _t1_brain_extracted_registered_1mm
       cost: normcorr
       searchcost: normcorr
-      overwrite: False
       mri_template: data/raw/templates/MNI152_T1_1mm_brain.nii.gz
+      overwrite: False
+    - type: template_registration
+      from_subfolder: _t1_brain_extracted
+      subfolder: _t1_brain_extracted_registered_2mm
+      cost: normcorr
+      searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T1_2mm_brain.nii.gz
+      overwrite: False
+    # Substantia Nigra extraction
+    - type: image_crop
+      from_subfolder: _t1_brain_extracted_registered_1mm
+      subfolder: _t1_brain_extracted_registered_1mm_sn
+      crop_x: [65, 115] # 50
+      crop_y: [85, 125] # 40
+      crop_z: [44, 71]  # 27
+      overwrite: False
   filter_xml:
     files: /local/PPMI/raw/*_I*.xml
     xml_image_id: ./project/subject/study/imagingProtocol/imageUID
@@ -23,7 +43,7 @@ params:
             eq: T1
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix Z']
         value:
-            gt: 50
+            gt: 40
       # Remove some weirdly bugged images
       - key: ./project/subject/study/imagingProtocol/protocolTerm/protocol[@term='Matrix X']
         value:

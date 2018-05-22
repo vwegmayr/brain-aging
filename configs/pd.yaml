@@ -6,7 +6,7 @@
 class: src.estimator.Estimator
 params:
   sumatra_outcome_config:
-    reason: "PD_HC: SN (dn,bn_novar,augment train) | SVM"
+    reason: "PD_HC: SN | SVM"
     tags:
       - pd_hc_1mm_sn
   input_fn_config: # Parameters for input generation (gen_input_fn)
@@ -95,9 +95,9 @@ params:
     network_body:
       layers_def:
         - type: dataset_norm_online
-          smooth_params:
+          compute_moments_on_smoothed:
             kernel_half_size: 10
-            sigma: 0.5
+            sigma: 1
         - type: batch_norm
           center: False
           scale: False

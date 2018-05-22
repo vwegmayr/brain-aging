@@ -7,16 +7,22 @@ from src.features import all_features
 
 class LoopBufferManager:
     def __init__(self, size, default_value=0.0, name='loop_buffer'):
-        self.cursor_pos = tf.Variable(
-            0,
-            trainable=False,
-            name='%s/cursor_pos' % name,
-        )
-        self.buffer = tf.Variable(
-            [default_value] * size,
-            name='%s/buffer' % name,
-            trainable=False,
-        )
+        with tf.name_scope(name):
+            self.cursor_pos = tf.Variable(
+                0,
+                trainable=False,
+                name='cursor_pos',
+            )
+            self.total_written = tf.Variable(
+                0,
+                trainable=False,
+                name='total_written',
+            )
+            self.buffer = tf.Variable(
+                [default_value] * size,
+                name='buffer',
+                trainable=False,
+            )
         self.buffer_size = size
         self.name = name
 
@@ -27,25 +33,18 @@ class LoopBufferManager:
             self.cursor_pos + num_values,
             self.buffer_size,
         )
+
+        buf = self.buffer.assign(
+            tf.concat([
+                self.buffer[:self.cursor_pos],
+                values[:write_pos_last - self.cursor_pos],
+                self.buffer[write_pos_last:],
+            ], 0),
+        )
         with tf.control_dependencies([
-            # self.buffer[:self.cursor_pos]
-            tf.assert_less_equal(self.cursor_pos, self.buffer_size),
-            tf.assert_greater_equal(self.cursor_pos, 0),
-            # values[:write_pos_last - self.cursor_pos]
-            tf.assert_less_equal(write_pos_last - self.cursor_pos, num_values),
-            tf.assert_greater_equal(write_pos_last - self.cursor_pos, 0),
-            # self.buffer[write_pos_last:]
-            tf.assert_less_equal(write_pos_last, self.buffer_size),
-            tf.assert_greater_equal(write_pos_last, 0),
+            buf,
+            self.total_written.assign_add(num_values),
         ]):
-            buf = self.buffer.assign(
-                tf.concat([
-                    self.buffer[:self.cursor_pos],
-                    values[:write_pos_last - self.cursor_pos],
-                    self.buffer[write_pos_last:],
-                ], 0),
-            )
-        with tf.control_dependencies([buf]):
             return self.cursor_pos.assign(tf.cond(
                 self.cursor_pos + num_values >= self.buffer_size,
                 lambda: 0,
@@ -53,7 +52,7 @@ class LoopBufferManager:
             ))
 
     def get_buffer(self):
-        return self.buffer
+        return self.buffer[0:self.total_written]
 
 
 def accumulated_histogram(variable, accumulate_size, name):
@@ -78,7 +77,6 @@ class ClassificationHead(NetworkHeadBase):
         model,
         last_layer,
         features,
-        is_training,
         # Custom arguments (from config file)
         predict,
         loss_classes_weights={},
@@ -110,13 +108,25 @@ class ClassificationHead(NetworkHeadBase):
         ])
         self.labels = [features[ft_name] for ft_name in predict]
         self.labels = tf.concat(self.labels, 1)
-        labels_float = tf.cast(self.labels, tf.float32)
         self.predictions, self.loss, weighted_loss_per_sample = \
             self.compute_prediction_and_loss(
                 last_layer,
                 weights_per_class,
             )
+        self.predictions = tf.identity(self.predictions, name='logits')
 
+        with tf.variable_scope('metrics'):
+            self.compute_metrics(weighted_loss_per_sample)
+
+        super(ClassificationHead, self).__init__(
+            name=name,
+            model=model,
+            last_layer=last_layer,
+            features=features,
+            **kwargs
+        )
+
+    def compute_metrics(self, weighted_loss_per_sample):
         # Metrics for training/eval
         batch_size = tf.cast(tf.shape(self.labels)[0], tf.float32)
         accuracy = tf.cast(
@@ -133,13 +143,13 @@ class ClassificationHead(NetworkHeadBase):
             'labels/%s_ratio' % class_name: tf.reduce_mean(
                 tf.cast(self.labels[:, i], tf.float32),
             )
-            for i, class_name in enumerate(predict)
+            for i, class_name in enumerate(self.predict_feature_names)
         })
         self.metrics.update({
             'logits/%s' % class_name: tf.reduce_mean(
                 tf.cast(self.predictions[:, i], tf.float32),
             )
-            for i, class_name in enumerate(predict)
+            for i, class_name in enumerate(self.predict_feature_names)
         })
         self.metrics.update({
             'predicted_%s_ratio' % ft_name:
@@ -164,29 +174,30 @@ class ClassificationHead(NetworkHeadBase):
             return class_acc, tf.reduce_sum(weights)
         self.classes_accuracy = {
             'accuracy_on_%s' % c: accuracy_on_class(i)
-            for i, c in enumerate(predict)
+            for i, c in enumerate(self.predict_feature_names)
         }
         self.metrics.update({
             name: v[0]
             for name, v in self.classes_accuracy.items()
         })
         if weighted_loss_per_sample is not None:
+            labels_float = tf.cast(self.labels, tf.float32)
             loss_contribution_ratio = [
                 tf.reduce_sum(
                     weighted_loss_per_sample * labels_float[:, i] / batch_size
                 )
-                for i, _ in enumerate(predict)
+                for i, _ in enumerate(self.predict_feature_names)
             ]
             self.metrics.update({
                 'loss_contribution_ratio/%s' % class_name:
                     loss_contribution_ratio[i] / self.loss
-                for i, class_name in enumerate(predict)
+                for i, class_name in enumerate(self.predict_feature_names)
             })
 
         # Histogram summaries
         self.probas = tf.nn.softmax(self.predictions)
         control_deps = []
-        if is_training:
+        if self.model.is_training_bool:
             HISTOGRAM_NUMBER_VALUES_TRAIN_SET = 350
             for p_idx, p_ft_name in enumerate(self.predict_feature_names):
                 summary, update_op = accumulated_histogram(
@@ -207,38 +218,31 @@ class ClassificationHead(NetworkHeadBase):
         with tf.control_dependencies(control_deps):
             self.loss = tf.identity(self.loss)
 
-        super(ClassificationHead, self).__init__(
-            name=name,
-            model=model,
-            last_layer=last_layer,
-            features=features,
-            is_training=is_training,
-            **kwargs
-        )
-
     def compute_prediction_and_loss(
         self,
         last_layer,
         weights_per_class,
     ):
-        predictions = self.model.gen_head(
-            last_layer,
-            len(self.predict_feature_names),
-        )
-        weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
-            self.labels,
-            predictions,
-            reduction=tf.losses.Reduction.NONE,
-            weights=tf.reduce_sum(
-                tf.cast(self.labels, tf.float32) * weights_per_class, 1,
-            ),
-        )
-        loss = tf.reduce_mean(weighted_loss_per_sample)
-        return predictions, loss, weighted_loss_per_sample
+        with tf.variable_scope('prediction'):
+            predictions = self.model.gen_head(
+                last_layer,
+                len(self.predict_feature_names),
+            )
+        with tf.variable_scope('loss'):
+            weighted_loss_per_sample = tf.losses.softmax_cross_entropy(
+                self.labels,
+                predictions,
+                reduction=tf.losses.Reduction.NONE,
+                weights=tf.reduce_sum(
+                    tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                ),
+            )
+            loss = tf.reduce_mean(weighted_loss_per_sample)
+            return predictions, loss, weighted_loss_per_sample
 
-    def get_evaluated_metrics(self):
+    def _get_evaluated_metrics(self):
         evaluation_metrics = \
-            super(ClassificationHead, self).get_evaluated_metrics()
+            super(ClassificationHead, self)._get_evaluated_metrics()
 
         predicted = tf.argmax(
             self.predictions[:, 0:self.num_classes_in_evaluation],
@@ -300,7 +304,7 @@ class ClassificationHead(NetworkHeadBase):
         return tags
 
     def get_tensors_to_dump(self):
-        if self.is_training:
+        if self.model.is_training_bool:
             return {}
         return {
             'proba': self.probas,
@@ -315,6 +319,16 @@ class ClassificationHead(NetworkHeadBase):
 
 
 class ClassificationSVMHead(ClassificationHead):
+    def __init__(
+        self,
+        svm_reg_coeff=5.0,
+        svm_force_w_symmetry_axis=[],
+        **kwargs
+    ):
+        self.svm_reg_coeff = svm_reg_coeff
+        self.svm_force_w_symmetry_axis = svm_force_w_symmetry_axis
+        super(ClassificationSVMHead, self).__init__(**kwargs)
+
     """
     Does one-versus-rest classification using SVM loss
     """
@@ -323,11 +337,7 @@ class ClassificationSVMHead(ClassificationHead):
         last_layer,
         weights_per_class,
     ):
-        SVM_C_CONST = 5 #0.00001
-
-        # Get features
-        ft_in = np.prod(last_layer.get_shape().as_list()[1:])
-        features = tf.reshape(last_layer, [tf.shape(last_layer)[0], ft_in])
+        SVM_REG_CONST = self.svm_reg_coeff
 
         all_predictions = []
         all_loss = tf.constant(0.0)
@@ -335,17 +345,17 @@ class ClassificationSVMHead(ClassificationHead):
             ft_shortname = all_features.feature_info[ft_name]['shortname']
             with tf.variable_scope('%s_vs_rest' % (ft_shortname)):
                 # Prediction and loss
-                predictions, W = self.build_svm_layer(features)
+                predictions, W = self.build_svm_layer(last_layer)
                 weighted_loss_per_sample = tf.losses.hinge_loss(
                     tf.cast(self.labels[:, i], tf.float32),
                     tf.reshape(predictions, [-1]),
                     reduction=tf.losses.Reduction.NONE,
-                    weights=tf.reduce_sum(
-                        tf.cast(self.labels, tf.float32) * weights_per_class, 1,
+                    weights=tf.reduce_sum(tf.cast(
+                        self.labels, tf.float32) * weights_per_class, 1,
                     ),
                 )
                 w_l2 = 0.5 * tf.reduce_sum(tf.square(W))
-                reg_loss = SVM_C_CONST * w_l2
+                reg_loss = SVM_REG_CONST * w_l2
                 hinge_loss = tf.reduce_mean(weighted_loss_per_sample)
                 loss = hinge_loss + reg_loss
                 self.metrics.update({
@@ -359,9 +369,17 @@ class ClassificationSVMHead(ClassificationHead):
                 all_loss += loss
         return tf.concat(all_predictions, 1), all_loss, None
 
-    def build_svm_layer(self, features):
-        ft_in = features.get_shape().as_list()[1]
-        W = tf.Variable(tf.zeros([ft_in, 1]), name="svm_w")
+    def build_svm_layer(self, last_layer):
+        in_shape = last_layer.get_shape().as_list()[1:]
+        W = tf.Variable(tf.zeros(in_shape), name="svm_w")
         b = tf.Variable(tf.zeros([1]), name="svm_b")
-        y_raw = tf.matmul(features, W) + b
-        return y_raw, W
+        if len(self.svm_force_w_symmetry_axis) > 0:
+            W = 0.5 * (W + tf.reverse(W, self.svm_force_w_symmetry_axis))
+        reduction_axis = range(1, len(in_shape) + 1)
+        y_raw = tf.reduce_sum(last_layer * W, axis=reduction_axis) + b
+        return tf.reshape(y_raw, [-1, 1]), W
+
+    def get_tags(self):
+        tags = super(ClassificationSVMHead, self).get_tags()
+        tags.append('svm_head')
+        return tags

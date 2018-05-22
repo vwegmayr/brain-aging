@@ -14,6 +14,10 @@ class DataProvider(object):
         self.input_fn_config = input_fn_config
         self.seed = 0
 
+    def export_dataset(self):
+        # Not implemented
+        return None
+
     def get_input_fn(self, train, shard):
         self.seed += 1
         def _input_fn():

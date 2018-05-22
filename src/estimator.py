@@ -73,8 +73,17 @@ class Estimator(TensorflowBaseEstimator):
         custom_print('[INFO] Main training loop. Model dir is %s' % (
             self.config["model_dir"]))
         if 'reason' in self.sumatra_outcome_config:
-            custom_print('[INFO] Provided run reason in config: %s' %
-                self.sumatra_outcome_config['reason'])
+            custom_print('[INFO] Provided run reason in config: %s' % (
+                self.sumatra_outcome_config['reason'],
+            ))
+
+        # Dump list of train/test images
+        dataset = self.data_provider.export_dataset()
+        if dataset is not None:
+            with open('%s/dataset.json' % (
+                self.config["model_dir"]
+            ), 'w') as outfile:
+                json.dump(dataset, outfile)
 
         printed_count = [0]  # Workaround to modify variable inside nested func
 
@@ -142,12 +151,25 @@ class Estimator(TensorflowBaseEstimator):
         NETWORK_BODY_SCOPE = 'network_body'
         network_heads = params['network_heads']
 
+        # Give input feature tensors a fixed name independant of the
+        #  input pipeline (for when loading the network)
+        with tf.variable_scope('input_features'):
+            for k, v in features.items():
+                features[k] = tf.identity(v, name=k)
+
+        is_training_placeholder = tf.placeholder(tf.bool, [], 'is_training')
+        is_training_bool = (mode == tf.estimator.ModeKeys.TRAIN)
+        set_is_training_placeholder_hook = tf.train.FeedFnHook(
+            lambda: {is_training_placeholder: is_training_bool},
+        )
+
         if mode == tf.estimator.ModeKeys.PREDICT:
             features = self.data_provider.predict_features(features)
 
         with tf.variable_scope(NETWORK_BODY_SCOPE):
             m = Model(
-                is_training=(mode == tf.estimator.ModeKeys.TRAIN),
+                is_training_bool=is_training_bool,
+                is_training_placeholder=is_training_placeholder,
                 print_shapes=self.is_model_first_run,
             )
             self.is_model_first_run = False
@@ -164,7 +186,6 @@ class Estimator(TensorflowBaseEstimator):
                     model=m,
                     last_layer=last_layer,
                     features=features,
-                    is_training=(mode == tf.estimator.ModeKeys.TRAIN),
                     **h
                 )
                 self.sumatra_add_tags(head.get_tags())
@@ -218,30 +239,30 @@ class Estimator(TensorflowBaseEstimator):
                 })
 
         # Optimizer
-        train_vars = tf.get_collection(
-            tf.GraphKeys.TRAINABLE_VARIABLES,
-            scope=NETWORK_BODY_SCOPE,
-        )
-        for head in heads:
-            head.register_globally_trained_variables(train_vars)
-
-        train_ops = self.generate_train_ops(
-            train_log_variables,
-            global_loss,
-            train_vars,
-            heads,
-            **params['network_train_ops_settings']
-        )
+        with tf.variable_scope('train_ops'):
+            train_vars = tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES,
+                scope=NETWORK_BODY_SCOPE,
+            )
+            for head in heads:
+                head.register_globally_trained_variables(train_vars)
+            train_ops = self.generate_train_ops(
+                train_log_variables,
+                global_loss,
+                train_vars,
+                heads,
+                **params['network_train_ops_settings']
+            )
 
         # Evaluation hooks
-        evaluation_hooks = []
+        evaluation_hooks = [set_is_training_placeholder_hook]
         all_summaries = tf.summary.merge_all()
         if all_summaries is not None:
-            evaluation_hooks = [tf.train.SummarySaverHook(
+            evaluation_hooks.append(tf.train.SummarySaverHook(
                 save_steps=1,
                 output_dir=self.config["model_dir"] + "/eval",
                 summary_op=tf.summary.merge_all(),
-            )]
+            ))
         tensors_to_dump = {}
         for head in heads:
             with tf.variable_scope(head.get_name()):
@@ -250,10 +271,10 @@ class Estimator(TensorflowBaseEstimator):
                     head.name + '/' + var_name: var_value
                     for var_name, var_value in variables.items()
                 })
-        evaluation_hooks += [SessionHookDumpTensors(
+        evaluation_hooks.append(SessionHookDumpTensors(
             self.save_path,
             tensors_to_dump,
-        )]
+        ))
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
@@ -263,7 +284,7 @@ class Estimator(TensorflowBaseEstimator):
             training_hooks=self.get_training_hooks(
                 params,
                 log_variables=train_log_variables,
-            ),
+            ) + [set_is_training_placeholder_hook],
             evaluation_hooks=evaluation_hooks,
         )
 
