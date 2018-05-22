@@ -1,6 +1,7 @@
 import tensorflow as tf
 import sys
 import os
+import numpy as np
 
 
 from modules.models.base import BaseTF
@@ -11,16 +12,30 @@ from src.data.mnist import read as mnist_read
 from src.train_hooks import ConfusionMatrixHook, ICCHook
 
 
-def test_retest_evaluation_spec(labels, loss, preds_test, preds_retest,
-                                probs_test, probs_retest, params, mode,
-                                evaluation_hooks):
+def test_retest_evaluation_spec(
+        labels, loss, preds_test,
+        preds_retest, probs_test, probs_retest, params,
+        mode, evaluation_hooks):
+
+    return test_retest_two_labels_evaluation_spec(
+        test_labels=labels, retest_labels=labels, loss=loss,
+        preds_test=preds_test, preds_retest=preds_retest,
+        probs_retest=probs_retest, probs_test=probs_test,
+        params=params, mode=mode, evaluation_hooks=evaluation_hooks
+    )
+
+
+def test_retest_two_labels_evaluation_spec(
+        test_labels, retest_labels, loss, preds_test,
+        preds_retest, probs_test, probs_retest, params,
+        mode, evaluation_hooks):
     # Evaluation
     eval_acc_test = tf.metrics.accuracy(
-        labels=labels,
+        labels=test_labels,
         predictions=preds_test
     )
     eval_acc_retest = tf.metrics.accuracy(
-        labels=labels,
+        labels=retest_labels,
         predictions=preds_retest
     )
     # Compute KL-divergence between test and retest probs
@@ -102,6 +117,46 @@ def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
             False
         )
 
+    return tf.estimator.inputs.numpy_input_fn(
+        x={
+            "X_test": test,
+            "X_retest": retest
+        },
+        y=labels,
+        **input_fn_config
+    )
+
+
+def mnist_test_retest_two_labels_input_fn(X, data_params, y=None, train=True,
+                                          input_fn_config={}):
+    """
+    MNIST logistic regression for test-retest data. Loads presampled
+    images from .npy files.
+    """
+    if train:
+        # load training data
+        test, retest, test_labels, retest_labels = \
+            mnist_read.load_test_retest_two_labels(
+                data_params["data_path"],  # path to MNIST root folder
+                data_params["train_test_retest"],
+                data_params["train_size"],
+                True,
+                data_params["mix_pairs"]
+            )
+
+    else:
+        # load test/retest data
+        test, retest, test_labels, retest_labels = \
+            mnist_read.load_test_retest_two_labels(
+                data_params["data_path"],  # path to MNIST root folder
+                data_params["test_test_retest"],
+                data_params["test_size"],
+                False,
+                data_params["mix_pairs"]
+            )
+
+    labels = np.hstack((np.reshape(test_labels, (-1, 1)),
+                        np.reshape(retest_labels, (-1, 1))))
     return tf.estimator.inputs.numpy_input_fn(
         x={
             "X_test": test,

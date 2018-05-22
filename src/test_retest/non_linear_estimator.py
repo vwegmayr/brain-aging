@@ -3,8 +3,10 @@ import tensorflow as tf
 
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 import src.test_retest.regularizer as regularizer
-from src.test_retest.test_retest_base import test_retest_evaluation_spec
-from src.test_retest.test_retest_base import mnist_test_retest_input_fn
+from src.test_retest.test_retest_base import \
+    test_retest_two_labels_evaluation_spec
+from src.test_retest.test_retest_base \
+    import mnist_test_retest_two_labels_input_fn
 
 
 def name_to_hidden_regularization(layer_id, reg_name, activations_test,
@@ -39,6 +41,9 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
             features["X_retest"],
             [-1, self.params["input_dim"]]
         )
+
+        test_labels = labels[:, 0]
+        retest_labels = labels[:, 1]
 
         f_test = input_test
         f_retest = input_retest
@@ -138,12 +143,12 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
 
         # compute cross-entropy loss for test and retest
         loss_test = tf.losses.sparse_softmax_cross_entropy(
-            labels=labels,
+            labels=test_labels,
             logits=logits_test
         )
 
         loss_retest = tf.losses.sparse_softmax_cross_entropy(
-            labels=labels,
+            labels=retest_labels,
             logits=logits_retest
         )
 
@@ -195,8 +200,9 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
             features_retest=f_retest
         )
 
-        return test_retest_evaluation_spec(
-            labels=labels,
+        return test_retest_two_labels_evaluation_spec(
+            test_labels=test_labels,
+            retest_labels=retest_labels,
             loss=loss,
             preds_test=preds_test,
             preds_retest=preds_retest,
@@ -214,7 +220,7 @@ class MnistDeepTestRetestClassifier(DeepTestRetestClassifier):
     images from .npy files.
     """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        return mnist_test_retest_input_fn(
+        return mnist_test_retest_two_labels_input_fn(
             X=X,
             y=y,
             data_params=self.data_params,

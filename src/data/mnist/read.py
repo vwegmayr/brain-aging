@@ -131,6 +131,21 @@ def load_mnist_test(folder_path):
 
 
 def load_test_retest(data_path, test_rest_path, n_samples, train):
+    """
+    Load load pre-sampled test-retest pairs of MNIST digits.
+    Args:
+        - data_path: path to the MNIST data folder (needed to load
+          labels)
+        - test_rest_path: path to folder containing test-retest samples
+        - n_samples: number of samples to load
+        - train: True to load training samples, False to load test
+          samples
+
+    Returns:
+        - test: array containing test images of test-retest pairs
+        - retest: array containg retest images of test-retest pairs
+        - labels: array containg labels
+    """
     # load labels
     if train:
         labels = load_training_labels(data_path)
@@ -141,6 +156,55 @@ def load_test_retest(data_path, test_rest_path, n_samples, train):
         X = np.load(f)
 
     return X[0, :n_samples, :, :], X[1, :n_samples, :, :], labels[:n_samples]
+
+
+def load_test_retest_two_labels(data_path, test_rest_path, n_samples, train,
+                                mix_pairs=False):
+    """
+    Load load pre-sampled test-retest pairs of MNIST digits.
+    Args:
+        - data_path: path to the MNIST data folder (needed to load
+          labels)
+        - test_rest_path: path to folder containing test-retest samples
+        - n_samples: number of samples to load
+        - train: True to load training samples, False to load test
+          samples
+        - uncouple_pairs: True if we pairs should be broken up, i.e.
+          test-retest relationship of pairs is broken up
+
+    Returns:
+        - test: array containing test images of test-retest pairs
+        - retest: array containg retest images of test-retest pairs
+        - labels: array containg labels
+    """
+    # load labels
+    if train:
+        labels = load_training_labels(data_path)
+    else:
+        labels = load_test_labels(data_path)
+
+    with open(test_rest_path, "rb") as f:
+        X = np.load(f)
+
+    test_labels = np.copy(labels)
+    retest_labels = np.copy(labels)
+
+    if mix_pairs:
+        # shuffle pairs
+        n = X.shape[1]
+        np.random.seed(40)
+        idx = np.arange(n)
+        np.random.shuffle(idx)
+        X[0, :] = X[0, idx]
+        test_labels[:] = test_labels[idx]
+
+        idx = np.arange(n)
+        np.random.shuffle(idx)
+        X[1, :] = X[1, idx]
+        retest_labels[:] = retest_labels[idx]
+
+    return X[0, :n_samples, :, :], X[1, :n_samples, :, :], \
+        test_labels[:n_samples], retest_labels[:n_samples]
 
 
 def _sample_test_retest(n_pairs, images):
