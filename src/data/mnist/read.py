@@ -186,6 +186,9 @@ def load_test_retest_two_labels(data_path, test_rest_path, n_samples, train,
     with open(test_rest_path, "rb") as f:
         X = np.load(f)
 
+    X = X[:, :n_samples, :, :]
+    labels = labels[:n_samples]
+
     test_labels = np.copy(labels)
     retest_labels = np.copy(labels)
 
