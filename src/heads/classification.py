@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from base import NetworkHeadBase
+from .base import NetworkHeadBase
 import src.features as ft_def
 from src.features import all_features
 

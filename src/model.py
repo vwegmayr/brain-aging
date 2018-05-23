@@ -1,7 +1,7 @@
 import copy
 import tensorflow as tf
-import features as features_def
-from deepnn.layers import DeepNNLayers
+from . import features as features_def
+from .deepnn.layers import DeepNNLayers
 
 
 class ModelLayerContext:

@@ -75,6 +75,7 @@ class FeaturesStore:
         ft = {}
         match = self.extract_from_path.match(filename)
         if match is None:
+            print(filename)
             raise LookupError('Regexp doesnt match')
         for ft_name, ft_group in self.features_in_regexp.items():
             ft[ft_name] = str_to_ft(ft_name, match.group(ft_group))

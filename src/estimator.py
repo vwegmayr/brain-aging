@@ -7,10 +7,10 @@ import sys
 
 from modules.models.base import BaseTF as TensorflowBaseEstimator
 from modules.models.utils import custom_print
-import features as ft_def
+import src.features as ft_def
 import src.data.providers
-from model import Model
-from train_hooks import PrintAndLogTensorHook, SessionHookDumpTensors
+from src.model import Model
+from .train_hooks import PrintAndLogTensorHook, SessionHookDumpTensors
 
 
 class Estimator(TensorflowBaseEstimator):

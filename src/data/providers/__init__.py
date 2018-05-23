@@ -1,2 +1,2 @@
-import tf_streaming
-import py_streaming
+from . import tf_streaming
+from . import py_streaming

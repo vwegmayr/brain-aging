@@ -126,7 +126,7 @@ def input_iterator(
         )
     assert(type in ['train', 'test'])
     if type == 'test':
-        dataset = get_dataset(config_data_generation['test_database_file'])
+        dataset = get_dataset(config_data_generation['test_data_file'])
     else:
         ENABLE_RESAMPLING_BATCH_BALANCE = False
         if ENABLE_RESAMPLING_BATCH_BALANCE:
