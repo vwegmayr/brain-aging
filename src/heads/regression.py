@@ -53,9 +53,9 @@ class RegressionHead(NetworkHeadBase):
             **kwargs
         )
 
-    def get_evaluated_metrics(self):
+    def _get_evaluated_metrics(self):
         evaluation_metrics = \
-            super(RegressionHead, self).get_evaluated_metrics()
+            super(RegressionHead, self)._get_evaluated_metrics()
         evaluation_metrics.update({
             'rmse': tf.metrics.root_mean_squared_error(
                 tf.cast(self.labels, tf.float32),

@@ -19,6 +19,13 @@ params:
       searchcost: normcorr
       mri_template: data/raw/templates/MNI152_T1_1mm_brain.nii.gz
       overwrite: False
+    - type: template_registration
+      from_subfolder: _t1_brain_extracted
+      subfolder: _t1_brain_extracted_registered_2mm
+      cost: normcorr
+      searchcost: normcorr
+      mri_template: data/raw/templates/MNI152_T1_2mm_brain.nii.gz
+      overwrite: False
     # Substantia Nigra extraction
     - type: image_crop
       from_subfolder: _t1_brain_extracted_registered_1mm
