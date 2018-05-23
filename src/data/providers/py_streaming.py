@@ -116,9 +116,9 @@ class DataProvider(object):
         ]
 
         def _read_files(f, label, seed):
-            ft = self.file_to_features[f]
+            ft = self.file_to_features[f.decode("utf-8")]
             ret = [DataInput.load_and_augment_file(
-                f, seed, self.augment_ratio[['test', 'train'][train]],
+                f.decode("utf-8"), seed, self.augment_ratio[['test', 'train'][train]],
             )]
             ret += [
                 ft[pf]
