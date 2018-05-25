@@ -5,6 +5,9 @@ import re
 
 
 class FileStream(abc.ABC):
+    """
+    Base class to stream files from disk.
+    """
     def __init__(self, stream_config):
         """
         Arg:
@@ -61,14 +64,28 @@ class FileStream(abc.ABC):
 
     @abc.abstractmethod
     def get_batches(self):
+        """
+        Produce batches of file groups.
+        Return:
+            - batches: list of list of groups
+        """
         pass
 
     @abc.abstractmethod
     def group_data(self):
+        """
+        Group files together that should be streamed together.
+        For example groups of two files (i.e. pairs) or groups
+        of three files (i.e. triples) can be formed.
+        """
         pass
 
     @abc.abstractmethod
     def make_train_test_split(self):
+        """
+        Split the previously formed groups in a training set and
+        a test set.
+        """
         pass
 
     @abc.abstractmethod
@@ -76,6 +93,10 @@ class FileStream(abc.ABC):
         pass
 
     def parse_meta_csv(self):
+        """
+        Parse the csv file containing the meta information about the
+        data.
+        """
         meta_info = {}
         with open(self.meta_csv) as csvfile:
             reader = csv.DictReader(csvfile)
@@ -86,10 +107,19 @@ class FileStream(abc.ABC):
         return meta_info
 
     def get_file_path(self, file_id):
+        """
+        Arg:
+            - file_id: id of file
+        Return:
+            - file path for the given id
+        """
         return self.file_id_to_meta[file_id]["file_path"]
 
 
 class Group(object):
+    """
+    Represents files that should be considered as a group.
+    """
     def __init__(self, file_ids, is_train=None):
         self.file_ids = file_ids
         self.is_train = is_train
@@ -99,7 +129,20 @@ class Group(object):
 
 
 class DataSource(object):
+    """
+    Represents a dataset that is located in one folder.
+    """
     def __init__(self, name, glob_pattern, id_from_filename):
+        """
+        Args:
+            - name: name of the dataset
+            - glob_pattern: regular expression that identifies
+              files that should be considered
+            - id_from_filename: dictionary containing a regular
+              expression identifying valid file names and the ID
+              of the group in the regular expression that contains
+              the file ID, e.g. 3991 is the ID in 3991_aug_mni.nii.gz
+        """
         self.name = name
         self.glob_pattern = glob_pattern
         self.id_from_filename = id_from_filename
@@ -107,6 +150,11 @@ class DataSource(object):
         self.collect_files()
 
     def collect_files(self):
+        """
+        Map file IDs to corresponding file paths, and file paths
+        to file IDs.
+        Raises an error for encountered invalid file names.
+        """
         paths = glob.glob(self.glob_pattern)
         self.file_paths = []
         self.file_path_to_id = {}

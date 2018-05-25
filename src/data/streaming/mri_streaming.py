@@ -13,6 +13,9 @@ class MRIImageLoader(object):
 
 
 class MRISingleStream(FileStream, MRIImageLoader):
+    """
+    Stream files one by one.
+    """
     def get_batches(self):
         return [[group] for group in self.groups]
 
