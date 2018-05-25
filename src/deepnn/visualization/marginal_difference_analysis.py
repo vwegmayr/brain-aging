@@ -3,7 +3,7 @@ import numpy as np
 import nibabel as nib
 
 
-class MarginalDifferenceAnalysis:
+class MarginalDifferenceAnalysis(object):
     def __init__(
         self,
         session,
@@ -11,6 +11,7 @@ class MarginalDifferenceAnalysis:
         cnn_probas_output,
         cnn_feed_input,
         cnn_feed_other_values,
+        step=4,
         small_hw=10,
         big_hw=15,
     ):
@@ -19,25 +20,27 @@ class MarginalDifferenceAnalysis:
         """
         BATCH_SIZE = 16
         self.session = session
-        self.images_dataset = self.load_dataset(images_dataset)
+        self.images_dataset = images_dataset
         self.image_shape = self.images_dataset.get_shape().as_list()[1:]
         self.small_hw = small_hw
         self.big_hw = big_hw
+        self.step = step
         # Tensors from already existing graph
         self.cnn_probas_output = cnn_probas_output
         self.cnn_feed_input = cnn_feed_input
         self.cnn_feed_other_values = cnn_feed_other_values
         # TF Placeholders
         self.center_pos_placeholder = tf.placeholder(tf.float32, [3])
+        self.hw_placeholder = tf.placeholder(tf.float32, [3])
         self.analyzed_image_placeholder = tf.placeholder(
             tf.float32, self.image_shape)
         # TF Graph
-        self.block_small_hw = self.create_block_mask(self.small_hw)
-        self.block_big_hw = self.create_block_mask(self.big_hw)
+        self.block_mask = self.create_block_mask(self.hw_placeholder)
         self.images_batch_tf = self.create_images_with_block_sampled(
             BATCH_SIZE)
 
-    def load_dataset(self, file_names):
+    @staticmethod
+    def load_dataset(file_names, session):
         sample_image = nib.load(file_names[0]).get_data()
         tf_dataset = tf.Variable(
             tf.zeros([len(file_names)] + list(sample_image.shape)),
@@ -50,13 +53,13 @@ class MarginalDifferenceAnalysis:
         with tf.control_dependencies([tf.scatter_update(
             tf_dataset,
             tf_i,
-            self._normalize_image(tf_image))
+            MarginalDifferenceAnalysis._normalize_image(tf_image))
         ]):
             op = tf.identity(tf_i)
         print('Loading %d input images...' % len(file_names))
-        self.session.run(tf.variables_initializer([tf_dataset]))
+        session.run(tf.variables_initializer([tf_dataset]))
         for i, image_file_name in enumerate(file_names):
-            self.session.run([op], {
+            session.run([op], {
                 tf_i: i,
                 tf_image: nib.load(image_file_name).get_data(),
             })
@@ -77,16 +80,16 @@ class MarginalDifferenceAnalysis:
         center_z = tf.cast(self.center_pos_placeholder[2], tf.float32)
         in_range = [
             tf.logical_and(
-                coords_x <= center_x + block_hw,
-                center_x - block_hw <= coords_x,
+                coords_x < center_x + block_hw[0],
+                center_x - block_hw[0] <= coords_x,
             ),
             tf.logical_and(
-                coords_y <= center_y + block_hw,
-                center_y - block_hw <= coords_y,
+                coords_y < center_y + block_hw[1],
+                center_y - block_hw[1] <= coords_y,
             ),
             tf.logical_and(
-                coords_z <= center_z + block_hw,
-                center_z - block_hw <= coords_z,
+                coords_z < center_z + block_hw[2],
+                center_z - block_hw[2] <= coords_z,
             )
         ]
         return tf.logical_and(
@@ -102,11 +105,12 @@ class MarginalDifferenceAnalysis:
             dtype=tf.int32,
         )
         block_mask = tf.cast(
-            tf.expand_dims(self.block_small_hw, axis=0),
+            tf.expand_dims(self.block_mask, axis=0),
             tf.float32,
         )
         result = tf.expand_dims(
-            self._normalize_image(self.analyzed_image_placeholder),
+            MarginalDifferenceAnalysis._normalize_image(
+                self.analyzed_image_placeholder),
             axis=0,
         ) * (1.0 - block_mask)
         result += tf.gather(
@@ -115,14 +119,16 @@ class MarginalDifferenceAnalysis:
         ) * block_mask
         return result
 
-    def run_block(self, image, center_pos):
+    def run_block(self, image, block_info):
+        feed_dict = {
+            self.center_pos_placeholder: block_info['center'],
+            self.analyzed_image_placeholder: image,
+            self.hw_placeholder: block_info['hw'],
+        }
         images_batch, block_mask = self.session.run([
             self.images_batch_tf,
-            self.block_small_hw,
-        ], {
-            self.center_pos_placeholder: center_pos,
-            self.analyzed_image_placeholder: image,
-        })
+            self.block_mask,
+        ], feed_dict)
         feed_dict = {
             self.cnn_feed_input: images_batch,
         }
@@ -139,26 +145,14 @@ class MarginalDifferenceAnalysis:
         # Odds func
         return raw_proba / (1. - raw_proba)
 
-    def visualize_image(self, image, const_z=None, step=None, class_index=0):
+    def visualize_image(self, image, const_z=None, class_index=0):
         assert(list(image.shape) == list(self.image_shape))
-        if step is None:
-            step = self.small_hw / 2
         we = np.zeros_like(image)
         counts = np.zeros_like(image)
 
         # Iterate all possible blocks
-        margin = self.small_hw + 1
-        all_centers_todo = []
-        for center_x in range(margin, image.shape[0] - margin, step):
-            for center_y in range(margin, image.shape[1] - margin, step):
-                if const_z is not None:
-                    all_centers_todo.append(
-                        np.array([center_x, center_y, const_z]))
-                    continue
-                for center_z in range(margin, image.shape[2] - margin, step):
-                    all_centers_todo.append(
-                        np.array([center_x, center_y, center_z]))
-        print('There are %d blocks to iterate over' % len(all_centers_todo))
+        all_todo = self._generate_all_centers_and_hw(const_z)
+        print('There are %d blocks to iterate over' % len(all_todo))
 
         # Compute class probability with full image
         feed_dict = {
@@ -169,10 +163,10 @@ class MarginalDifferenceAnalysis:
         full_img_odds = self.compute_odds(full_img_proba[0, class_index])
 
         # Compute class probability when replacing part of the image
-        for i, center_pos in enumerate(all_centers_todo):
+        for i, block_info in enumerate(all_todo):
             if i % 50 == 0:
-                print('Doing block %d/%d...' % (i, len(all_centers_todo)))
-            probas, block_mask = self.run_block(image, center_pos)
+                print('Doing block %d/%d...' % (i, len(all_todo)))
+            probas, block_mask = self.run_block(image, block_info)
             proba = np.mean(probas[:, class_index])
             odd = self.compute_odds(proba)
             we += (
@@ -183,6 +177,84 @@ class MarginalDifferenceAnalysis:
         print('Done: Visualization computed :)')
         return we / (counts.astype(np.float32) + 0.001)
 
-    def _normalize_image(self, x):
+    def _generate_all_centers_and_hw(self, const_z):
+        all_centers_todo = []
+        margin = self.small_hw + 1
+        image_shape = self.image_shape
+        step = self.step
+        for center_x in range(margin, image_shape[0] - margin, step):
+            for center_y in range(margin, image_shape[1] - margin, step):
+                if const_z is not None:
+                    all_centers_todo.append({
+                        'center': np.array([center_x, center_y, const_z]),
+                        'hw': np.array([self.small_hw] * 3),
+                    })
+                    continue
+                for center_z in range(margin, image_shape[2] - margin, step):
+                    all_centers_todo.append({
+                        'center': np.array([center_x, center_y, center_z]),
+                        'hw': np.array([self.small_hw] * 3),
+                    })
+        return all_centers_todo
+
+    @staticmethod
+    def _normalize_image(x):
         mean, var = tf.nn.moments(x, axes=[0, 1, 2], keep_dims=True)
         return (x - mean) / tf.sqrt(var + 0.0001)
+
+
+def next_multiple(x, m):
+    return (int((x - 1) / m) + 1) * m
+
+
+class PyramidalMDA(MarginalDifferenceAnalysis):
+    def __init__(
+        self,
+        min_depth=1,
+        max_depth=4,
+        *args,
+        **kwargs
+    ):
+        super(PyramidalMDA, self).__init__(
+            *args, **kwargs)
+        self.max_depth = max_depth
+        self.min_depth = min_depth
+
+    @staticmethod
+    def _binary_splits(min_depth, max_depth):
+        all_splits = []
+        for d in range(min_depth, max_depth+1):
+            for i in range(pow(2, d)):
+                all_splits.append([i, d])
+        return all_splits
+
+    def _generate_all_centers_and_hw(self, const_z):
+        all_centers_todo = []
+        splits_x = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
+        splits_y = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
+        splits_z = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
+        for x in splits_x:
+            max_x = next_multiple(self.image_shape[0], pow(2, x[1] + 1))
+            hw_x = max_x / pow(2, x[1] + 1)
+            center_x = hw_x + x[0] * hw_x * 2
+            for y in splits_y:
+                max_y = next_multiple(self.image_shape[1], pow(2, y[1] + 1))
+                hw_y = max_y / pow(2, y[1] + 1)
+                center_y = hw_y + y[0] * hw_y * 2
+                for z in splits_z:
+                    max_z = next_multiple(
+                        self.image_shape[2],
+                        pow(2, z[1] + 1),
+                    )
+                    hw_z = max_z / pow(2, z[1] + 1)
+                    center_z = hw_z + z[0] * hw_z * 2
+                    if const_z is not None and (
+                        const_z < center_z - hw_z or
+                        const_z > center_z + hw_z
+                    ):
+                        continue
+                    all_centers_todo.append({
+                        'center': np.array([center_x, center_y, center_z]),
+                        'hw': np.array([hw_x, hw_y, hw_z]),
+                    })
+        return all_centers_todo
