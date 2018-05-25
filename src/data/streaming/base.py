@@ -37,6 +37,7 @@ class FileStream(abc.ABC):
         for name in self.name_to_data_source:
             ds = self.name_to_data_source[name]
             new_paths = ds.get_file_paths()
+            print("{} has {} files".format(name, len(new_paths)))
             # Add path as meta information
             for p in new_paths:
                 file_id = ds.get_file_id(p)
@@ -46,13 +47,17 @@ class FileStream(abc.ABC):
                 else:
                     n_files_not_used += 1
 
-        print("{} files found but not in meta csv".format(n_files_not_used))
+        print("{} files found but not specified meta csv"
+              .format(n_files_not_used))
+        print("Number of files: {}".format(len(self.all_file_paths)))
+        n_missing = len(self.file_id_to_meta) - len(self.all_file_paths)
+        print("Number of files missing: {}".format(n_missing))
 
         # Group files into tuples
-        groups = self.group_data()
+        self.groups = self.group_data()
 
         # Make train-test split based on grouping
-        self.make_train_test_split(groups)
+        self.make_train_test_split()
 
     @abc.abstractmethod
     def get_batches(self):
@@ -60,6 +65,14 @@ class FileStream(abc.ABC):
 
     @abc.abstractmethod
     def group_data(self):
+        pass
+
+    @abc.abstractmethod
+    def make_train_test_split(self):
+        pass
+
+    @abc.abstractmethod
+    def load_sample(self):
         pass
 
     def parse_meta_csv(self):
@@ -72,15 +85,17 @@ class FileStream(abc.ABC):
 
         return meta_info
 
-    @abs.abstractmethod
-    def make_train_test_split(self, groups):
-        pass
+    def get_file_path(self, file_id):
+        return self.file_id_to_meta[file_id]["file_path"]
 
 
 class Group(object):
     def __init__(self, file_ids, is_train=None):
         self.file_ids = file_ids
         self.is_train = is_train
+
+    def get_file_ids(self):
+        return self.file_ids
 
 
 class DataSource(object):
