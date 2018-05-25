@@ -162,7 +162,7 @@ class DataProvider(object):
                 stateful=False,
                 name='read_files',
             )),
-            num_parallel_calls=1,
+            num_parallel_calls=12,
         )
         dataset = dataset.map(_parser)
         dataset = dataset.prefetch(10 * self.config['batch_size'])
