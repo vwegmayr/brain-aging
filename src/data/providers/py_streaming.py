@@ -142,6 +142,7 @@ class DataProvider(object):
                 for ft_name, d in ft_def.all_features.feature_info.items()
                 if ft_name not in ft
             })
+
             return {
                 ft_name: tf.reshape(ft_tensor, ft_info[ft_name]['shape'])
                 for ft_name, ft_tensor in ft.items()
@@ -161,7 +162,7 @@ class DataProvider(object):
                 stateful=False,
                 name='read_files',
             )),
-            num_parallel_calls=12,
+            num_parallel_calls=1,
         )
         dataset = dataset.map(_parser)
         dataset = dataset.prefetch(10 * self.config['batch_size'])
