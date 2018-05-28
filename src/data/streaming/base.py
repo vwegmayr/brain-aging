@@ -2,6 +2,7 @@ import abc
 import csv
 import glob
 import re
+import warnings
 
 
 class FileStream(abc.ABC):
@@ -190,8 +191,8 @@ class DataSource(object):
         for p in paths:
             match = regexp.match(p)
             if match is None:
-                raise ValueError("Could note extract id from path {}"
-                                 .format(p))
+                raise warnings.warn("Could note extract id from path {}"
+                                    .format(p))
             else:
                 file_id = match.group(group_id)
                 self.file_paths.append(p)
