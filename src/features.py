@@ -45,9 +45,19 @@ for disease in [
 HEALTHY = all_features.add('healthy', 'hc', default=0)
 MRI = all_features.add('mri', t=tf.float32)
 SEX = all_features.add('sex', doc='male = 0; female = 1', default=-1)
+
+# Other features
 STUDY_ID = all_features.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = all_features.add('study_image_id', 'image', default=-1)
 STUDY_PATIENT_ID = all_features.add('study_patient_id', 'patient', default=-1)
-
 SUBJECT_DIVERSITY = all_features.add(
     'subject_diversity', default=1)
+
+MRI_MANUFACTURER = all_features.add(
+    'mri_manufacturer', t=tf.string, default='',
+    doc='Manufacturer name e.g. SIEMENS',
+)
+MRI_FIELD_STRENGTH = all_features.add(
+    'mri_field_strength', t=tf.string, default='',
+    doc='Field strength in Tesla - if available',
+)
