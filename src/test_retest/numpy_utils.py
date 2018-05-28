@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import pearsonr as sp_pearson
 
 
 def MS_R(Y):
@@ -99,3 +100,31 @@ def js_divergence(p, q, eps=0.000001):
     js = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
 
     return js
+
+
+# Lin's Concordance Correlation Coefficient
+def linccc(Y):
+    """
+    Arg:
+        - Y: array of size (n_subjects, 2)
+    """
+    mu_Y_1 = np.mean(Y[:, 0])
+    mu_Y_2 = np.mean(Y[:, 1])
+    S_1_sq = np.mean((Y[:, 0] - mu_Y_1) ** 2)
+    S_2_sq = np.mean((Y[:, 1] - mu_Y_2) ** 2)
+    S_12 = np.mean((Y[:, 0] - mu_Y_1) * (Y[:, 1] - mu_Y_2))
+
+    num = 2 * S_12
+    denom = (S_1_sq + S_2_sq + (mu_Y_1 - mu_Y_2)**2)
+
+    if (num == denom == 0):
+        return 1
+
+    ccc_est = num / denom
+
+    return ccc_est
+
+
+def pearsonr(Y):
+    r, p = sp_pearson(Y[:, 0], Y[:, 1])
+    return r
