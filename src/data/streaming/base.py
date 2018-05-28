@@ -102,6 +102,13 @@ class FileStream(abc.ABC):
             reader = csv.DictReader(csvfile)
             for row in reader:
                 key = row[self.meta_id_column]
+
+                for k in row:
+                    if k == self.meta_id_column:
+                        continue
+                    if row[k].isdigit():
+                        row[k] = int(row[k])
+
                 meta_info[key] = row
 
         return meta_info
@@ -115,6 +122,21 @@ class FileStream(abc.ABC):
         """
         return self.file_id_to_meta[file_id]["file_path"]
 
+    def get_diagnose(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        if record["health_ad"] == 1:
+            return "health_ad"
+        if record["healthy"] == 1:
+            return "healthy"
+        if record["health_mci"] == 1:
+            return "health_mci"
+
+        raise ValueError("diagnosis not found for id {}".format(file_id))
+
+    def get_age(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["age"]
+
 
 class Group(object):
     """
@@ -126,6 +148,9 @@ class Group(object):
 
     def get_file_ids(self):
         return self.file_ids
+
+    def __str__(self):
+        return str([str(i) for i in self.file_ids])
 
 
 class DataSource(object):
