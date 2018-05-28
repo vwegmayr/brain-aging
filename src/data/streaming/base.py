@@ -191,8 +191,8 @@ class DataSource(object):
         for p in paths:
             match = regexp.match(p)
             if match is None:
-                raise warnings.warn("Could note extract id from path {}"
-                                    .format(p))
+                warnings.warn("Could note extract id from path {}"
+                              .format(p))
             else:
                 file_id = match.group(group_id)
                 self.file_paths.append(p)
