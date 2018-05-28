@@ -1,12 +1,16 @@
 import numpy as np
 import nibabel as nib
 import sklearn.decomposition
+from sklearn.exceptions import NotFittedError
 import pylab
 from matplotlib import pyplot as plt
 
 
 def load_image_filename(fname):
+    import scipy.ndimage
     image = nib.load(fname).get_data()
+    #if 'PPMI' in fname:
+#        image = scipy.ndimage.filters.gaussian_filter(image, 0.5)
     return np.reshape(image, [1] + list(image.shape))
 
 
@@ -55,7 +59,9 @@ class EmbeddingsVisualization:
         legend,
         embedding_tensors=['network_body/conv7/output:0'],
         custom_colors_per_class={},
+        decomposition=None,
         plt_legend=True,
+        plt_scatter_kwargs={'alpha': 0.6, 's': 20},
     ):
         all_embeddings_list, classes_list = self.compute_embeddings(
             dataset, embedding_tensors)
@@ -79,23 +85,35 @@ class EmbeddingsVisualization:
         class_to_color['AD'] = 'indianred'
         class_to_color['AD_test'] = class_to_color['AD']
         class_to_color['AD_train'] = 'goldenrod'
-        class_to_color['MCI'] = 'grey'
+        class_to_color['MCI'] = 'black'
         class_to_color['health_mci'] = class_to_color['MCI']
 
-        for embedding_tensor, embeddings_list in zip(
+        pca_fitted = []
+        if decomposition is None:
+            decomposition = [sklearn.decomposition.PCA(
+                n_components=2,
+                random_state=0,
+            ) for _ in embedding_tensors]
+        for embedding_tensor, embeddings_list, pca in zip(
             embedding_tensors,
             all_embeddings_list,
+            decomposition,
         ):
-            pca = sklearn.decomposition.PCA(
-                n_components=2,
-            )
-            data_2d = pca.fit_transform(np.stack(embeddings_list, 0))
+            embeddings_for_pca = np.stack(embeddings_list, 0)
+            try:
+                data_2d = pca.transform(embeddings_for_pca)
+            except NotFittedError:
+                pca = pca.fit(embeddings_for_pca)
+                data_2d = pca.transform(embeddings_for_pca)
+            pca_fitted.append(pca)
+
             print('PCA of %d vectors in dim %d (variance_explained=%s)' % (
                 len(embeddings_list),
                 embeddings_list[0].shape[0],
                 pca.explained_variance_ratio_
             ))
 
+            plt.figure(figsize=(10,7))
             for cidx, class_full_name in enumerate(full_classes_list_unique):
                 class_name = class_full_name.split('__')[0]
                 marker = cname_extract(class_full_name, 'm', 'o')
@@ -118,9 +136,10 @@ class EmbeddingsVisualization:
                 plt.scatter(
                     d0, d1,
                     c=[color] * len(d0), label=class_name, marker=marker,
-                    alpha=0.5, s=20,
+                    **plt_scatter_kwargs
                 )
             if plt_legend:
                 plt.legend()
             plt.title('Embedding PCA: `%s` (%s)' % (embedding_tensor, legend))
             plt.show()
+        return pca_fitted

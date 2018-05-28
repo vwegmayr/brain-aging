@@ -152,7 +152,6 @@ class MarginalDifferenceAnalysis(object):
 
         # Iterate all possible blocks
         all_todo = self._generate_all_centers_and_hw(const_z)
-        print('There are %d blocks to iterate over' % len(all_todo))
 
         # Compute class probability with full image
         feed_dict = {
@@ -164,7 +163,7 @@ class MarginalDifferenceAnalysis(object):
 
         # Compute class probability when replacing part of the image
         for i, block_info in enumerate(all_todo):
-            if i % 50 == 0:
+            if i % 500 == 0:
                 print('Doing block %d/%d...' % (i, len(all_todo)))
             probas, block_mask = self.run_block(image, block_info)
             proba = np.mean(probas[:, class_index])
@@ -174,7 +173,6 @@ class MarginalDifferenceAnalysis(object):
             ) * block_mask.astype(np.float32)
             counts += block_mask
 
-        print('Done: Visualization computed :)')
         return we / (counts.astype(np.float32) + 0.001)
 
     def _generate_all_centers_and_hw(self, const_z):
@@ -212,6 +210,7 @@ class PyramidalMDA(MarginalDifferenceAnalysis):
         self,
         min_depth=1,
         max_depth=4,
+        overlap_count=1,
         *args,
         **kwargs
     ):
@@ -219,42 +218,49 @@ class PyramidalMDA(MarginalDifferenceAnalysis):
             *args, **kwargs)
         self.max_depth = max_depth
         self.min_depth = min_depth
+        self.overlap_count = overlap_count
 
     @staticmethod
-    def _binary_splits(min_depth, max_depth):
+    def _binary_splits(min_depth, max_depth, overlap_count, max_dim):
+        """
+        Returns a list of blocks in the format:
+        [[block1_center, block1_hw], [block2_center, block2_hw], ...]
+        """
         all_splits = []
         for d in range(min_depth, max_depth+1):
-            for i in range(pow(2, d)):
-                all_splits.append([i, d])
+            window_size = max_dim / pow(2, d)
+            window_size = next_multiple(window_size, 2)
+            for shift_idx in range(overlap_count):
+                shift = int(window_size * shift_idx / float(overlap_count))
+                window_begin_coord = - window_size + shift
+                while window_begin_coord < max_dim:
+                    all_splits.append([
+                        window_begin_coord + window_size / 2,  # center
+                        window_size / 2,  # hw
+                    ])
+                    window_begin_coord += window_size
         return all_splits
 
     def _generate_all_centers_and_hw(self, const_z):
         all_centers_todo = []
-        splits_x = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
-        splits_y = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
-        splits_z = PyramidalMDA._binary_splits(self.min_depth, self.max_depth)
-        for x in splits_x:
-            max_x = next_multiple(self.image_shape[0], pow(2, x[1] + 1))
-            hw_x = max_x / pow(2, x[1] + 1)
-            center_x = hw_x + x[0] * hw_x * 2
-            for y in splits_y:
-                max_y = next_multiple(self.image_shape[1], pow(2, y[1] + 1))
-                hw_y = max_y / pow(2, y[1] + 1)
-                center_y = hw_y + y[0] * hw_y * 2
-                for z in splits_z:
-                    max_z = next_multiple(
-                        self.image_shape[2],
-                        pow(2, z[1] + 1),
-                    )
-                    hw_z = max_z / pow(2, z[1] + 1)
-                    center_z = hw_z + z[0] * hw_z * 2
+        splits = [PyramidalMDA._binary_splits(
+                self.min_depth,
+                self.max_depth,
+                self.overlap_count,
+                self.image_shape[dim],
+            )
+            for dim in range(3)
+        ]
+        for x in splits[0]:
+            for y in splits[1]:
+                for z in splits[2]:
                     if const_z is not None and (
-                        const_z < center_z - hw_z or
-                        const_z > center_z + hw_z
+                        const_z < z[0] - z[1] or
+                        const_z > z[0] + z[1]
                     ):
                         continue
                     all_centers_todo.append({
-                        'center': np.array([center_x, center_y, center_z]),
-                        'hw': np.array([hw_x, hw_y, hw_z]),
+                        'center': np.array([x[0], y[0], z[0]]),
+                        'hw': np.array([x[1], y[1], z[1]]),
                     })
         return all_centers_todo
