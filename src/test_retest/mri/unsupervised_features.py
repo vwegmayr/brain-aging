@@ -6,6 +6,7 @@ import json
 from memory_profiler import profile
 import gc
 import tensorflow as tf
+from subprocess import call
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -49,6 +50,65 @@ class PyRadiomicsFeatures(DataTransformer):
                         "w"
                     ) as f:
                         json.dump(features, f, indent=2)
+
+
+class PyRadiomicsFeaturesSpawn(DataTransformer):
+    def __init__(self, streamer):
+        # Initialize streamer
+        _class = streamer["class"]
+        self.streamer = _class(**streamer["params"])
+
+    def get_extractor(self):
+        # Initialize extractor
+        extractor = featureextractor.RadiomicsFeaturesExtractor()
+        extractor.enableAllImageTypes()
+        extractor.enableAllFeatures()
+
+        return extractor
+
+    def transform(self, X, y=None):
+        out_path = os.path.join(self.save_path, "features")
+        os.mkdir(out_path)
+        # Stream image one by one
+        batches = self.streamer.get_batches()
+        for batch in batches:
+            for group in batch:
+                for file_id in group.get_file_ids():
+                    path_in = self.streamer.get_file_path(file_id)
+                    path_out = os.path.join(out_path, str(file_id) + ".json")
+
+                    cmd = 'python -m src.test_retest.mri.run_py_radiomics_transformer '
+                    cmd += "{} {}".format(path_in, path_out)
+                    print(cmd)
+                    call(cmd, shell=True)
+
+
+class PyRadiomicsSingleFileTransformer(DataTransformer):
+    def __init__(self, in_path, out_path):
+        self.in_path = in_path
+        self.out_path = out_path
+
+    def get_extractor(self):
+        # Initialize extractor
+        extractor = featureextractor.RadiomicsFeaturesExtractor()
+        extractor.enableAllImageTypes()
+        extractor.enableAllFeatures()
+
+        return extractor
+
+    def transform(self, X, y=None):
+        sitk_im = sitk.ReadImage(self.in_path)
+        all_ones = np.ones(sitk_im.GetSize())
+        sitk_mask = sitk.GetImageFromArray(all_ones)
+
+        extractor = self.get_extractor()
+        features = extractor.computeFeatures(sitk_im, sitk_mask, "brain")
+
+        with open(
+            os.path.join(self.out_path),
+            "w"
+        ) as f:
+            json.dump(features, f, indent=2)
 
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
