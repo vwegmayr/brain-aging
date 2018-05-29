@@ -13,6 +13,7 @@ from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
+from src.test_retest.non_linear_estimator import name_to_hidden_regularization
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -223,6 +224,22 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         loss_0 = tf.losses.mean_squared_error(x_0, rec_0)
         loss_1 = tf.losses.mean_squared_error(x_1, rec_1)
         loss = loss_0 + loss_1
+
+        # Regularization
+        reg = 0
+        reg_lambda = params["hidden_lambda"]
+        reg_name = params["hidden_regularizer"]
+        if reg_lambda != 0:
+            reg = name_to_hidden_regularization(
+                0,
+                reg_name,
+                hidden_0,
+                hidden_1
+            )
+            reg *= reg_lambda
+
+        reg = tf.cast(reg, loss.dtype)
+        loss += reg
 
         optimizer = tf.train.RMSPropOptimizer(
             learning_rate=params["learning_rate"]
