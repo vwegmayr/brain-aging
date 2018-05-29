@@ -120,10 +120,9 @@ class FileStream(abc.ABC):
                 key = row[self.meta_id_column]
 
                 for k in row:
-                    if k == self.meta_id_column:
-                        continue
-                    if row[k].isdigit():
-                        row[k] = int(row[k])
+                    if k in self.feature_desc:
+                        ty = self.feature_desc[k]["py_type"]
+                        row[k] = (ty)(row[k])  # cast to type
 
                 meta_info[key] = row
 
@@ -222,6 +221,7 @@ class FileStream(abc.ABC):
             self.feature_desc[fname]["type"]
             for fname in port_features
         ])
+
         dataset = dataset.map(
             lambda file_ids, label: tuple(tf.py_func(
                 _read_files,

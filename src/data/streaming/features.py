@@ -10,6 +10,7 @@ class FeatureCollection:
         s,
         shortname=None,
         t=tf.int64,
+        py_type=int,
         shape=[1],
         doc=None,
         default=None,
@@ -19,6 +20,7 @@ class FeatureCollection:
             'shortname': shortname if shortname is not None else s,
             'shape': shape,
             'default': default,
+            'py_type': py_type,
         }
         return s
 
@@ -26,11 +28,11 @@ class FeatureCollection:
 adni_aibl = FeatureCollection()
 
 IMAGE_LABEL = adni_aibl.add(
-    'image_label', t=tf.string, default='')
+    'image_label', t=tf.string, py_type=str, default='')
 SUBJECT_LABEL = adni_aibl.add(
-    'patient_label', t=tf.string, default='')
+    'patient_label', t=tf.string, py_type=str, default='')
 DATASET = adni_aibl.add(
-    'dataset', t=tf.string, default='')
+    'dataset', t=tf.string, py_type=str, default='')
 
 
 for disease in [
@@ -41,7 +43,7 @@ for disease in [
 
 
 HEALTHY = adni_aibl.add('healthy', 'hc', default=0)
-MRI = adni_aibl.add('mri', t=tf.float32)
+MRI = adni_aibl.add('mri', t=tf.float32, py_type=float)
 SEX = adni_aibl.add('sex', doc='male = 0; female = 1', default=-1)
 STUDY_ID = adni_aibl.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = adni_aibl.add('study_image_id', 'image', default=-1)
