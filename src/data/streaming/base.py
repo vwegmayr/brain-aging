@@ -175,16 +175,21 @@ class FileStream(abc.ABC):
             if (k != _features.MRI) and (k in self.feature_desc)
         ]
 
-        def _read_files(file_id, label):
-            path = self.get_file_path(file_id)
-            file_features = self.file_id_to_meta[file_id]
-            image = self.load_sample(path).astype(np.float16)
-            ret = [image]
+        def _read_files(file_ids, label):
+            file_ids = [fid.decode('utf-8') for fid in file_ids]
 
-            ret += [
-                file_features[pf]
-                for pf in port_features
-            ]
+            ret = []
+            for fid in file_ids:
+                path = self.get_file_path(fid)
+
+                file_features = self.file_id_to_meta[fid]
+                image = self.load_sample(path).astype(np.float16)
+                ret = [image]
+
+                ret += [
+                    file_features[pf]
+                    for pf in port_features
+                ]
             return ret  # return list of features
 
         def _parser(_mri, *rest):
@@ -212,14 +217,15 @@ class FileStream(abc.ABC):
             tuple([files, labels])
         )
 
-        read_types = [tf.float16] + [
+        group_size = len(groups[0].file_ids)
+        read_types = group_size * ([tf.float16] + [
             self.feature_desc[fname]["type"]
             for fname in port_features
-        ]
+        ])
         dataset = dataset.map(
-            lambda file_id, label: tuple(tf.py_func(
+            lambda file_ids, label: tuple(tf.py_func(
                 _read_files,
-                [file_id, label],
+                [file_ids, label],
                 read_types,
                 stateful=False,
                 name="read_files"

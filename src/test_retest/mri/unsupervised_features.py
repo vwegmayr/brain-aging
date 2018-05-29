@@ -51,24 +51,27 @@ class PyRadiomicsFeatures(DataTransformer):
                         json.dump(features, f, indent=2)
 
 
-class LinearAutoEncoder(EvaluateEpochsBaseTF):
+class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
+        input_dim = params["input_dim"]
         input_mri = tf.reshape(
             features["mri"],
-            [-1, params["input_dim"]]
+            [-1, input_dim]
         )
 
-        hidden_dim = params["input_dim"]
-        w, b, hidden = linear_trafo(
-            X=input_mri,
-            out_dim=hidden_dim,
-            types=[tf.float16, tf.float16],
-            names=["weights", "bias", "hidden_rep"]
+        hidden_dim = params["hidden_dim"]
+        w = tf.get_variable(
+            name="weights",
+            shape=[input_dim, hidden_dim],
+            dtype=input_mri.dtype,
+            initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
-        reconstruction = tf.add(
-            tf.matmul(hidden, tf.transpose(w)),
-            b,
+        hidden = tf.matmul(input_mri, w, name="hidden_rep")
+
+        reconstruction = tf.matmul(
+            hidden,
+            tf.transpose(w),
             name="reconstruction"
         )
 
