@@ -152,6 +152,10 @@ class FileStream(abc.ABC):
         record = self.file_id_to_meta[file_id]
         return record["age"]
 
+    def get_patient_label(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["patient_label"]
+
     def get_sample_shape(self):
         assert len(self.groups) > 0
         some_id = self.groups[0].file_ids[0]
@@ -165,6 +169,7 @@ class FileStream(abc.ABC):
         # TODO: get batch ordering here
         batches = self.get_batches(train)
         groups = [group for batch in batches for group in batch]
+        group_size = len(groups[0].file_ids)
         files = [group.file_ids for group in groups]
 
         feature_keys = next(iter(self.file_id_to_meta.items()))[1].keys()
@@ -191,32 +196,42 @@ class FileStream(abc.ABC):
                 ]
             return ret  # return list of features
 
-        def _parser(_mri, *rest):
+        def _parser(*to_parse):
             sample_shape = self.sample_shape
+            el_n_features = 1 + len(port_features)  # sample + csv features
 
-            self.feature_desc[_features.MRI]["shape"] = sample_shape
-            ft = {
-                _features.MRI: tf.reshape(_mri, sample_shape),
-            }
-            ft.update({
-                ft_name: d['default']
-                for ft_name, d in self.feature_desc.items()
-                if ft_name not in ft
-            })
-            return {
-                ft_name: tf.reshape(
-                    ft_tensor,
-                    self.feature_desc[ft_name]['shape']
-                )
-                for ft_name, ft_tensor in ft.items()
-            }  # return dictionary of features, should be tensors
+            all_features = {}
+            # parse features for every sample in group
+            for i in range(group_size):
+                self.feature_desc[_features.MRI]["shape"] = sample_shape
+                mri_idx = i * el_n_features
+                _mri = to_parse[mri_idx]
+                ft = {
+                    _features.MRI: tf.reshape(_mri, sample_shape),
+                }
+                ft.update({
+                    ft_name: d['default']
+                    for ft_name, d in self.feature_desc.items()
+                    if ft_name not in ft
+                })
+                el_features = {
+                    ft_name + "_" + str(i): tf.reshape(
+                        ft_tensor,
+                        self.feature_desc[ft_name]['shape']
+                    )
+                    for ft_name, ft_tensor in ft.items()
+                }  # return dictionary of features, should be tensors
+                # rename mri_i to X_i
+                el_features["X_" + str(i)] = el_features.pop(_features.MRI + "_" + str(i))
+                all_features.update(el_features)
+
+            return all_features
 
         labels = len(files) * [0]  # currently not used
         dataset = tf.data.Dataset.from_tensor_slices(
             tuple([files, labels])
         )
 
-        group_size = len(groups[0].file_ids)
         read_types = group_size * ([tf.float16] + [
             self.feature_desc[fname]["type"]
             for fname in port_features

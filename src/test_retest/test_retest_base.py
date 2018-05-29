@@ -93,6 +93,35 @@ def test_retest_two_labels_evaluation_spec(
     )
 
 
+def mnist_input_fn(X, data_params, y=None, train=True,
+                   input_fn_config={}):
+    """
+    MNIST logistic regression for test-retest data. Loads presampled
+    images from .npy files.
+    """
+    if train:
+        # load training data
+        images, labels = mnist_read.load_mnist_training(
+            data_params["data_path"]
+        )
+        images = images[:data_params["train_size"]]
+        labels = images[:data_params["train_size"]]
+
+    else:
+        # load test data
+        images, labels = mnist_read.load_mnist_test(
+            data_params["data_path"]
+        )
+        images = images[:data_params["test_size"]]
+        labels = images[:data_params["test_size"]]
+
+    return tf.estimator.inputs.numpy_input_fn(
+        x={"X_0": images},
+        y=labels,
+        **input_fn_config,
+    )
+
+
 def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
                                input_fn_config={}):
     """

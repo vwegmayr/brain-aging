@@ -12,6 +12,7 @@ from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
+from src.test_retest.test_retest_base import mnist_input_fn
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -113,9 +114,11 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
+        print(features)
+        exit()
         input_dim = params["input_dim"]
         input_mri = tf.reshape(
-            features["mri"],
+            features["X_0"],
             [-1, input_dim]
         )
 
@@ -147,7 +150,8 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
             )
 
         # Compute loss
-        loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
+        # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
+        loss = tf.losses.mean_squared_error(input_mri, reconstruction)
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
@@ -168,3 +172,12 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return self.streamer.get_input_fn(train)
+
+
+class MnistPCAAutoEncoder(PCAAutoEncoder):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return mnist_input_fn(
+            X,
+            self.data_params,
+            input_fn_config=input_fn_config
+        )

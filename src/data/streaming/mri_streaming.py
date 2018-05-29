@@ -47,7 +47,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
         groups = []
         for key in self.file_id_to_meta:
             if "file_path" in self.file_id_to_meta[key]:
-                groups.append(Group([key]))
+                g = Group([key])
+                g.patient_label = self.get_patient_label(key)
+                groups.append(g)
 
         return groups
 
@@ -55,16 +57,19 @@ class MRISingleStream(FileStream, MRIImageLoader):
         return self.load_image(file_path)
 
     def make_train_test_split(self):
+        # pairs belonging to the same person should be in same split
         train_ratio = self.config["train_ratio"]
-        n_groups = len(self.groups)
-        n_train = int(train_ratio * n_groups)
         self.np_random.shuffle(self.groups)
+        # Make split with respect to patients
+        patient_labels = list(set([g.patient_label for g in self.groups]))
+        n_train = int(train_ratio * len(patient_labels))
+        train_labels = set(patient_labels[:n_train])
 
-        for i in range(n_groups):
-            self.groups[i].is_train = (i < n_train)
+        for g in self.groups:
+            g.is_train = (g.patient_label in train_labels)
 
 
-class MRISamePatientSameAgePairStream(FileStream):
+class MRISamePatientSameAgePairStream(MRISingleStream):
     def group_data(self):
         groups = []
         not_found = 0
@@ -104,18 +109,8 @@ class MRISamePatientSameAgePairStream(FileStream):
                 age_1 = self.get_age(id_1)
                 age_2 = self.get_age(id_2)
                 if (age_1 == age_2) and (diag_1 == diag_2):
-                    groups.append(Group([id_1, id_2]))
+                    g = Group([id_1, id_2])
+                    g.patient_label = patient_label
+                    groups.append(g)
 
         return groups
-
-    def get_batches(self):
-        if self.batch_size == -1:
-            return [self.groups]
-        else:
-            raise NotImplementedError()
-
-    def load_sample(self, file_path):
-        return self.load_image(file_path)
-
-    def make_train_test_split(self):
-        pass
