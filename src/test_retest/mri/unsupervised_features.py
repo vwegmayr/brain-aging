@@ -53,8 +53,6 @@ class PyRadiomicsFeatures(DataTransformer):
 
 class LinearAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
-        print("features: {}".format(features))
-
         input_mri = tf.reshape(
             features["mri"],
             [-1, params["input_dim"]]

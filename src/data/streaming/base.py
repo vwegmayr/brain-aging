@@ -164,8 +164,9 @@ class FileStream(abc.ABC):
 
     def get_input_fn(self, train):
         # TODO: get batch ordering here
-        files = [group.file_ids for group in self.groups
-                 if group.is_train == train]
+        batches = self.get_batches(train)
+        groups = [group for batch in batches for group in batch]
+        files = [group.file_ids for group in groups]
 
         feature_keys = next(iter(self.file_id_to_meta.items()))[1].keys()
         port_features = [
@@ -223,7 +224,7 @@ class FileStream(abc.ABC):
                 stateful=False,
                 name="read_files"
             )),
-            num_parallel_calls=1
+            num_parallel_calls=12
         )
 
         dataset = dataset.map(_parser)

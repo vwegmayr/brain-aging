@@ -17,25 +17,28 @@ class MRISingleStream(FileStream, MRIImageLoader):
     """
     Stream files one by one.
     """
-    def get_batches(self):
+    def get_batches(self, train=True):
+        groups = [group for group in self.groups
+                  if group.is_train == train]
+
         if self.shuffle:
-            self.np_random.shuffle(self.groups)
+            self.np_random.shuffle(groups)
 
         if self.batch_size == -1:
-            return [[group] for group in self.groups]
+            return [[group] for group in groups]
 
-        n_samples = len(self.groups)
-        n_batches = n_samples / self.batch_size
+        n_samples = len(groups)
+        n_batches = int(n_samples / self.batch_size)
 
         batches = []
         for i in range(n_batches):
             bi = i * self.batch_size
             ei = (i + 1) * self.batch_size
-            batches.append(self.group[bi:ei])
+            batches.append(groups[bi:ei])
 
         if n_batches * self.batch_size < n_samples:
             bi = n_batches * self.batch_size
-            batches.append(self.groups[bi:])
+            batches.append(groups[bi:])
 
         return batches
 
