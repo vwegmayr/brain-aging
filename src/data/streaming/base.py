@@ -186,14 +186,13 @@ class FileStream(abc.ABC):
 
         def _read_files(file_ids, label):
             file_ids = [fid.decode('utf-8') for fid in file_ids]
-
             ret = []
             for fid in file_ids:
                 path = self.get_file_path(fid)
 
                 file_features = self.file_id_to_meta[fid]
                 image = self.load_sample(path).astype(np.float16)
-                ret = [image]
+                ret += [image]
 
                 ret += [
                     file_features[pf]

@@ -91,7 +91,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
                 if patient_label not in patient_to_file_ids:
                     patient_to_file_ids[patient_label] = []
                 patient_to_file_ids[patient_label].append(
-                    record[self.meta_id_column]
+                    file_id
                 )
 
             else:

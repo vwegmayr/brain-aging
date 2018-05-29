@@ -172,6 +172,79 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         return self.streamer.get_input_fn(train)
 
 
+class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
+    def model_fn(self, features, labels, mode, params):
+        input_dim = params["input_dim"]
+        x_0 = tf.reshape(
+            features["X_0"],
+            [-1, input_dim]
+        )
+        x_1 = tf.reshape(
+            features["X_1"],
+            [-1, input_dim]
+        )
+
+        hidden_dim = params["hidden_dim"]
+        w = tf.get_variable(
+            name="weights",
+            shape=[input_dim, hidden_dim],
+            dtype=x_0.dtype,
+            initializer=tf.contrib.layers.xavier_initializer(seed=43)
+        )
+
+        hidden_0 = tf.matmul(x_0, w, name="hidden_rep_0")
+        hidden_1 = tf.matmul(x_1, w, name="hidden_rep_1")
+
+        rec_0 = tf.matmul(
+            hidden_0,
+            tf.transpose(w),
+            name="reconstruction_0"
+        )
+
+        rec_1 = tf.matmul(
+            hidden_1,
+            tf.transpose(w),
+            name="reconstruction_1"
+        )
+
+        predictions = {
+            "hidden_rep": hidden_0,
+            "reconstruction": rec_0
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
+
+        # Compute loss
+        # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
+        loss_0 = tf.losses.mean_squared_error(x_0, rec_0)
+        loss_1 = tf.losses.mean_squared_error(x_1, rec_1)
+        loss = loss_0 + loss_1
+
+        optimizer = tf.train.RMSPropOptimizer(
+            learning_rate=params["learning_rate"]
+        )
+        train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op
+            )
+
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=loss
+        )
+
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return self.streamer.get_input_fn(train)
+
+
 class MnistPCAAutoEncoder(PCAAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return mnist_input_fn(
