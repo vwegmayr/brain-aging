@@ -5,6 +5,7 @@ import re
 import warnings
 import numpy as np
 import tensorflow as tf
+import copy
 
 from . import features as _features
 
@@ -59,9 +60,12 @@ class FileStream(abc.ABC):
             print("{} has {} files".format(name, len(new_paths)))
             # Add path as meta information
             for p in new_paths:
-                file_id = ds.get_file_id(p)
-                if file_id in self.file_id_to_meta:
-                    self.file_id_to_meta[file_id]["file_path"] = p
+                image_label = ds.get_file_image_label(p)
+                if image_label in self.file_id_to_meta:
+                    self.file_id_to_meta[p] = copy.deepcopy(
+                        self.file_id_to_meta[image_label]
+                    )
+                    self.file_id_to_meta[p]["file_path"] = p
                     self.all_file_paths.append(p)
                 else:
                     n_files_not_used += 1
@@ -302,8 +306,7 @@ class DataSource(object):
         """
         paths = glob.glob(self.glob_pattern)
         self.file_paths = []
-        self.file_path_to_id = {}
-        self.id_to_file_path = {}
+        self.file_path_to_image_label = {}
 
         regexp = re.compile(self.id_from_filename["regexp"])
         group_id = self.id_from_filename["regex_id_group"]
@@ -315,8 +318,7 @@ class DataSource(object):
             else:
                 file_id = match.group(group_id)
                 self.file_paths.append(p)
-                self.id_to_file_path[file_id] = p
-                self.file_path_to_id[p] = file_id
+                self.file_path_to_image_label[p] = file_id
 
     def get_file_paths(self):
         return self.file_paths
@@ -327,5 +329,5 @@ class DataSource(object):
     def get_file_path(self, file_id):
         return self.id_to_file_path[file_id]
 
-    def get_file_id(self, file_path):
-        return self.file_path_to_id[file_path]
+    def get_file_image_label(self, file_path):
+        return self.file_path_to_image_label[file_path]
