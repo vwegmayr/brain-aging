@@ -3,6 +3,9 @@ import csv
 import glob
 import re
 import warnings
+import numpy as np
+import tensorflow as tf
+from . import features as _features
 
 
 class FileStream(abc.ABC):
@@ -20,6 +23,17 @@ class FileStream(abc.ABC):
         self.meta_id_column = config["meta_id_column"]
         self.batch_size = config["batch_size"]
         self.data_sources_list = config["data_sources"]
+        self.seed = config["seed"]
+        self.shuffle = config["shuffle"]
+
+        if "feature_collection" in config:
+            self.feature_desc = _features.collections[
+                config["feature_collection"]
+            ].feature_info
+
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            self.np_random = np.random
 
         # Parse meta information
         self.file_id_to_meta = self.parse_meta_csv()
@@ -59,6 +73,7 @@ class FileStream(abc.ABC):
 
         # Group files into tuples
         self.groups = self.group_data()
+        self.sample_shape = self.get_sample_shape()
 
         # Make train-test split based on grouping
         self.make_train_test_split()
@@ -137,6 +152,87 @@ class FileStream(abc.ABC):
     def get_age(self, file_id):
         record = self.file_id_to_meta[file_id]
         return record["age"]
+
+    def get_sample_shape(self):
+        assert len(self.groups) > 0
+        some_id = self.groups[0].file_ids[0]
+        path = self.get_file_path(some_id)
+        sample = self.load_sample(path)
+
+        self.sample_shape = sample.shape
+        return sample.shape
+
+    def get_input_fn(self, train):
+        # TODO: get batch ordering here
+        files = [group.file_ids for group in self.groups
+                 if group.is_train == train]
+
+        feature_keys = next(iter(self.file_id_to_meta.items()))[1].keys()
+        port_features = [
+            k
+            for k in feature_keys
+            if (k != _features.MRI) and (k in self.feature_desc)
+        ]
+
+        def _read_files(file_id, label):
+            path = self.get_file_path(file_id)
+            file_features = self.file_id_to_meta[file_id]
+            image = self.load_sample(path).astype(np.float16)
+            ret = [image]
+
+            ret += [
+                file_features[pf]
+                for pf in port_features
+            ]
+            return ret  # return list of features
+
+        def _parser(_mri, *rest):
+            sample_shape = self.sample_shape
+
+            self.feature_desc[_features.MRI]["shape"] = sample_shape
+            ft = {
+                _features.MRI: tf.reshape(_mri, sample_shape),
+            }
+            ft.update({
+                ft_name: d['default']
+                for ft_name, d in self.feature_desc.items()
+                if ft_name not in ft
+            })
+            return {
+                ft_name: tf.reshape(
+                    ft_tensor,
+                    self.feature_desc[ft_name]['shape']
+                )
+                for ft_name, ft_tensor in ft.items()
+            }  # return dictionary of features, should be tensors
+
+        labels = len(files) * [0]  # currently not used
+        dataset = tf.data.Dataset.from_tensor_slices(
+            tuple([files, labels])
+        )
+
+        read_types = [tf.float16] + [
+            self.feature_desc[fname]["type"]
+            for fname in port_features
+        ]
+        dataset = dataset.map(
+            lambda file_id, label: tuple(tf.py_func(
+                _read_files,
+                [file_id, label],
+                read_types,
+                stateful=False,
+                name="read_files"
+            )),
+            num_parallel_calls=1
+        )
+
+        dataset = dataset.map(_parser)
+        dataset = dataset.prefetch(10 * self.config["batch_size"])
+        dataset = dataset.batch(batch_size=self.config["batch_size"])
+
+        def _input_fn():
+            return dataset.make_one_shot_iterator().get_next()
+        return _input_fn
 
 
 class Group(object):

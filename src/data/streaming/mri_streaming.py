@@ -18,7 +18,26 @@ class MRISingleStream(FileStream, MRIImageLoader):
     Stream files one by one.
     """
     def get_batches(self):
-        return [[group] for group in self.groups]
+        if self.shuffle:
+            self.np_random.shuffle(self.groups)
+
+        if self.batch_size == -1:
+            return [[group] for group in self.groups]
+
+        n_samples = len(self.groups)
+        n_batches = n_samples / self.batch_size
+
+        batches = []
+        for i in range(n_batches):
+            bi = i * self.batch_size
+            ei = (i + 1) * self.batch_size
+            batches.append(self.group[bi:ei])
+
+        if n_batches * self.batch_size < n_samples:
+            bi = n_batches * self.batch_size
+            batches.append(self.groups[bi:])
+
+        return batches
 
     def group_data(self):
         # We just to stream the images one by one
@@ -33,7 +52,13 @@ class MRISingleStream(FileStream, MRIImageLoader):
         return self.load_image(file_path)
 
     def make_train_test_split(self):
-        pass
+        train_ratio = self.config["train_ratio"]
+        n_groups = len(self.groups)
+        n_train = int(train_ratio * n_groups)
+        self.np_random.shuffle(self.groups)
+
+        for i in range(n_groups):
+            self.groups[i].is_train = (i < n_train)
 
 
 class MRISamePatientSameAgePairStream(FileStream):

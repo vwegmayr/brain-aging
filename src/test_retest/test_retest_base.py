@@ -167,17 +167,19 @@ def mnist_test_retest_two_labels_input_fn(X, data_params, y=None, train=True,
     )
 
 
-def linear_trafo(X, out_dim, names):
+def linear_trafo(X, out_dim, names, types=[tf.float32, tf.float32]):
     input_dim = X.get_shape()[1]
     w = tf.get_variable(
         name=names[0],
         shape=[input_dim, out_dim],
+        dtype=types[0],
         initializer=tf.contrib.layers.xavier_initializer(seed=43)
     )
 
     b = tf.get_variable(
         name=names[1],
         shape=[1, out_dim],
+        dtype=types[1],
         initializer=tf.contrib.layers.xavier_initializer(seed=43)
     )
 
@@ -241,6 +243,7 @@ class EvaluateEpochsBaseTF(BaseTF):
         config,
         params,
         data_params,
+        streamer=None,
         sumatra_params=None,
         hooks=None
     ):
@@ -263,6 +266,11 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.data_params = data_params
         self.sumatra_params = sumatra_params
         self.hooks = hooks
+
+        # Initialize streamer
+        if streamer is not None:
+            _class = streamer["class"]
+            self.streamer = _class(**streamer["params"])
 
     def fit_main_training_loop(self, X, y):
         n_epochs = self.input_fn_config["num_epochs"]
