@@ -26,6 +26,26 @@ class NetworkLoader:
         new_saver.restore(self.sess, tf.train.latest_checkpoint(export_dir))
         print('Graph restored')
 
+    def refresh_adni_aibl_features_from_csv(self):
+        glob_pattern = \
+            '/local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz'
+        fs = FeaturesStore(
+            csv_file_path='data/raw/csv/adni_aibl.csv',
+            features_from_filename={
+                'regexp': '.*/([A0-9]+)_(aug_){0,1}mni_aligned\\.nii\\.gz',
+                'features_group': {
+                      'image_label': 1,
+                }
+            }
+        )
+
+        for file_name in glob.glob(glob_pattern):
+            try:
+                features = fs.get_features_for_file(file_name)
+                self.dataset['file_to_features'][file_name] = features
+            except LookupError:
+                pass
+
     def add_sai_smoothed_mci_to_test_set(self):
         health_mci_files = []
         glob_pattern = \
