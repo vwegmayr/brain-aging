@@ -114,8 +114,6 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
-        print(features)
-        exit()
         input_dim = params["input_dim"]
         input_mri = tf.reshape(
             features["X_0"],
@@ -153,7 +151,7 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
         loss = tf.losses.mean_squared_error(input_mri, reconstruction)
 
-        optimizer = tf.train.AdamOptimizer(
+        optimizer = tf.train.RMSPropOptimizer(
             learning_rate=params["learning_rate"]
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())

@@ -1,5 +1,8 @@
 import nibabel as nib
 import warnings
+from skimage.transform import resize
+import numpy as np
+import matplotlib.pyplot as plt
 
 from .base import FileStream
 from .base import Group
@@ -54,7 +57,13 @@ class MRISingleStream(FileStream, MRIImageLoader):
         return groups
 
     def load_sample(self, file_path):
-        return self.load_image(file_path)
+        im = self.load_image(file_path)
+        if self.config["downsample"]["enabled"]:
+            im = im / np.max(im)
+            shape = tuple(self.config["downsample"]["shape"])
+            im = resize(im, shape, anti_aliasing=False)
+
+        return im
 
     def make_train_test_split(self):
         # pairs belonging to the same person should be in same split

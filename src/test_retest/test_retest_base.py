@@ -340,6 +340,8 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.metric_logger.dump()
             sys.stdout.flush()
 
+        self.streamer = None
+
     def get_hooks(self, preds_test, preds_retest, features_test,
                   features_retest):
         hooks = []
