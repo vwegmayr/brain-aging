@@ -8,6 +8,7 @@ import gc
 import tensorflow as tf
 from subprocess import call, Popen
 import math
+from sklearn.decomposition import IncrementalPCA
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -123,6 +124,36 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
             "w"
         ) as f:
             json.dump(features, f, indent=2)
+
+
+class MriIncrementalPCA(DataTransformer):
+    """
+    batch_size has to be larger than n_components
+    """
+    def __init__(self, streamer, n_components):
+        _class = streamer["class"]
+        self.streamer = _class(**streamer["params"])
+        self.pca = IncrementalPCA(
+            n_components=n_components,
+            batch_size=self.streamer.batch_size
+        )
+
+    def transform(self, X, y=None):
+        batches = self.streamer.get_batches()
+
+        for batch in batches:
+            file_ids = [fid for group in batch for fid in group.file_ids]
+            X = []
+            for fid in file_ids:
+                path = self.streamer.get_file_path(fid)
+                im = self.streamer.load_sample(path)
+                X.append(im.ravel())
+
+            X = np.array(X)
+            print(X.shape)
+            self.pca = self.pca.partial_fit(X)
+
+        self.streamer = None
 
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):

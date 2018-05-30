@@ -203,12 +203,12 @@ class FileStream(abc.ABC):
                     file_features[pf]
                     for pf in port_features
                 ]
+            # print("_read_files {}".format(ret[1]))
             return ret  # return list of features
 
         def _parser(*to_parse):
             sample_shape = self.sample_shape
             el_n_features = 1 + len(port_features)  # sample + csv features
-
             all_features = {}
             # parse features for every sample in group
             for i in range(group_size):
@@ -218,6 +218,11 @@ class FileStream(abc.ABC):
                 ft = {
                     _features.MRI: tf.reshape(_mri, sample_shape),
                 }
+
+                ft.update({
+                    port_features[i - 1]: to_parse[i]
+                    for i in range(mri_idx + 1, mri_idx + el_n_features)
+                })
                 ft.update({
                     ft_name: d['default']
                     for ft_name, d in self.feature_desc.items()
