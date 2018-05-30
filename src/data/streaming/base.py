@@ -170,6 +170,10 @@ class FileStream(abc.ABC):
         self.sample_shape = sample.shape
         return sample.shape
 
+    def get_image_label(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["image_label"]
+
     def get_input_fn(self, train):
         # TODO: get batch ordering here
         batches = self.get_batches(train)

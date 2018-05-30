@@ -76,8 +76,9 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
         for batch in batches:
             for group in batch:
                 for file_id in group.get_file_ids():
+                    image_label = self.streamer.get_image_label(file_id)
                     path_in = self.streamer.get_file_path(file_id)
-                    path_out = os.path.join(out_path, str(file_id) + ".json")
+                    path_out = os.path.join(out_path, str(image_label) + ".json")
 
                     cmd = 'python -m src.test_retest.mri.run_py_radiomics_transformer '
                     cmd += "{} {}".format(path_in, path_out)
