@@ -7,6 +7,8 @@ from memory_profiler import profile
 import gc
 import tensorflow as tf
 from subprocess import call, Popen
+import math
+import nibabel as nib
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -107,12 +109,16 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
         return extractor
 
     def transform(self, X, y=None):
-        sitk_im = sitk.ReadImage(self.in_path)
-        all_ones = np.ones(sitk_im.GetSize())
-        sitk_mask = sitk.GetImageFromArray(all_ones)
+        #sitk_im = sitk.ReadImage(self.in_path)
+        #all_ones = np.ones(sitk_im.GetSize())
+        #sitk_mask = sitk.GetImageFromArray(all_ones)
 
-        extractor = self.get_extractor()
-        features = extractor.computeFeatures(sitk_im, sitk_mask, "brain")
+        #extractor = self.get_extractor()
+        #features = extractor.computeFeatures(sitk_im, sitk_mask, "brain")
+        im = nib.load(self.in_path).get_data()
+        features = {
+            "mean": float(np.mean(im))
+        }
 
         with open(
             os.path.join(self.out_path),
@@ -271,6 +277,102 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
 
 
 class MnistPCAAutoEncoder(PCAAutoEncoder):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return mnist_input_fn(
+            X,
+            self.data_params,
+            input_fn_config=input_fn_config
+        )
+
+
+class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
+    def model_fn(self, features, labels, mode, params):
+        input_dim = params["input_dim"]
+        x = features["X_0"]
+
+        n_filters = params["n_filters"]
+        filter_sizes = params["filter_sizes"]
+
+        x = tf.reshape(x, [-1, input_dim, input_dim, 1])
+        current_input = x
+
+        # Build the encoder
+        encoder = []
+        shapes = []
+        for layer_i, n_output in enumerate(n_filters):
+            n_input = current_input.get_shape().as_list()[3]
+            shapes.append(current_input.get_shape().as_list())
+            W = tf.Variable(
+                tf.random_uniform([
+                    filter_sizes[layer_i],
+                    filter_sizes[layer_i],
+                    n_input, n_output],
+                    -1.0 / math.sqrt(n_input),
+                    1.0 / math.sqrt(n_input)))
+            b = tf.Variable(tf.zeros([n_output]))
+            encoder.append(W)
+            output = tf.nn.relu(
+                tf.add(tf.nn.conv2d(
+                    current_input, W, strides=[1, 2, 2, 1], padding='SAME'), b))
+            current_input = output
+            shapes.append(current_input.get_shape().as_list())
+            output = tf.layers.max_pooling2d(
+                current_input,
+                pool_size=2,
+                strides=2,
+                padding='SAME'
+            )
+            current_input = output
+
+        exit()
+
+        z = current_input
+        encoder.reverse()
+        shapes.reverse()
+        # Build the decoder
+        for layer_i, shape in enumerate(shapes):
+            W = encoder[layer_i]
+            b = tf.Variable(tf.zeros([W.get_shape().as_list()[2]]))
+            output = tf.nn.relu(tf.add(
+                tf.nn.conv2d_transpose(
+                    current_input, W,
+                    tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3]]),
+                    strides=[1, 2, 2, 1], padding='SAME'), b))
+            current_input = output
+
+        y = current_input
+        predictions = {
+            "hidden_rep": z,
+            "reconstruction": y
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
+
+        loss = tf.losses.mean_squared_error(x, y)
+
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=params["learning_rate"]
+        )
+        train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op
+            )
+
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=loss
+        )
+
+
+class MnistConv2DAutoEncoder(Conv2DAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return mnist_input_fn(
             X,
