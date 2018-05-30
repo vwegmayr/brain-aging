@@ -6,7 +6,7 @@ import json
 from memory_profiler import profile
 import gc
 import tensorflow as tf
-from subprocess import call
+from subprocess import call, Popen
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -73,7 +73,12 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
         os.mkdir(out_path)
         # Stream image one by one
         batches = self.streamer.get_batches()
+        processes = []
         for batch in batches:
+            if len(processes) >= 8:
+                for p in processes:
+                    p.wait()
+                processes = []
             for group in batch:
                 for file_id in group.get_file_ids():
                     image_label = self.streamer.get_image_label(file_id)
@@ -83,7 +88,9 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
                     cmd = 'python -m src.test_retest.mri.run_py_radiomics_transformer '
                     cmd += "{} {}".format(path_in, path_out)
                     print(cmd)
-                    call(cmd, shell=True)
+                    # call(cmd, shell=True)
+                    proc = Popen(cmd, shell=True)
+                    processes.append(proc)
 
 
 class PyRadiomicsSingleFileTransformer(DataTransformer):
