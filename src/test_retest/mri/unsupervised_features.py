@@ -8,7 +8,6 @@ import gc
 import tensorflow as tf
 from subprocess import call, Popen
 import math
-import nibabel as nib
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -57,10 +56,11 @@ class PyRadiomicsFeatures(DataTransformer):
 
 
 class PyRadiomicsFeaturesSpawn(DataTransformer):
-    def __init__(self, streamer):
+    def __init__(self, streamer, out_dir):
         # Initialize streamer
         _class = streamer["class"]
         self.streamer = _class(**streamer["params"])
+        self.out_dir = out_dir
 
     def get_extractor(self):
         # Initialize extractor
@@ -71,8 +71,10 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
         return extractor
 
     def transform(self, X, y=None):
-        out_path = os.path.join(self.save_path, "features")
-        os.mkdir(out_path)
+        out_path = self.out_dir
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
         # Stream image one by one
         batches = self.streamer.get_batches()
         processes = []
@@ -109,16 +111,12 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
         return extractor
 
     def transform(self, X, y=None):
-        #sitk_im = sitk.ReadImage(self.in_path)
-        #all_ones = np.ones(sitk_im.GetSize())
-        #sitk_mask = sitk.GetImageFromArray(all_ones)
+        sitk_im = sitk.ReadImage(self.in_path)
+        all_ones = np.ones(sitk_im.GetSize())
+        sitk_mask = sitk.GetImageFromArray(all_ones)
 
-        #extractor = self.get_extractor()
-        #features = extractor.computeFeatures(sitk_im, sitk_mask, "brain")
-        im = nib.load(self.in_path).get_data()
-        features = {
-            "mean": float(np.mean(im))
-        }
+        extractor = self.get_extractor()
+        features = extractor.computeFeatures(sitk_im, sitk_mask, "brain")
 
         with open(
             os.path.join(self.out_path),
