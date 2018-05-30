@@ -39,6 +39,7 @@ class FileStream(abc.ABC):
 
         # Parse meta information
         self.file_id_to_meta = self.parse_meta_csv()
+        csv_len = len(self.file_id_to_meta)
 
         self.name_to_data_source = {}
         # Create datasources
@@ -73,7 +74,7 @@ class FileStream(abc.ABC):
         print("{} files found but not specified meta csv"
               .format(n_files_not_used))
         print("Number of files: {}".format(len(self.all_file_paths)))
-        n_missing = len(self.file_id_to_meta) - len(self.all_file_paths)
+        n_missing = csv_len - len(self.all_file_paths)
         print("Number of files missing: {}".format(n_missing))
 
         # Group files into tuples
