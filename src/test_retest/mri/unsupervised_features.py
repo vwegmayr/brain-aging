@@ -127,11 +127,14 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
+        tf.logging.set_verbosity(tf.logging.DEBUG)
         input_dim = params["input_dim"]
         input_mri = tf.reshape(
             features["X_0"],
             [-1, input_dim]
         )
+
+        input_mri = tf.nn.sigmoid(input_mri)
 
         hidden_dim = params["hidden_dim"]
         w = tf.get_variable(
@@ -139,15 +142,18 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
             shape=[input_dim, hidden_dim],
             dtype=input_mri.dtype,
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
+            #initializer=tf.initializers.random_normal()
         )
 
         hidden = tf.matmul(input_mri, w, name="hidden_rep")
+        # hidden = tf.nn.sigmoid(hidden)
 
         reconstruction = tf.matmul(
             hidden,
             tf.transpose(w),
             name="reconstruction"
         )
+        reconstruction = tf.nn.sigmoid(reconstruction)
 
         predictions = {
             "hidden_rep": hidden,
@@ -164,7 +170,8 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
         loss = tf.losses.mean_squared_error(input_mri, reconstruction)
 
-        optimizer = tf.train.RMSPropOptimizer(
+        #optimizer = tf.train.RMSPropOptimizer(
+        optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
@@ -283,6 +290,18 @@ class MnistPCAAutoEncoder(PCAAutoEncoder):
         )
 
 
+class RandomImageAutoEncoder(PCAAutoEncoder):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        images = np.random.rand(2000, 28, 28)
+        labels = np.ones((2000, 1))
+
+        return tf.estimator.inputs.numpy_input_fn(
+            x={"X_0": images},
+            y=labels,
+            **input_fn_config,
+        )
+
+
 class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
         input_dim = params["input_dim"]
@@ -297,6 +316,7 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
         # Build the encoder
         encoder = []
         shapes = []
+        pooling = True
         for layer_i, n_output in enumerate(n_filters):
             n_input = current_input.get_shape().as_list()[3]
             shapes.append(current_input.get_shape().as_list())
@@ -313,22 +333,34 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                 tf.add(tf.nn.conv2d(
                     current_input, W, strides=[1, 2, 2, 1], padding='SAME'), b))
             current_input = output
-            shapes.append(current_input.get_shape().as_list())
-            output = tf.layers.max_pooling2d(
-                current_input,
-                pool_size=2,
-                strides=2,
-                padding='SAME'
-            )
-            current_input = output
-
-        exit()
+            #shapes.append(current_input.get_shape().as_list())
+            print("encoder conv shape {}".format(shapes[-1]))
+            if pooling:
+                output = tf.layers.max_pooling2d(
+                    current_input,
+                    pool_size=2,
+                    strides=2,
+                    padding='SAME'
+                )
+                current_input = output
 
         z = current_input
         encoder.reverse()
         shapes.reverse()
         # Build the decoder
         for layer_i, shape in enumerate(shapes):
+            # unpool
+            if pooling:
+                output = tf.image.resize_images(
+                    current_input,
+                    size=(shape[1], shape[2]),
+                    method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+                )
+                current_input = output
+                print("decoder upsample shape {}".format(current_input.get_shape().as_list()))
+                print("shape {}".format(shape))
+
+            # deconv
             W = encoder[layer_i]
             b = tf.Variable(tf.zeros([W.get_shape().as_list()[2]]))
             output = tf.nn.relu(tf.add(
@@ -337,7 +369,10 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                     tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3]]),
                     strides=[1, 2, 2, 1], padding='SAME'), b))
             current_input = output
+            print("decoder deconv shape {}".format(current_input.get_shape().as_list()))
 
+        print(current_input)
+        print("model built")
         y = current_input
         predictions = {
             "hidden_rep": z,
