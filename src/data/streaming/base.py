@@ -175,8 +175,28 @@ class FileStream(abc.ABC):
         record = self.file_id_to_meta[file_id]
         return record["image_label"]
 
+    def get_patient_to_file_ids_mapping(self):
+        patient_to_file_ids = {}
+        not_found = 0
+        for file_id in self.file_id_to_meta:
+            record = self.file_id_to_meta[file_id]
+            if "file_path" in record:
+                patient_label = record["patient_label"]
+                if patient_label not in patient_to_file_ids:
+                    patient_to_file_ids[patient_label] = []
+                patient_to_file_ids[patient_label].append(
+                    file_id
+                )
+            else:
+                not_found += 1
+
+        if not_found > 0:
+            warnings.warn("{} files not found".format(not_found))
+
+        return patient_to_file_ids
+
     def get_input_fn(self, train):
-        print("<>>>>>>>>>> called get input fn")
+        print(">>>>>>>>>> called get input fn")
         # TODO: get batch ordering here
         batches = self.get_batches(train)
         groups = [group for batch in batches for group in batch]

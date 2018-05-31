@@ -3,6 +3,7 @@ import warnings
 from skimage.transform import resize
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
 
 from .base import FileStream
 from .base import Group
@@ -59,9 +60,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
     def load_sample(self, file_path):
         im = self.load_image(file_path)
         if self.config["downsample"]["enabled"]:
-            #im = im / np.max(im)
+            # im = im / np.max(im)
             shape = tuple(self.config["downsample"]["shape"])
-            #im = resize(im, shape, anti_aliasing=False)
+            # im = resize(im, shape, anti_aliasing=False)
             im = np.zeros(shape)
 
         return im
@@ -122,5 +123,98 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
                     g = Group([id_1, id_2])
                     g.patient_label = patient_label
                     groups.append(g)
+
+        return groups
+
+
+class MRIDifferentPatientDifferentDiagnosisPairStream(MRISingleStream):
+    def group_data(self):
+        n_pairs = self.config["n_pairs"]
+        groups = []
+
+        patient_to_file_ids = self.get_patient_to_file_ids_mapping()
+
+        # Remap patient to diagnose to file_ids
+        patient_to_diags = {}
+        for patient_label in patient_to_file_ids:
+            file_ids = patient_to_file_ids[patient_label]
+            diagnoses = [(fid, self.get_diagnose(fid)) for fid in file_ids]
+
+            dic = {}
+            for t in diagnoses:
+                fid, diag = t
+                if diag not in dic:
+                    dic[diag] = []
+                dic[diag].append(fid)
+
+            patient_to_diags[patient_label] = dic
+
+        # Sample some pairs
+        sampled = set()
+
+        def get_common_diag(p1, p2):
+            s1 = set(list(patient_to_diags[p1].keys()))
+            s2 = set(list(patient_to_diags[p2].keys()))
+            inter = s1.intersection(s2)
+            inter = list(inter)
+
+            if len(inter) == 0:
+                return None
+
+            idx = self.np_random.randint(0, len(inter))
+            return inter[idx]
+
+        def get_different_diag(p1, p2):
+            s1 = list(patient_to_diags[p1].keys())
+            s2 = list(patient_to_diags[p2].keys())
+
+            # build possible pairs
+            pairs = list(itertools.product(s1, s2))
+            self.np_random.shuffle(pairs)
+            for d1, d2 in pairs:
+                if d1 != d2:
+                    return d1, d2
+
+            return None
+
+        def sample_file_ids(ids):
+            idx = self.np_random.randint(0, len(ids))
+            return ids[idx]
+
+        patient_labels = list(patient_to_diags.keys())
+        n_patients = len(patient_labels)
+
+        def sample_pair():
+            # sample first patient
+            p1 = self.np_random.randint(0, n_patients)
+            p1 = patient_labels[p1]
+            # sample second patient
+            p2 = self.np_random.randint(0, n_patients)
+            p2 = patient_labels[p2]
+            d = get_different_diag(p1, p2)
+            # sample until both patients have a different diagnose
+            while (d is None):
+                p2 = self.np_random.randint(0, n_patients)
+                p2 = patient_labels[p2]
+                d = get_different_diag(p1, p2)
+
+            d1, d2 = d
+            id1 = sample_file_ids(patient_to_diags[p1][d1])
+            id2 = sample_file_ids(patient_to_diags[p2][d2])
+            return tuple(sorted((id1, id2)))
+
+        for i in range(n_pairs):
+            pair = sample_pair()
+            while pair in sampled:
+                pair = sample_pair()
+
+            sampled.add(pair)
+
+        for s in sampled:
+            lll = s
+            id1 = lll[0]
+            id2 = lll[1]
+            groups.append(Group([id1, id2]))
+
 
         return groups
