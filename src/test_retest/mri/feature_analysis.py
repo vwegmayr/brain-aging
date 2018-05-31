@@ -52,11 +52,12 @@ class RobustnessMeasureComputation(DataTransformer):
             im_label_2 = self.streamer.get_image_label(ids[1])
             if self.features_exist(im_label_1) and \
                     self.features_exist(im_label_2):
-                print("features not found for {} and {}"
-                      .format(im_label_1, im_label_2))
                 f1 = self.load_features(im_label_1)
                 f2 = self.load_features(im_label_2)
                 features.append((f1, f2))
+            else:
+                print("features not found for {} and {}"
+                      .format(im_label_1, im_label_2))
 
         # Compute robustness measure using different features
         feature_names = features[0][0].keys()
