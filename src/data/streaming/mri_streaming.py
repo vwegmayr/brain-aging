@@ -28,7 +28,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             self.np_random.shuffle(groups)
 
         if self.batch_size == -1:
-            return [[group] for group in groups]
+            return [[group for group in groups]]
 
         n_samples = len(groups)
         n_batches = int(n_samples / self.batch_size)

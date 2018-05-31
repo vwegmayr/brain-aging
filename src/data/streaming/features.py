@@ -36,7 +36,7 @@ DATASET = adni_aibl.add(
 
 
 for disease in [
-    'lmci', 'emci', 'mci', 'smc',
+    'lmci', 'emci', 'mci', 'smc', 'ad'
     #'prodromal', 'swedd', 'gencohort_unaff', 'gencohort_pd',
 ]:
     adni_aibl.add('health_%s' % disease, disease, default=0)

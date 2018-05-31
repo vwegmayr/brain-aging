@@ -176,6 +176,7 @@ class FileStream(abc.ABC):
         return record["image_label"]
 
     def get_input_fn(self, train):
+        print("<>>>>>>>>>> called get input fn")
         # TODO: get batch ordering here
         batches = self.get_batches(train)
         groups = [group for batch in batches for group in batch]
@@ -203,7 +204,7 @@ class FileStream(abc.ABC):
                     file_features[pf]
                     for pf in port_features
                 ]
-            # print("_read_files {}".format(ret[1]))
+            # print("_read_files {}".format(ret[0] is None))
             return ret  # return list of features
 
         def _parser(*to_parse):
@@ -239,7 +240,10 @@ class FileStream(abc.ABC):
                 el_features["X_" + str(i)] = el_features.pop(_features.MRI + "_" + str(i))
                 all_features.update(el_features)
 
-            return all_features
+            return {
+                "X_0": all_features["X_0"]
+            }
+            # return all_features
 
         labels = len(files) * [0]  # currently not used
         dataset = tf.data.Dataset.from_tensor_slices(
@@ -263,7 +267,7 @@ class FileStream(abc.ABC):
         )
 
         dataset = dataset.map(_parser)
-        dataset = dataset.prefetch(10 * self.config["batch_size"])
+        # dataset = dataset.prefetch(10 * self.config["batch_size"])
         dataset = dataset.batch(batch_size=self.config["batch_size"])
 
         def _input_fn():

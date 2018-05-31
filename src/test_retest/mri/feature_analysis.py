@@ -21,8 +21,11 @@ class RobustnessMeasureComputation(DataTransformer):
         _class = streamer["class"]
         self.streamer = _class(**streamer["params"])
 
-    def load_features(self, file_id):
-        with open(os.path.join(self.features_path, str(file_id) + ".json")) \
+    def features_exist(self, im_label):
+        return os.path.isfile(os.path.join(self.features_path, str(im_label) + ".json"))
+
+    def load_features(self, im_label):
+        with open(os.path.join(self.features_path, str(im_label) + ".json")) \
          as f:
             features_dic = json.load(f)
 
@@ -45,9 +48,15 @@ class RobustnessMeasureComputation(DataTransformer):
             ids = group.get_file_ids()
             assert len(ids) == 2  # test-retest features
             # Read features for this group
-            f1 = self.load_features(ids[0])
-            f2 = self.load_features(ids[1])
-            features.append((f1, f2))
+            im_label_1 = self.streamer.get_image_label(ids[0])
+            im_label_2 = self.streamer.get_image_label(ids[1])
+            if self.features_exist(im_label_1) and \
+                    self.features_exist(im_label_2):
+                print("features not found for {} and {}"
+                      .format(im_label_1, im_label_2))
+                f1 = self.load_features(im_label_1)
+                f2 = self.load_features(im_label_2)
+                features.append((f1, f2))
 
         # Compute robustness measure using different features
         feature_names = features[0][0].keys()
@@ -68,6 +77,7 @@ class RobustnessMeasureComputation(DataTransformer):
 
             print("Computed robustness for feature {}".format(name))
 
+        self.streamer = None
         # Dump computations
         with open(os.path.join(out_path, "computations.json"), 'w') as f:
             json.dump(computation_dic, f, indent=2)

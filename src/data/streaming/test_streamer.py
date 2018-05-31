@@ -14,11 +14,11 @@ class TestStreamer(DataTransformer):
         fn = self.streamer.get_input_fn(train=True)
 
         e = fn()
-        for i in range(280):
+        for i in range(2):
             print(i)
             r = self.sess.run(e)
             print("image_label = {}".format(r["patient_label_0"]))
-
+            print(r["X_0"].shape)
             for k in r:
                 for v in r[k]:
                     assert v is not None

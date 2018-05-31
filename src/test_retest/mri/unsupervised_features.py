@@ -16,6 +16,7 @@ from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
+from src.train_hooks import TensorsDumpHook
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -207,11 +208,16 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
+        train_hook = TensorsDumpHook(
+            [features],
+            self.save_path
+        )
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
-                train_op=train_op
+                train_op=train_op,
+                training_hooks=[train_hook]
             )
 
         return tf.estimator.EstimatorSpec(
@@ -323,7 +329,8 @@ class MnistPCAAutoEncoder(PCAAutoEncoder):
 
 class RandomImageAutoEncoder(PCAAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        images = np.random.rand(2000, 28, 28)
+        # images = np.random.rand(2000, 28, 28)
+        images = np.zeros((2000, 28, 28))
         labels = np.ones((2000, 1))
 
         return tf.estimator.inputs.numpy_input_fn(
