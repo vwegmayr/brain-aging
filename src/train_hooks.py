@@ -68,6 +68,22 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
         np.save(out_file, self.confusion.astype(int))
 
 
+class TensorsDumpHook(tf.train.SessionRunHook):
+    def __init__(self, tensor_list, out_dir):
+        self.tensor_list = tensor_list
+        self.out_dir = out_dir
+
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(fetches=self.tensor_list)
+
+    def after_run(self, run_context, run_values):
+        print(">>>>>>>>>>>>> After run")
+        for val in run_values.results:
+            if not os.path.exists(self.out_dir):
+                os.mkdir(self.out_dir)
+            print(val)
+
+
 class ICCHook(tf.train.SessionRunHook):
     def __init__(self, icc_op, out_dir, icc_name):
         self.icc_op = icc_op
