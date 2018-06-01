@@ -84,6 +84,9 @@ class FileStream(abc.ABC):
         # Make train-test split based on grouping
         self.make_train_test_split()
 
+        # Print stats
+        self.print_stats()
+
     @abc.abstractmethod
     def get_batches(self):
         """
@@ -113,6 +116,44 @@ class FileStream(abc.ABC):
     @abc.abstractmethod
     def load_sample(self):
         pass
+
+    def print_stats(self):
+        group_size = len(self.groups[0].file_ids)
+
+        dignosis_count = {}
+        ages = []
+        age_diffs = []
+        for group in self.groups:
+            for fid in group.file_ids:
+                ages.append(self.get_age(fid))
+                diag = self.get_diagnose(fid)
+                if diag not in dignosis_count:
+                    dignosis_count[diag] = 0
+                dignosis_count[diag] += 1
+
+            if group_size == 1:
+                continue
+
+            for i, fid in enumerate(group.file_ids[1:]):
+                age1 = self.get_age(group.file_ids[i])
+                age2 = self.get_age(fid)
+                diff = abs(age1 - age2)
+                age_diffs.append(diff)
+
+        age_diffs = np.array(age_diffs)
+        ages = np.array(ages)
+
+        print(">>>>>>>>>>>>>>>>")
+        print(">>>> Age stats, mean={}, std={}"
+              .format(np.mean(ages), np.std(ages)))
+
+        if len(age_diffs) > 0:
+            print(">>>> Age diffences stats, mean={}, std={}"
+                  .format(np.mean(age_diffs), np.std(age_diffs)))
+
+        for diag, c in dignosis_count.items():
+            print(">>>> {} count: {}".format(diag, c))
+        print(">>>>>>>>>>>>>>>>")
 
     def parse_meta_csv(self):
         """
