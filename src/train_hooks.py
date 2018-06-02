@@ -72,16 +72,22 @@ class TensorsDumpHook(tf.train.SessionRunHook):
     def __init__(self, tensor_list, out_dir):
         self.tensor_list = tensor_list
         self.out_dir = out_dir
+        self.count = 0
 
     def before_run(self, run_context):
         return tf.train.SessionRunArgs(fetches=self.tensor_list)
 
     def after_run(self, run_context, run_values):
         print(">>>>>>>>>>>>> After run")
+        self.count += 1
         for val in run_values.results:
             if not os.path.exists(self.out_dir):
                 os.mkdir(self.out_dir)
+            print(np.count_nonzero(val))
             print(val)
+
+        if self.count >= 3:
+            exit()
 
 
 class ICCHook(tf.train.SessionRunHook):

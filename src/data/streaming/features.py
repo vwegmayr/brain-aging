@@ -31,8 +31,8 @@ IMAGE_LABEL = adni_aibl.add(
     'image_label', t=tf.string, py_type=str, default='')
 SUBJECT_LABEL = adni_aibl.add(
     'patient_label', t=tf.string, py_type=str, default='')
-DATASET = adni_aibl.add(
-    'dataset', t=tf.string, py_type=str, default='')
+#DATASET = adni_aibl.add(
+ #   'dataset', t=tf.string, py_type=str, default='')
 
 
 for disease in [

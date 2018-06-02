@@ -159,14 +159,11 @@ class MriIncrementalPCA(DataTransformer):
 
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
-        tf.logging.set_verbosity(tf.logging.DEBUG)
         input_dim = params["input_dim"]
         input_mri = tf.reshape(
             features["X_0"],
             [-1, input_dim]
         )
-
-        input_mri = tf.nn.sigmoid(input_mri)
 
         hidden_dim = params["hidden_dim"]
         w = tf.get_variable(
@@ -179,13 +176,12 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
 
         hidden = tf.matmul(input_mri, w, name="hidden_rep")
         # hidden = tf.nn.sigmoid(hidden)
-
+        w_T = tf.transpose(w)
         reconstruction = tf.matmul(
             hidden,
-            tf.transpose(w),
+            w_T,
             name="reconstruction"
         )
-        reconstruction = tf.nn.sigmoid(reconstruction)
 
         predictions = {
             "hidden_rep": hidden,
@@ -199,8 +195,8 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
             )
 
         # Compute loss
-        # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
-        loss = tf.losses.mean_squared_error(input_mri, reconstruction)
+        #loss = 0 * tf.reduce_sum(tf.square(input_mri - reconstruction))
+        loss = 1 * tf.losses.mean_squared_error(input_mri, reconstruction)
 
         #optimizer = tf.train.RMSPropOptimizer(
         optimizer = tf.train.AdamOptimizer(
@@ -209,7 +205,7 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
         train_hook = TensorsDumpHook(
-            [features],
+            [input_mri, reconstruction, w],
             self.save_path
         )
         if mode == tf.estimator.ModeKeys.TRAIN:
@@ -217,7 +213,7 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                training_hooks=[train_hook]
+                #training_hooks=[train_hook]
             )
 
         return tf.estimator.EstimatorSpec(

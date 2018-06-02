@@ -14,7 +14,7 @@ class MRIImageLoader(object):
         mri_image = nib.load(image_path)
         mri_image = mri_image.get_data()
 
-        return mri_image
+        return mri_image.astype(np.float16)
 
 
 class MRISingleStream(FileStream, MRIImageLoader):

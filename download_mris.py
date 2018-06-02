@@ -9,6 +9,9 @@ CSV_PATH = "data/raw/csv/adni_aibl.csv"
 REMOTE_PATH = "/local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images"
 LOCAL_PATH = "brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/"
 
+if not os.path.exists(LOCAL_PATH):
+    os.makedirs(LOCAL_PATH)
+
 
 def main():
     pwd = sys.argv[1]
@@ -30,6 +33,7 @@ def main():
             child.expect("mhoerold@isegpu2.inf.ethz.ch's password:")
             child.sendline(pwd)
             child.expect(pexpect.EOF)
+
 
 if __name__ == "__main__":
     main()
