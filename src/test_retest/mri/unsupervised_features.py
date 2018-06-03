@@ -272,7 +272,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
         loss_0 = tf.losses.mean_squared_error(x_0, rec_0)
         loss_1 = tf.losses.mean_squared_error(x_1, rec_1)
-        loss = loss_0 + loss_1
+        loss = loss_0 / 2 + loss_1 / 2
 
         # Regularization
         reg = 0
