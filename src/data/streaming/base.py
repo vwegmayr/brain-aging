@@ -89,6 +89,8 @@ class FileStream(abc.ABC):
 
         # Make train-test split based on grouping
         self.make_train_test_split()
+        self.sanity_checks()
+        print(">>>>>>>>> Sanity checks OK")
 
         # Print stats
         self.print_stats()
@@ -122,6 +124,23 @@ class FileStream(abc.ABC):
     @abc.abstractmethod
     def load_sample(self):
         pass
+
+    def get_set_file_ids(self, train=True):
+        groups = [group for group in self.groups if group.is_train == train]
+        fids = [fid for group in groups for fid in group.file_ids]
+        return fids
+
+    def sanity_checks(self):
+        """
+        Check sound train-test split. The train set and test set
+        of patients should be disjoint.
+        """
+        train_ids = self.get_set_file_ids(True)
+        test_ids = self.get_set_file_ids(False)
+        train_patients = set([self.get_patient_id(fid) for fid in train_ids])
+        test_patiens = set([self.get_patient_id(fid) for fid in test_ids])
+
+        assert len(train_patients.intersection(test_patiens)) == 0
 
     def print_stats(self):
         group_size = len(self.groups[0].file_ids)
@@ -200,6 +219,10 @@ class FileStream(abc.ABC):
             return "health_mci"
 
         raise ValueError("diagnosis not found for id {}".format(file_id))
+
+    def get_patient_id(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["patient_label"]
 
     def get_age(self, file_id):
         record = self.file_id_to_meta[file_id]
@@ -285,6 +308,7 @@ class FileStream(abc.ABC):
             sample_shape = self.sample_shape
             el_n_features = 1 + len(port_features)  # sample + csv features
             all_features = {}
+
             # parse features for every sample in group
             for i in range(group_size):
                 self.feature_desc[_features.MRI]["shape"] = sample_shape
@@ -295,8 +319,8 @@ class FileStream(abc.ABC):
                 }
 
                 ft.update({
-                    port_features[i - 1]: to_parse[i]
-                    for i in range(mri_idx + 1, mri_idx + el_n_features)
+                    port_features[i]: to_parse[mri_idx + i + 1]
+                    for i in range(0, el_n_features - 1)
                 })
                 ft.update({
                     ft_name: d['default']
@@ -311,7 +335,9 @@ class FileStream(abc.ABC):
                     for ft_name, ft_tensor in ft.items()
                 }  # return dictionary of features, should be tensors
                 # rename mri_i to X_i
-                el_features["X_" + str(i)] = el_features.pop(_features.MRI + "_" + str(i))
+                el_features["X_" + str(i)] = el_features.pop(
+                    _features.MRI + "_" + str(i)
+                )
                 all_features.update(el_features)
 
             return all_features

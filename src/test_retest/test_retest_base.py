@@ -9,7 +9,7 @@ from modules.models.utils import custom_print
 from src.logging import MetricLogger
 import src.test_retest.regularizer as regularizer
 from src.data.mnist import read as mnist_read
-from src.train_hooks import ConfusionMatrixHook, ICCHook
+from src.train_hooks import ConfusionMatrixHook, ICCHook, BatchDumpHook
 
 
 def test_retest_evaluation_spec(
@@ -373,6 +373,25 @@ class EvaluateEpochsBaseTF(BaseTF):
             hooks.append(hook)
 
         return hooks
+
+    def get_batch_dump_hook(self, tensor_val, tensor_name):
+        train_hook = BatchDumpHook(
+            tensor_batch=tensor_val,
+            batch_names=tensor_name,
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=True
+        )
+        test_hook = BatchDumpHook(
+            tensor_batch=tensor_val,
+            batch_names=tensor_name,
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=False
+        )
+        return train_hook, test_hook
 
     def score(self, X, y):
         pass

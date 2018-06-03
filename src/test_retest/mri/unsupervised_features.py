@@ -201,23 +201,8 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
-        dump_hook_train = BatchDumpHook(
-            tensor_batch=hidden,
-            batch_names=features["file_name_0"],
-            model_save_path=self.save_path,
-            out_dir=self.data_params["dump_out_dir"],
-            epoch=self.current_epoch,
-            train=True
-        )
-
-        dump_hook_test = BatchDumpHook(
-            tensor_batch=hidden,
-            batch_names=features["file_name_0"],
-            model_save_path=self.save_path,
-            out_dir=self.data_params["dump_out_dir"],
-            epoch=self.current_epoch,
-            train=False
-        )
+        dump_hook_train, dump_hook_test = \
+            self.get_batch_dump_hook(hidden, features["file_name_0"])
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
@@ -292,8 +277,8 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         # Regularization
         reg = 0
         reg_lambda = params["hidden_lambda"]
-        reg_name = params["hidden_regularizer"]
         if reg_lambda != 0:
+            reg_name = params["hidden_regularizer"]
             reg = name_to_hidden_regularization(
                 0,
                 reg_name,
@@ -305,21 +290,29 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         reg = tf.cast(reg, loss.dtype)
         loss += reg
 
-        optimizer = tf.train.RMSPropOptimizer(
+        optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        hidden_0_hook_train, hidden_0_hook_test = \
+            self.get_batch_dump_hook(hidden_0, features["file_name_0"])
+
+        hidden_1_hook_train, hidden_1_hook_test = \
+            self.get_batch_dump_hook(hidden_1, features["file_name_1"])
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
-                train_op=train_op
+                train_op=train_op,
+                training_hooks=[hidden_0_hook_train, hidden_1_hook_train]
             )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=loss
+            loss=loss,
+            evaluation_hooks=[hidden_0_hook_test, hidden_1_hook_test]
         )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
