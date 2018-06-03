@@ -309,6 +309,7 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.metric_logger = MetricLogger(output_dir, "Evaluation metrics")
 
         for i in range(n_epochs):
+            self.current_epoch = i
             # train
             self.estimator.train(
                 input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)

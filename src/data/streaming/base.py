@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 import tensorflow as tf
 import copy
+import os
 
 from . import features as _features
 
@@ -67,6 +68,11 @@ class FileStream(abc.ABC):
                         self.file_id_to_meta[image_label]
                     )
                     self.file_id_to_meta[p]["file_path"] = p
+                    # store file name
+                    # extract filename without extensions
+                    file_name = os.path.split(p)[-1]
+                    file_name = file_name.split(".")[0]
+                    self.file_id_to_meta[p]["file_name"] = file_name
                     self.all_file_paths.append(p)
                 else:
                     n_files_not_used += 1
@@ -216,6 +222,10 @@ class FileStream(abc.ABC):
         record = self.file_id_to_meta[file_id]
         return record["image_label"]
 
+    def get_file_name(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["file_name"]
+
     def get_patient_to_file_ids_mapping(self):
         patient_to_file_ids = {}
         not_found = 0
@@ -237,13 +247,17 @@ class FileStream(abc.ABC):
         return patient_to_file_ids
 
     def get_input_fn(self, train):
-        print(">>>>>>>>>> called get input fn")
         batches = self.get_batches(train)
         groups = [group for batch in batches for group in batch]
         group_size = len(groups[0].file_ids)
         files = [group.file_ids for group in groups]
 
-        feature_keys = next(iter(self.file_id_to_meta.items()))[1].keys()
+        # get feature names present in csv file (e.g. patient_label)
+        # and added during preprocessing (e.g. file_name)
+        feature_keys = self.file_id_to_meta[
+            self.all_file_paths[0]
+        ].keys()
+
         port_features = [
             k
             for k in feature_keys
@@ -299,11 +313,7 @@ class FileStream(abc.ABC):
                 # rename mri_i to X_i
                 el_features["X_" + str(i)] = el_features.pop(_features.MRI + "_" + str(i))
                 all_features.update(el_features)
-            """
-            return {
-                "X_0": all_features["X_0"]
-            }
-            """
+
             return all_features
 
         labels = len(files) * [0]  # currently not used
@@ -311,6 +321,7 @@ class FileStream(abc.ABC):
             tuple([files, labels])
         )
 
+        # mri + other features
         read_types = group_size * ([tf.float64] + [
             self.feature_desc[fname]["type"]
             for fname in port_features
@@ -390,9 +401,10 @@ class DataSource(object):
                 warnings.warn("Could note extract id from path {}"
                               .format(p))
             else:
-                file_id = match.group(group_id)
+                # extract image_label
+                image_label = match.group(group_id)
                 self.file_paths.append(p)
-                self.file_path_to_image_label[p] = file_id
+                self.file_path_to_image_label[p] = image_label
 
     def get_file_paths(self):
         return self.file_paths

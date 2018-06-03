@@ -16,7 +16,7 @@ from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
-from src.train_hooks import TensorsDumpHook
+from src.train_hooks import BatchDumpHook
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -160,7 +160,7 @@ class MriIncrementalPCA(DataTransformer):
 class PCAAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
         input_dim = params["input_dim"]
-        input_mri = tf.reshape(
+        X = tf.reshape(
             features["X_0"],
             [-1, input_dim]
         )
@@ -169,12 +169,11 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
         w = tf.get_variable(
             name="weights",
             shape=[input_dim, hidden_dim],
-            dtype=input_mri.dtype,
+            dtype=X.dtype,
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
-            #initializer=tf.initializers.random_normal()
         )
 
-        hidden = tf.matmul(input_mri, w, name="hidden_rep")
+        hidden = tf.matmul(X, w, name="hidden_rep")
         # hidden = tf.nn.sigmoid(hidden)
         w_T = tf.transpose(w)
         reconstruction = tf.matmul(
@@ -195,30 +194,43 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
             )
 
         # Compute loss
-        #loss = 0 * tf.reduce_sum(tf.square(input_mri - reconstruction))
-        loss = 1 * tf.losses.mean_squared_error(input_mri, reconstruction)
+        loss = tf.losses.mean_squared_error(X, reconstruction)
 
-        #optimizer = tf.train.RMSPropOptimizer(
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
-        train_hook = TensorsDumpHook(
-            [input_mri, reconstruction, w],
-            self.save_path
+        dump_hook_train = BatchDumpHook(
+            tensor_batch=hidden,
+            batch_names=features["file_name_0"],
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=True
         )
+
+        dump_hook_test = BatchDumpHook(
+            tensor_batch=hidden,
+            batch_names=features["file_name_0"],
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=False
+        )
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                #training_hooks=[train_hook]
+                training_hooks=[dump_hook_train]
             )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=loss
+            loss=loss,
+            evaluation_hooks=[dump_hook_test]
         )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):

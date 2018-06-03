@@ -68,26 +68,39 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
         np.save(out_file, self.confusion.astype(int))
 
 
-class TensorsDumpHook(tf.train.SessionRunHook):
-    def __init__(self, tensor_list, out_dir):
-        self.tensor_list = tensor_list
-        self.out_dir = out_dir
-        self.count = 0
+class BatchDumpHook(tf.train.SessionRunHook):
+    """
+    Dump tensor to file.
+    """
+    def __init__(self, tensor_batch, batch_names, model_save_path,
+                 out_dir, epoch, train=True):
+        self.tensor_batch = tensor_batch
+        self.batch_names = batch_names
+        self.epoch = epoch
+        # Extract smt label
+        label = os.path.split(model_save_path)[-1]
+        if train:
+            sub = "train" + "_" + str(epoch)
+        else:
+            sub = "test" + "_" + str(epoch)
+        self.out_dir = os.path.join(out_dir, label, sub)
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
 
     def before_run(self, run_context):
-        return tf.train.SessionRunArgs(fetches=self.tensor_list)
+        return tf.train.SessionRunArgs(
+            fetches=[self.tensor_batch, self.batch_names]
+        )
 
     def after_run(self, run_context, run_values):
-        print(">>>>>>>>>>>>> After run")
-        self.count += 1
-        for val in run_values.results:
-            if not os.path.exists(self.out_dir):
-                os.mkdir(self.out_dir)
-            print(np.count_nonzero(val))
-            print(val)
-
-        if self.count >= 3:
-            exit()
+        batch, names = run_values.results
+        for val, name in zip(batch, names):
+            out_file = os.path.join(
+                self.out_dir,
+                name[0].decode('utf-8') + ".npy"
+            )
+            with open(out_file, 'wb') as f:
+                np.save(f, val)
 
 
 class ICCHook(tf.train.SessionRunHook):
