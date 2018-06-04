@@ -4,6 +4,7 @@ from skimage.transform import resize
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+from time import process_time
 
 from .base import FileStream
 from .base import Group
@@ -125,6 +126,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 if s >= n_train:
                     split = i
                     break
+
+            if train_ratio == 1:
+                split = len(remaining) + 10
 
             for i, g_list in enumerate(remaining):
                 for g in g_list:
@@ -434,7 +438,14 @@ class MRIDifferentPatientPairStream(MRISingleStream):
 
 
 class MRIDiagnosePairStream(MRISingleStream):
+    """
+    Allows for more exact sampling wrt. diagnoses. A diagnosis
+    pairs is expected in the config file under 'diagnoses'. For
+    every sampled pair, there is one image for each of diagnoses
+    specified.
+    """
     def group_data(self):
+        self.start_time = process_time()
         n_pairs = self.config["n_pairs"]
         groups = []
 
@@ -472,6 +483,10 @@ class MRIDiagnosePairStream(MRISingleStream):
         test_labels = patient_labels[n_train:]
         print("Num of training labels {}".format(len(train_labels)))
 
+        def check_time():
+            delta_t = process_time() - self.start_time
+            return delta_t <= 3
+
         def sample_patient(diagnosis, patient_labels):
             patients = set(diag_to_patient[diagnosis].keys())
             sample_from = set(patient_labels).intersection(patients)
@@ -493,21 +508,24 @@ class MRIDiagnosePairStream(MRISingleStream):
             p1 = sample_patient(d1, patient_labels)
 
             if self.config["same_patient"] and self.config["same_diagnosis"]:
-                while (len(diag_to_patient[d1][p1]) < 2):
+                while (len(diag_to_patient[d1][p1]) < 2 and check_time()):
                     p1 = sample_patient(d1, patient_labels)
 
                 p2 = p1
             elif self.config["same_patient"]:
                 while (not(p1 in diag_to_patient[d1] and
-                       p1 in diag_to_patient[d2])):
+                       p1 in diag_to_patient[d2]) and check_time()):
                     p1 = sample_patient(d1, patient_labels)
 
                 p2 = p1
             else:
                 # different patient
                 p2 = sample_patient(d2, patient_labels)
-                while (p2 == p1):
+                while (p2 == p1 and check_time()):
                     p2 = sample_patient(d2, patient_labels)
+
+            if not check_time():
+                return None
 
             # sample file ids
             fid1, fid2 = sample_file_ids(p1, d1, p2, d2)
@@ -526,15 +544,25 @@ class MRIDiagnosePairStream(MRISingleStream):
 
             p = get_pair_sample(patient_labels)
 
+            if p is None:
+                return None
+
             return tuple(sorted(p))
 
         sampled = set([])
         for i in range(n_pairs):
             pair = sample_pair(i)
             while pair in sampled:
+                if pair is None:
+                    break
                 pair = sample_pair(i)
 
+            if pair is None:
+                break
             sampled.add(pair)
+
+        if len(sampled) < n_pairs:
+            warnings.warn("Sampled only {} pairs!!!".format(len(sampled)))
 
         for i, s in enumerate(sampled):
             lll = s

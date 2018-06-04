@@ -290,7 +290,7 @@ class FileStream(abc.ABC):
 
     def get_meta_info_by_key(self, file_id, key):
         record = self.file_id_to_meta[file_id]
-        return record[k]
+        return record[key]
 
     def get_patient_to_file_ids_mapping(self):
         patient_to_file_ids = {}
