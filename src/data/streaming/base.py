@@ -288,6 +288,10 @@ class FileStream(abc.ABC):
         record = self.file_id_to_meta[file_id]
         return record["file_name"]
 
+    def get_meta_info_by_key(self, file_id, key):
+        record = self.file_id_to_meta[file_id]
+        return record[k]
+
     def get_patient_to_file_ids_mapping(self):
         patient_to_file_ids = {}
         not_found = 0

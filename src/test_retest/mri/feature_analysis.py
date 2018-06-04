@@ -5,9 +5,14 @@ import importlib
 
 from modules.models.data_transform import DataTransformer
 
+JSON_TYPE = '.json'
+NUMPY_TYPE = '.npy'
+FILE_TYPES = [JSON_TYPE, NUMPY_TYPE]
+
 
 class RobustnessMeasureComputation(DataTransformer):
-    def __init__(self, robustness_funcs, features_path, streamer):
+    def __init__(self, robustness_funcs, features_path, file_type,
+                 streamer, file_name_key):
         # Parse functions
         self.robustness_funcs = []
         for f in robustness_funcs:
@@ -21,13 +26,36 @@ class RobustnessMeasureComputation(DataTransformer):
         _class = streamer["class"]
         self.streamer = _class(**streamer["params"])
 
-    def features_exist(self, im_label):
-        return os.path.isfile(os.path.join(self.features_path, str(im_label) + ".json"))
+        self.file_type = file_type
+        self.file_name_key = file_name_key
 
-    def load_features(self, im_label):
-        with open(os.path.join(self.features_path, str(im_label) + ".json")) \
-         as f:
-            features_dic = json.load(f)
+    def get_file_name(self, file_id):
+        return self.streamer.get_meta_info_by_key[self.file_name_key]
+
+    def construct_file_path(self, file_name):
+        return os.path.join(self.features_path, file_name + self.file_type)
+
+    def features_exist(self, file_name):
+        p = self.construct_file_path(file_name)
+        return os.path.isfile(p)
+
+    def load_features(self, file_name):
+        """
+        Return:
+            - features_dic: dictionary mapping feature names
+              to their value
+        """
+        assert self.file_type in FILE_TYPES
+        p = self.construct_file_path(file_name)
+        with open(p) as f:
+            if self.file_type == JSON_TYPE:
+                features_dic = json.load(f)
+            elif self.file_type == NUMPY_TYPE:
+                features_vec = np.load(p)
+                features_dic = {
+                    str(i): val
+                    for i, val in enumerate(features_vec)
+                }
 
         return features_dic
 
@@ -48,16 +76,16 @@ class RobustnessMeasureComputation(DataTransformer):
             ids = group.get_file_ids()
             assert len(ids) == 2  # test-retest features
             # Read features for this group
-            im_label_1 = self.streamer.get_image_label(ids[0])
-            im_label_2 = self.streamer.get_image_label(ids[1])
-            if self.features_exist(im_label_1) and \
-                    self.features_exist(im_label_2):
-                f1 = self.load_features(im_label_1)
-                f2 = self.load_features(im_label_2)
+            file_name_1 = self.get_file_name(ids[0])
+            file_name_2 = self.get_file_name(ids[1])
+            if self.features_exist(file_name_1) and \
+                    self.features_exist(file_name_2):
+                f1 = self.load_features(file_name_1)
+                f2 = self.load_features(file_name_2)
                 features.append((f1, f2))
             else:
                 print("features not found for {} and {}"
-                      .format(im_label_1, im_label_2))
+                      .format(file_name_1, file_name_2))
 
         # Compute robustness measure using different features
         feature_names = features[0][0].keys()

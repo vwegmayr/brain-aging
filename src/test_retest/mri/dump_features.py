@@ -8,6 +8,12 @@ from modules.models.data_transform import DataTransformer
 
 
 class MriFeatureDumper(DataTransformer):
+    """
+    Common interface to load trained model, compute trained
+    feature transformation and dump the computed features to
+    an output folder. The 'compute_features' method should be
+    overriden by a subclass to customize the feature computation.
+    """
     def __init__(self, streamer, out_dir):
         # Initialize streamer
         _class = streamer["class"]

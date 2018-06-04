@@ -81,10 +81,6 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
         batches = self.streamer.get_batches()
         processes = []
         for batch in batches:
-            if len(processes) >= 8:
-                for p in processes:
-                    p.wait()
-                processes = []
             for group in batch:
                 for file_id in group.get_file_ids():
                     image_label = self.streamer.get_image_label(file_id)
@@ -97,6 +93,11 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
                     # call(cmd, shell=True)
                     proc = Popen(cmd, shell=True)
                     processes.append(proc)
+
+                    if len(processes) >= 8:
+                        for p in processes:
+                            p.wait()
+                        processes = []
 
 
 class PyRadiomicsSingleFileTransformer(DataTransformer):
