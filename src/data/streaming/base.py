@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import copy
 import os
+from functools import reduce
 
 from . import features as _features
 
@@ -96,13 +97,30 @@ class FileStream(abc.ABC):
         self.print_stats()
 
     @abc.abstractmethod
-    def get_batches(self):
-        """
-        Produce batches of file groups.
-        Return:
-            - batches: list of list of groups
-        """
-        pass
+    def get_batches(self, train=True):
+        groups = [group for group in self.groups
+                    if group.is_train == train]
+
+        if self.shuffle:
+            self.np_random.shuffle(groups)
+
+        if self.batch_size == -1:
+            return [[group for group in groups]]
+
+        n_samples = len(groups)
+        n_batches = int(n_samples / self.batch_size)
+
+        batches = []
+        for i in range(n_batches):
+            bi = i * self.batch_size
+            ei = (i + 1) * self.batch_size
+            batches.append(groups[bi:ei])
+
+        if n_batches * self.batch_size < n_samples:
+            bi = n_batches * self.batch_size
+            batches.append(groups[bi:])
+
+        return batches
 
     @abc.abstractmethod
     def group_data(self):
@@ -124,6 +142,9 @@ class FileStream(abc.ABC):
     @abc.abstractmethod
     def load_sample(self):
         pass
+
+    def get_data_source_by_name(self, name):
+        return self.name_to_data_source[name]
 
     def get_set_file_ids(self, train=True):
         groups = [group for group in self.groups if group.is_train == train]
@@ -240,6 +261,10 @@ class FileStream(abc.ABC):
 
         self.sample_shape = sample.shape
         return sample.shape
+
+    def get_sample_1d_dim(self):
+        shape = self.get_sample_shape()
+        return reduce(lambda x, y: x * y, shape)
 
     def get_image_label(self, file_id):
         record = self.file_id_to_meta[file_id]

@@ -17,21 +17,29 @@ class LogisticRegression(EvaluateEpochsBaseTF):
         - l2: l2-norm of weights
     """
     def model_fn(self, features, labels, mode, params):
+        if "target_feature_key" in params:
+            f_key = params["target_feature_key"]
+            labels = features[f_key]
+            params["input_dim"] = self.streamer.get_sample_1d_dim()
+            features["X"] = features["X_0"]
+
         # Prediction
         input_layer = tf.reshape(
             features["X"],
-            [-1, self.params["input_dim"]]
+            [-1, params["input_dim"]]
         )
 
         weights = tf.get_variable(
             name="logistic_weights",
-            shape=[self.params["input_dim"], self.params["n_classes"]],
+            dtype=features["X"].dtype,
+            shape=[params["input_dim"], params["n_classes"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
         bias = tf.get_variable(
             name="logistic_bias",
-            shape=[1, self.params["n_classes"]],
+            dtype=features["X"].dtype,
+            shape=[1, params["n_classes"]],
             initializer=tf.contrib.layers.xavier_initializer(seed=43)
         )
 
@@ -564,3 +572,8 @@ class MnistTestRetestTwoLevelLogisticRegression(
             train=train,
             input_fn_config=input_fn_config
         )
+
+
+class StreamerLogisticRegression(LogisticRegression):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return self.streamer.get_input_fn(train)
