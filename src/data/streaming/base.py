@@ -104,7 +104,7 @@ class FileStream(abc.ABC):
     @abc.abstractmethod
     def get_batches(self, train=True):
         groups = [group for group in self.groups
-                    if group.is_train == train]
+                  if group.is_train == train]
 
         if self.shuffle:
             self.np_random.shuffle(groups)
@@ -333,7 +333,7 @@ class FileStream(abc.ABC):
                 path = self.get_file_path(fid)
 
                 file_features = self.file_id_to_meta[fid]
-                image = self.load_sample(path).astype(np.float64)
+                image = self.load_sample(path).astype(np.float32)
                 ret += [image]
 
                 ret += [
@@ -387,7 +387,7 @@ class FileStream(abc.ABC):
         )
 
         # mri + other features
-        read_types = group_size * ([tf.float64] + [
+        read_types = group_size * ([tf.float32] + [
             self.feature_desc[fname]["type"]
             for fname in port_features
         ])
