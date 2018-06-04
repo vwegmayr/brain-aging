@@ -53,6 +53,10 @@ def MS_C(Y):
 
 
 def ICC_C1(Y):
+    # special case
+    if np.array_equal(Y[:, 0], Y[:, 1]):
+        return 1
+
     k = Y.shape[1]
     MSR = MS_R(Y)
     MSE = MS_E(Y)
@@ -64,6 +68,11 @@ def ICC_C1(Y):
 
 def ICC_A1(Y):
     n, k = Y.shape
+
+    # special case:
+    if np.array_equal(Y[:, 0], Y[:, 1]):
+        return 1
+
     MSR = MS_R(Y)
     MSE = MS_E(Y)
     MSC = MS_C(Y)
@@ -108,6 +117,10 @@ def linccc(Y):
     Arg:
         - Y: array of size (n_subjects, 2)
     """
+    # special case
+    if np.array_equal(Y[:, 0], Y[:, 1]):
+        return 1
+
     mu_Y_1 = np.mean(Y[:, 0])
     mu_Y_2 = np.mean(Y[:, 1])
     S_1_sq = np.mean((Y[:, 0] - mu_Y_1) ** 2)
@@ -126,5 +139,9 @@ def linccc(Y):
 
 
 def pearsonr(Y):
+    # special case
+    if np.array_equal(Y[:, 0], Y[:, 1]):
+        return 1
+
     r, p = sp_pearson(Y[:, 0], Y[:, 1])
     return r

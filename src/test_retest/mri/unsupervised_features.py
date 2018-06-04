@@ -99,6 +99,8 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
                             p.wait()
                         processes = []
 
+        self.streamer = None
+
 
 class PyRadiomicsSingleFileTransformer(DataTransformer):
     def __init__(self, in_path, out_path):

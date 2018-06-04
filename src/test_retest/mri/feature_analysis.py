@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import importlib
+import matplotlib.pyplot as plt
 
 from modules.models.data_transform import DataTransformer
 
@@ -12,7 +13,7 @@ FILE_TYPES = [JSON_TYPE, NUMPY_TYPE]
 
 class RobustnessMeasureComputation(DataTransformer):
     def __init__(self, robustness_funcs, features_path, file_type,
-                 streamer, file_name_key):
+                 streamer_collection, file_name_key):
         # Parse functions
         self.robustness_funcs = []
         for f in robustness_funcs:
@@ -22,15 +23,17 @@ class RobustnessMeasureComputation(DataTransformer):
             self.robustness_funcs.append(func)
 
         self.features_path = features_path
-        # Parse streamer
-        _class = streamer["class"]
-        self.streamer = _class(**streamer["params"])
-
+        # Initialize streamers
+        _class = streamer_collection["class"]
+        _params = streamer_collection["params"]
+        self.streamer_collection = _class(**_params)
+        self.streamers = self.streamer_collection.get_streamers()
         self.file_type = file_type
         self.file_name_key = file_name_key
 
     def get_file_name(self, file_id):
-        return self.streamer.get_meta_info_by_key[self.file_name_key]
+        streamer = self.streamers[0]
+        return streamer.get_meta_info_by_key(file_id, self.file_name_key)
 
     def construct_file_path(self, file_name):
         return os.path.join(self.features_path, file_name + self.file_type)
@@ -59,15 +62,9 @@ class RobustnessMeasureComputation(DataTransformer):
 
         return features_dic
 
-    def transform(self, X, y=None):
-        """
-        X and y are None. Data that is read is specified
-        by 'self.streamer'.
-        """
-        out_path = os.path.join(self.save_path, "robustness_measures")
-        os.mkdir(out_path)
+    def process_stream(self, streamer):
         # Steam batches (only one batch expected)
-        batches = self.streamer.get_batches()
+        batches = streamer.get_batches()
         assert len(batches) == 1
         batch = batches[0]
 
@@ -104,9 +101,74 @@ class RobustnessMeasureComputation(DataTransformer):
                 r = func(Y)
                 feature_dic[func.__name__] = r
 
-            print("Computed robustness for feature {}".format(name))
+        return computation_dic
 
-        self.streamer = None
-        # Dump computations
-        with open(os.path.join(out_path, "computations.json"), 'w') as f:
-            json.dump(computation_dic, f, indent=2)
+    def get_robustness_dic(self, computation_dic):
+        feature_names = list(computation_dic.keys())
+        some_feature = feature_names[0]
+        robustness_names = list(computation_dic[some_feature].keys())
+        robustness_names.remove('n_samples')
+        robustness_to_vals = {}
+        for r_name in robustness_names:
+            values = []
+            for f_name in feature_names:
+                values.append(computation_dic[f_name][r_name])
+            robustness_to_vals[r_name] = values
+
+        return robustness_to_vals
+
+    def generate_histo(self, values, labels, title, xlabel, ylabel, file_path):
+        plt.figure(figsize=(10, 6))
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.hist(values, edgecolor='black', label=labels)
+        plt.legend(loc=1, ncol=1)
+        plt.tight_layout()
+        plt.show()
+
+    def generate_streamer_histogram(self, computation_dic, file_path):
+        dic = self.get_robustness_dic(computation_dic)
+        all_values = []
+        labels = []
+        for r_name in dic:
+            labels.append(r_name)
+            all_values.append(dic[r_name])
+
+        self.generate_histo(
+            values=all_values,
+            labels=labels,
+            title="Robustness histogram",
+            xlabel="Robustness Value",
+            ylabel="Count",
+            file_path=file_path
+        )
+
+    def transform(self, X, y=None):
+        """
+        X and y are None. Data that is read is specified
+        by 'self.streamer'.
+        """
+        out_path = os.path.join(self.save_path, "robustness_measures")
+        os.mkdir(out_path)
+
+        # Compute robustness for features and streamers
+        streamer_to_comp = {}
+        for streamer in self.streamer_collection.get_streamers():
+            computation_dic = self.process_stream(streamer)
+            file_name = streamer.name + "_" + "computations.json"
+            # Dump computations
+            with open(os.path.join(out_path, file_name), 'w') as f:
+                json.dump(computation_dic, f, indent=2)
+
+            histo_path = os.path.join(out_path, streamer.name + "_histo.pdf")
+            # Generate histogram
+            self.generate_streamer_histogram(computation_dic, histo_path)
+
+            streamer_to_comp[streamer] = computation_dic
+
+        # Compare robusntess of different streamers
+
+        # Make pickable
+        self.streamers = None
+        self.streamer_collection = None
