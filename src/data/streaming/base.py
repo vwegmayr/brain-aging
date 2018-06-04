@@ -364,8 +364,11 @@ class FileStream(abc.ABC):
             num_parallel_calls=12
         )
 
+        prefetch = 4
+        if "prefetch" in self.config:
+            prefetch = self.config["prefetch"]
         dataset = dataset.map(_parser)
-        dataset = dataset.prefetch(10 * self.config["batch_size"])
+        dataset = dataset.prefetch(prefetch * self.config["batch_size"])
         dataset = dataset.batch(batch_size=self.config["batch_size"])
 
         def _input_fn():
