@@ -94,7 +94,12 @@ class FileStream(abc.ABC):
         print(">>>>>>>>> Sanity checks OK")
 
         # Print stats
-        self.print_stats()
+        train_groups = [group for group in self.groups if group.is_train]
+        test_groups = [group for group in self.groups if not group.is_train]
+        print(">>>>>>>> Train stats")
+        self.print_stats(train_groups)
+        print(">>>>>>>> Test stats")
+        self.print_stats(test_groups)
 
     @abc.abstractmethod
     def get_batches(self, train=True):
@@ -156,20 +161,29 @@ class FileStream(abc.ABC):
         Check sound train-test split. The train set and test set
         of patients should be disjoint.
         """
+        # Every group was assigned
+        for group in self.groups:
+            assert group.is_train in [True, False]
+
+        # Disjoint patients
         train_ids = self.get_set_file_ids(True)
         test_ids = self.get_set_file_ids(False)
+
+        ratio = len(train_ids)/(len(test_ids) + len(train_ids))
+        print("Achieved train ratio: {}".format(ratio))
+
         train_patients = set([self.get_patient_id(fid) for fid in train_ids])
         test_patiens = set([self.get_patient_id(fid) for fid in test_ids])
 
         assert len(train_patients.intersection(test_patiens)) == 0
 
-    def print_stats(self):
+    def print_stats(self, groups):
         group_size = len(self.groups[0].file_ids)
 
         dignosis_count = {}
         ages = []
         age_diffs = []
-        for group in self.groups:
+        for group in groups:
             for fid in group.file_ids:
                 ages.append(self.get_age(fid))
                 diag = self.get_diagnose(fid)

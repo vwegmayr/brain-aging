@@ -65,16 +65,82 @@ class MRISingleStream(FileStream, MRIImageLoader):
         return im
 
     def make_train_test_split(self):
-        # pairs belonging to the same person should be in same split
+        # these should be mutually exclusive
+        balanced_labels = self.config["balanced_labels"]
+        train_patients = set([])
+        test_patients = set([])
         train_ratio = self.config["train_ratio"]
-        self.np_random.shuffle(self.groups)
-        # Make split with respect to patients
-        patient_labels = list(set([g.patient_label for g in self.groups]))
-        n_train = int(train_ratio * len(patient_labels))
-        train_labels = set(patient_labels[:n_train])
 
-        for g in self.groups:
-            g.is_train = (g.patient_label in train_labels)
+        toggle = True
+        for label in balanced_labels:
+            # get groups for which this label is set
+            cur = []
+            for group in self.groups:
+                fid = group.file_ids[0]
+                val = self.file_id_to_meta[fid][label]
+                if val == 1:
+                    cur.append(group)
+                    assert group.is_train is None
+
+            # Make sure patients of train and test are mutually disjoint
+            train = 0
+            test = 0
+            remaining = []
+            for g in cur:
+                patient = self.get_patient_id(g.file_ids[0])
+                if patient in train_patients:
+                    g.is_train = True
+                    train += 1
+                elif patient in test_patients:
+                    g.is_train = False
+                    test += 1
+                else:
+                    remaining.append(g)
+
+            if len(remaining) == 0:
+                continue
+            # Make equal split
+            n_train = int(train_ratio * len(cur))
+            n_train -= train
+            n_train = max(n_train, 0)
+
+            # Group by patient
+            patient_to_groups = {}
+            for g in remaining:
+                patient = self.get_patient_id(g.file_ids[0])
+                if patient not in patient_to_groups:
+                    patient_to_groups[patient] = []
+
+                patient_to_groups[patient].append(g)
+
+            remaining = list(patient_to_groups.values())
+            if self.shuffle:
+                self.np_random.shuffle(remaining)
+
+            # Compute split index
+            split = len(remaining)
+            s = 0
+            for i in range(len(remaining)):
+                s += len(remaining[i])
+                if s >= n_train:
+                    split = i
+                    break
+
+            for i, g_list in enumerate(remaining):
+                for g in g_list:
+                    # Alternatively make train set a bit smaller or
+                    # a bit larger than it should be.
+                    if toggle:
+                        g.is_train = i < split
+                    else:
+                        g.is_train = i <= split
+                    patient = self.get_patient_id(g.file_ids[0])
+                    if g.is_train:
+                        train_patients = train_patients.union(set([patient]))
+                    else:
+                        test_patients = test_patients.union(set([patient]))
+
+            toggle = not toggle
 
 
 class MRISamePatientSameAgePairStream(MRISingleStream):
