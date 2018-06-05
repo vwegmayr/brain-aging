@@ -31,6 +31,7 @@ class RobustnessMeasureComputation(DataTransformer):
         self.file_type = file_type
         self.file_name_key = file_name_key
 
+
     def get_file_name(self, file_id):
         streamer = self.streamers[0]
         return streamer.get_meta_info_by_key(file_id, self.file_name_key)
@@ -104,6 +105,17 @@ class RobustnessMeasureComputation(DataTransformer):
         return computation_dic
 
     def get_robustness_dic(self, computation_dic):
+        """
+        Arg:
+            - computation_dic: dictionary mapping a feature name
+              to a dictionary mapping to robustness measures to their
+              values
+
+        Return:
+            - robustness_to_vals: dictionary mapping a robustness measure
+              name to a list containing the robustness values of all the
+              features for that robustness measure
+        """
         feature_names = list(computation_dic.keys())
         some_feature = feature_names[0]
         robustness_names = list(computation_dic[some_feature].keys())
@@ -118,6 +130,17 @@ class RobustnessMeasureComputation(DataTransformer):
         return robustness_to_vals
 
     def generate_histo(self, values, labels, title, xlabel, ylabel, file_path):
+        """
+        Generates a histogram for the given values.
+        Args:
+            - values: a list of value lists (comparing multiple series), or
+              just a list of values
+            - labels: list of strings, labels for the plots legend
+            - title: title for the plot
+            - xlabel: label for x-axis
+            - ylabel: label for y-axis
+            - file_path: path for plot figure
+        """
         plt.figure(figsize=(10, 6))
         plt.title(title)
         plt.xlabel(xlabel)
@@ -125,9 +148,18 @@ class RobustnessMeasureComputation(DataTransformer):
         plt.hist(values, edgecolor='black', label=labels)
         plt.legend(loc=1, ncol=1)
         plt.tight_layout()
-        plt.show()
+        plt.savefig(file_path)
 
     def generate_streamer_histogram(self, computation_dic, file_path):
+        """
+        Generate a histogram for the robustness computations of a single
+        streamer.
+        Args:
+            - computation_dic: dictionary mapping a feature name
+              to a dictionary mapping to robustness measures to their
+              values
+            - file_path: path for plot figure
+        """
         dic = self.get_robustness_dic(computation_dic)
         all_values = []
         labels = []
@@ -144,12 +176,123 @@ class RobustnessMeasureComputation(DataTransformer):
             file_path=file_path
         )
 
+    def compare_computations(self, comps, names, out_path):
+        """
+        Compare two computation dictionaries. A histogram is generated
+        for every robustness measure comparing the two dictionaries.
+
+        Args:
+            - comp1: first computation dictionary
+            - comp2: second computation dicitonary
+
+        """
+        dics = [self.get_robustness_dic(comp) for comp in comps]
+        labels = names
+        s = "_vs_".join(names)
+        for r_name in dics[0]:
+            values = [dic[r_name] for dic in dics]
+            file_name = "comparison_{}_{}.pdf".format(r_name, s)
+            file_path = os.path.join(out_path, file_name)
+            self.generate_histo(
+                values=values,
+                labels=labels,
+                title="Histogram comparison",
+                xlabel="Robustness Value {}".format(r_name),
+                ylabel="Count",
+                file_path=file_path
+            )
+
+    def get_feature_names(self, comp_dic):
+        feature_names = list(comp_dic.keys())
+        return feature_names
+
+    def get_robustness_names(self, comp_dic):
+        feature_names = self.get_feature_names(comp_dic)
+        robustness_names = list(comp_dic[feature_names[0]].keys())
+        robustness_names.remove("n_samples")
+
+        return robustness_names
+
+    def robustness_ratio(self, streamer_to_comp):
+        """
+        Arg:
+            - streamer_to_comp: maps streamer object to
+              computation dictionary
+        """
+        out_path = os.path.join(self.output_path, "predictive_power")
+        os.mkdir(out_path)
+
+        comp_dic = list(streamer_to_comp.values())[0]
+        feature_names = self.get_feature_names(comp_dic)
+        robustness_names = self.get_robustness_names(comp_dic)
+
+        streamers = self.streamer_collection.get_different_patient_streamers()
+        similar_streamers = [s for s in streamers if
+                             s.get_diagnoses()[0] == s.get_diagnoses()[1]]
+        dissimilar_streamers = [s for s in streamers if
+                                s.get_diagnoses()[0] != s.get_diagnoses()[1]]
+
+        similar_comps = [streamer_to_comp[s] for s in similar_streamers]
+        dissimilar_comps = [streamer_to_comp[s] for s in dissimilar_streamers]
+        similar_names = [s.name for s in similar_streamers]
+        dissimilar_names = [s.name for s in dissimilar_streamers]
+
+        robustness_to_feature_to_dic = {}
+        for f_name in feature_names:
+            for r_name in robustness_names:
+                similar_scores = [abs(comp[f_name][r_name])
+                                  for comp in similar_comps]
+                dissimilar_scores = [abs(comp[f_name][r_name])
+                                     for comp in dissimilar_comps]
+
+                sim_mean = np.mean(similar_scores)
+                dissim_mean = np.mean(dissimilar_scores)
+                dic = {
+                    'sim_names': similar_names,
+                    'dissim_names': dissimilar_names,
+                    'sim_scores': similar_scores,
+                    'dissim_scores': dissimilar_scores,
+                    'sim_mean': np.mean(similar_scores),
+                    'sim_std': np.std(similar_scores),
+                    'dissim_mean': np.mean(dissimilar_scores),
+                    'dissim_std': np.std(dissimilar_scores),
+                    'pred_score': sim_mean / dissim_mean,
+                }
+
+                if r_name not in robustness_to_feature_to_dic:
+                    robustness_to_feature_to_dic[r_name] = {}
+                robustness_to_feature_to_dic[r_name][f_name] = dic
+
+        for r_name in robustness_names:
+            r_dic = robustness_to_feature_to_dic[r_name]
+            # Dump dictionary
+            file_name = os.path.join(out_path, r_name + "_all.json")
+            with open(file_name, 'w') as f:
+                json.dump(r_dic, f, indent=2)
+
+            # List best features
+            items = list(r_dic.items())
+            # sort by descending predictive power
+            items = sorted(
+                items,
+                key=lambda x: r_dic[x[0]]["pred_score"],
+                reverse=False
+            )
+
+            file_name = os.path.join(out_path, r_name + "_summary.csv")
+            with open(file_name, 'w') as f:
+                f.write("FeatureName,PredictivePower\n")
+                for f_name, dic in items:
+                    f.write("{},{}\n".format(f_name, dic["pred_score"]))
+
+
     def transform(self, X, y=None):
         """
         X and y are None. Data that is read is specified
         by 'self.streamer'.
         """
-        out_path = os.path.join(self.save_path, "robustness_measures")
+        self.output_path = self.save_path
+        out_path = os.path.join(self.output_path, "robustness_measures")
         os.mkdir(out_path)
 
         # Compute robustness for features and streamers
@@ -167,7 +310,41 @@ class RobustnessMeasureComputation(DataTransformer):
 
             streamer_to_comp[streamer] = computation_dic
 
-        # Compare robusntess of different streamers
+        # Compare robusntess of streamers with same diagnosis pair, but
+        # same patient and different patient
+        pairs = self.streamer_collection.get_diagnosis_pairs()
+        for p in pairs:
+            streamers = self.streamer_collection.diagnosis_pair_to_streamers(p)
+            if len(streamers) < 2:
+                continue
+
+            assert len(streamers) == 2
+            s1 = streamers[0]
+            s2 = streamers[1]
+            print("Comparing {} and {}".format(s1.name, s2.name))
+            comp1 = streamer_to_comp[s1]
+            comp2 = streamer_to_comp[s2]
+            self.compare_computations(
+                [comp1, comp2],
+                [s1.name, s2.name],
+                out_path
+            )
+
+        """
+        # Compare same patient pairs
+        streamers = self.streamer_collection.get_same_patient_streamers()
+        names = [s.name for s in streamers]
+        comps = [streamer_to_comp[s] for s in streamers]
+        self.compare_computations(comps, names, out_path)
+        # Compare different patient pairs
+        streamers = self.streamer_collection.get_different_patient_streamers()
+        names = [s.name for s in streamers]
+        comps = [streamer_to_comp[s] for s in streamers]
+        self.compare_computations(comps, names, out_path)
+        """
+
+        # Compute predictive power of features
+        self.robustness_ratio(streamer_to_comp)
 
         # Make pickable
         self.streamers = None

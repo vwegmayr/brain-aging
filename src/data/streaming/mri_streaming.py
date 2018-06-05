@@ -444,6 +444,9 @@ class MRIDiagnosePairStream(MRISingleStream):
     every sampled pair, there is one image for each of diagnoses
     specified.
     """
+    def get_diagnoses(self):
+        return self.config["diagnoses"]
+
     def group_data(self):
         self.start_time = process_time()
         n_pairs = self.config["n_pairs"]
@@ -547,7 +550,12 @@ class MRIDiagnosePairStream(MRISingleStream):
             if p is None:
                 return None
 
-            return tuple(sorted(p))
+            # sort pair by age
+            age1 = self.get_age(p[0])
+            age2 = self.get_age(p[1])
+            if age1 > age2:
+                p = p[::-1]
+            return p
 
         sampled = set([])
         for i in range(n_pairs):

@@ -8,6 +8,7 @@ import tensorflow as tf
 import copy
 import os
 from functools import reduce
+import copy
 
 from . import features as _features
 
@@ -22,7 +23,7 @@ class FileStream(abc.ABC):
             - stream_config: config for streaming specified
               in the yaml configuration file
         """
-        self.config = config = stream_config
+        self.config = config = copy.deepcopy(stream_config)
         self.meta_csv = config["meta_csv"]
         self.meta_id_column = config["meta_id_column"]
         self.batch_size = config["batch_size"]
