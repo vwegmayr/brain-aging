@@ -373,7 +373,7 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                 shape=W_shape,
                 initializer=tf.contrib.layers.xavier_initializer(seed=40)
             )
-            
+
             b = tf.get_variable(
                 name="bias_layer_" + str(layer_i),
                 shape=[n_output],
@@ -396,7 +396,15 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
         # Build the decoder
         for layer_i, shape in enumerate(shapes):
             # deconv
-            W = encoder[layer_i]
+            if params["tied_weights"]:
+                W_shape = encoder[layer_i].get_shape().aslist()
+                W = tf.get_variable(
+                    name="filters_deconv_layer_" + str(layer_i),
+                    shape=W_shape,
+                    initializer=tf.contrib.layers.xavier_initializer(seed=40)
+                )
+            else:
+                W = encoder[layer_i]
             b = tf.get_variable(
                 name="bias_deconv_layer_" + str(layer_i),
                 shape=W.get_shape().as_list()[2],
@@ -447,6 +455,119 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
         )
 
 
+class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
+    def model_fn(self, features, labels, mode, params):
+        input_shape = params["input_shape"]
+        x = features["X_0"]
+
+        n_filters = params["n_filters"]
+        filter_sizes = params["filter_sizes"]
+
+        x = tf.reshape(
+            x,
+            [-1, input_shape[0], input_shape[1], input_shape[2], 1]
+        )
+        current_input = x
+
+        # Build the encoder
+        encoder = []
+        shapes = []
+        for layer_i, n_output in enumerate(n_filters):
+            print("layer {}".format(layer_i))
+            n_input = current_input.get_shape().as_list()[4]
+            shapes.append(current_input.get_shape().as_list())
+            W_shape = [
+                filter_sizes[layer_i],
+                filter_sizes[layer_i],
+                filter_sizes[layer_i],
+                n_input,
+                n_output
+            ]
+            W = tf.get_variable(
+                name="filters_layer_" + str(layer_i),
+                shape=W_shape,
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            b = tf.get_variable(
+                name="bias_layer_" + str(layer_i),
+                shape=[n_output],
+                initializer=tf.initializers.zeros
+            )
+
+            encoder.append(W)
+            output = tf.nn.relu(
+                tf.add(
+                    tf.nn.conv3d(
+                        current_input, W, strides=[1, 2, 2, 2, 1], padding='SAME'
+                    ),
+                    b
+                )
+            )
+            current_input = output
+
+        z = current_input
+        encoder.reverse()
+        shapes.reverse()
+        # Build the decoder
+        for layer_i, shape in enumerate(shapes):
+            # deconv
+            W = encoder[layer_i]
+            b = tf.get_variable(
+                name="bias_deconv_layer_" + str(layer_i),
+                shape=W.get_shape().as_list()[3],
+                initializer=tf.initializers.zeros
+            )
+
+            output = tf.nn.relu(
+                tf.add(
+                    tf.nn.conv3d_transpose(
+                        current_input, W,
+                        tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3], shape[4]]),
+                        strides=[1, 2, 2, 2, 1], padding='SAME'
+                    ),
+                    b
+                )
+            )
+            current_input = output
+
+        y = current_input
+
+        predictions = {
+            "hidden_rep": z,
+            "reconstruction": y
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
+
+        loss = tf.losses.mean_squared_error(x, y)
+
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=params["learning_rate"]
+        )
+        train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        y_hook_train, y_hook_test = \
+            self.get_batch_dump_hook(y, features["file_name_0"])
+
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op,
+                training_hooks=[y_hook_train]
+            )
+
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=loss,
+            evaluation_hooks=[y_hook_test]
+        )
+
+
 class MnistConv2DAutoEncoder(Conv2DAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return mnist_input_fn(
@@ -454,3 +575,12 @@ class MnistConv2DAutoEncoder(Conv2DAutoEncoder):
             self.data_params,
             input_fn_config=input_fn_config
         )
+
+class MnistConv3DAutoEncoder(Conv3DAutoEncoder):
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return mnist_input_fn(
+            X,
+            self.data_params,
+            input_fn_config=input_fn_config
+        )
+
