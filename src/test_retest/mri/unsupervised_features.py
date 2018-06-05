@@ -344,6 +344,7 @@ class RandomImageAutoEncoder(PCAAutoEncoder):
         )
 
 
+# Source: https://github.com/pkmital/tensorflow_tutorials/blob/master/python/09_convolutional_autoencoder.py
 class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
         input_dim = params["input_dim"]
@@ -358,63 +359,62 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
         # Build the encoder
         encoder = []
         shapes = []
-        pooling = True
         for layer_i, n_output in enumerate(n_filters):
             n_input = current_input.get_shape().as_list()[3]
             shapes.append(current_input.get_shape().as_list())
-            W = tf.Variable(
-                tf.random_uniform([
-                    filter_sizes[layer_i],
-                    filter_sizes[layer_i],
-                    n_input, n_output],
-                    -1.0 / math.sqrt(n_input),
-                    1.0 / math.sqrt(n_input)))
-            b = tf.Variable(tf.zeros([n_output]))
+            W_shape = [
+                filter_sizes[layer_i],
+                filter_sizes[layer_i],
+                n_input,
+                n_output
+            ]
+            W = tf.get_variable(
+                name="filters_layer_" + str(layer_i),
+                shape=W_shape,
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            
+            b = tf.get_variable(
+                name="bias_layer_" + str(layer_i),
+                shape=[n_output],
+                initializer=tf.initializers.zeros
+            )
             encoder.append(W)
             output = tf.nn.relu(
-                tf.add(tf.nn.conv2d(
-                    current_input, W, strides=[1, 2, 2, 1], padding='SAME'), b))
-            current_input = output
-            #shapes.append(current_input.get_shape().as_list())
-            print("encoder conv shape {}".format(shapes[-1]))
-            if pooling:
-                output = tf.layers.max_pooling2d(
-                    current_input,
-                    pool_size=2,
-                    strides=2,
-                    padding='SAME'
+                tf.add(
+                    tf.nn.conv2d(
+                        current_input, W, strides=[1, 2, 2, 1], padding='SAME'
+                    ),
+                    b
                 )
-                current_input = output
+            )
+            current_input = output
 
         z = current_input
         encoder.reverse()
         shapes.reverse()
         # Build the decoder
         for layer_i, shape in enumerate(shapes):
-            # unpool
-            if pooling:
-                output = tf.image.resize_images(
-                    current_input,
-                    size=(shape[1], shape[2]),
-                    method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
-                )
-                current_input = output
-                print("decoder upsample shape {}".format(current_input.get_shape().as_list()))
-                print("shape {}".format(shape))
-
             # deconv
             W = encoder[layer_i]
-            b = tf.Variable(tf.zeros([W.get_shape().as_list()[2]]))
-            output = tf.nn.relu(tf.add(
-                tf.nn.conv2d_transpose(
-                    current_input, W,
-                    tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3]]),
-                    strides=[1, 2, 2, 1], padding='SAME'), b))
-            current_input = output
-            print("decoder deconv shape {}".format(current_input.get_shape().as_list()))
+            b = tf.get_variable(
+                name="bias_deconv_layer_" + str(layer_i),
+                shape=W.get_shape().as_list()[2],
+                initializer=tf.initializers.zeros
+            )
 
-        print(current_input)
-        print("model built")
+            output = tf.nn.relu(
+                tf.add(
+                    tf.nn.conv2d_transpose(
+                        current_input, W,
+                        tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3]]),
+                        strides=[1, 2, 2, 1], padding='SAME'
+                    ),
+                    b
+                )
+            )
+            current_input = output
+
         y = current_input
         predictions = {
             "hidden_rep": z,
