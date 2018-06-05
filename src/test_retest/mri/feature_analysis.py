@@ -13,7 +13,7 @@ FILE_TYPES = [JSON_TYPE, NUMPY_TYPE]
 
 class RobustnessMeasureComputation(DataTransformer):
     def __init__(self, robustness_funcs, features_path, file_type,
-                 streamer_collection, file_name_key):
+                 streamer_collection, file_name_key, output_dir):
         # Parse functions
         self.robustness_funcs = []
         for f in robustness_funcs:
@@ -30,7 +30,7 @@ class RobustnessMeasureComputation(DataTransformer):
         self.streamers = self.streamer_collection.get_streamers()
         self.file_type = file_type
         self.file_name_key = file_name_key
-
+        self.output_dir = output_dir
 
     def get_file_name(self, file_id):
         streamer = self.streamers[0]
@@ -142,11 +142,12 @@ class RobustnessMeasureComputation(DataTransformer):
             - file_path: path for plot figure
         """
         plt.figure(figsize=(10, 6))
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
+        fs = 16
+        plt.title(title, fontsize=fs)
+        plt.xlabel(xlabel, fontsize=fs)
+        plt.ylabel(ylabel, fontsize=fs)
         plt.hist(values, edgecolor='black', label=labels)
-        plt.legend(loc=1, ncol=1)
+        plt.legend(loc=1, ncol=1, fontsize=fs-2)
         plt.tight_layout()
         plt.savefig(file_path)
 
@@ -220,7 +221,7 @@ class RobustnessMeasureComputation(DataTransformer):
               computation dictionary
         """
         out_path = os.path.join(self.output_path, "predictive_power")
-        os.mkdir(out_path)
+        os.makedirs(out_path)
 
         comp_dic = list(streamer_to_comp.values())[0]
         feature_names = self.get_feature_names(comp_dic)
@@ -276,7 +277,7 @@ class RobustnessMeasureComputation(DataTransformer):
             items = sorted(
                 items,
                 key=lambda x: r_dic[x[0]]["pred_score"],
-                reverse=False
+                reverse=True
             )
 
             file_name = os.path.join(out_path, r_name + "_summary.csv")
@@ -285,15 +286,15 @@ class RobustnessMeasureComputation(DataTransformer):
                 for f_name, dic in items:
                     f.write("{},{}\n".format(f_name, dic["pred_score"]))
 
-
     def transform(self, X, y=None):
         """
         X and y are None. Data that is read is specified
         by 'self.streamer'.
         """
-        self.output_path = self.save_path
+        smt_label = os.path.split(self.save_path)[-1]
+        self.output_path = os.path.join(self.output_dir, smt_label)
         out_path = os.path.join(self.output_path, "robustness_measures")
-        os.mkdir(out_path)
+        os.makedirs(out_path)
 
         # Compute robustness for features and streamers
         streamer_to_comp = {}
@@ -321,7 +322,6 @@ class RobustnessMeasureComputation(DataTransformer):
             assert len(streamers) == 2
             s1 = streamers[0]
             s2 = streamers[1]
-            print("Comparing {} and {}".format(s1.name, s2.name))
             comp1 = streamer_to_comp[s1]
             comp2 = streamer_to_comp[s2]
             self.compare_computations(
@@ -330,7 +330,6 @@ class RobustnessMeasureComputation(DataTransformer):
                 out_path
             )
 
-        """
         # Compare same patient pairs
         streamers = self.streamer_collection.get_same_patient_streamers()
         names = [s.name for s in streamers]
@@ -341,7 +340,6 @@ class RobustnessMeasureComputation(DataTransformer):
         names = [s.name for s in streamers]
         comps = [streamer_to_comp[s] for s in streamers]
         self.compare_computations(comps, names, out_path)
-        """
 
         # Compute predictive power of features
         self.robustness_ratio(streamer_to_comp)

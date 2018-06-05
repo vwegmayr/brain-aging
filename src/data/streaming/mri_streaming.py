@@ -454,8 +454,6 @@ class MRIDiagnosePairStream(MRISingleStream):
         n_pairs = self.config["n_pairs"]
         groups = []
 
-        self.np_random.seed(40)
-
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
 
         # Map diagnosis to patient to file_ids
