@@ -299,6 +299,7 @@ class MRISamePatientPairStream(MRISingleStream):
 
             sampled.add(pair)
 
+        sampled = sorted(list(sampled))
         for i, s in enumerate(sampled):
             lll = s
             id1 = lll[0]
@@ -347,7 +348,7 @@ class MRIDifferentPatientPairStream(MRISingleStream):
             s1 = set(list(patient_to_diags[p1].keys()))
             s2 = set(list(patient_to_diags[p2].keys()))
             inter = s1.intersection(s2)
-            inter = list(inter)
+            inter = sorted(list(inter))
 
             if len(inter) == 0:
                 return None
@@ -356,8 +357,8 @@ class MRIDifferentPatientPairStream(MRISingleStream):
             return inter[idx], inter[idx]
 
         def get_different_diag(p1, p2):
-            s1 = list(patient_to_diags[p1].keys())
-            s2 = list(patient_to_diags[p2].keys())
+            s1 = sorted(list(patient_to_diags[p1].keys()))
+            s2 = sorted(list(patient_to_diags[p2].keys()))
 
             # build possible pairs
             pairs = list(itertools.product(s1, s2))
@@ -372,7 +373,7 @@ class MRIDifferentPatientPairStream(MRISingleStream):
             idx = self.np_random.randint(0, len(ids))
             return ids[idx]
 
-        patient_labels = list(patient_to_diags.keys())
+        patient_labels = sorted(list(patient_to_diags.keys()))
         if self.shuffle:
             self.np_random.shuffle(patient_labels)
 
@@ -419,6 +420,7 @@ class MRIDifferentPatientPairStream(MRISingleStream):
 
             sampled.add(pair)
 
+        sampled = sorted(list(sampled))
         for i, s in enumerate(sampled):
             lll = s
             id1 = lll[0]
@@ -452,6 +454,8 @@ class MRIDiagnosePairStream(MRISingleStream):
         n_pairs = self.config["n_pairs"]
         groups = []
 
+        self.np_random.seed(40)
+
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
 
         # Map diagnosis to patient to file_ids
@@ -478,7 +482,7 @@ class MRIDiagnosePairStream(MRISingleStream):
             patient_labels = patient_labels.union(labels)
 
         # prepare train-test split
-        patient_labels = list(patient_labels)
+        patient_labels = sorted(list(patient_labels))
         n_patients = len(patient_labels)
         n_train = int(self.config["train_ratio"] * n_patients)
         n_train_pairs = int(self.config["train_ratio"] * n_pairs)
@@ -488,14 +492,15 @@ class MRIDiagnosePairStream(MRISingleStream):
 
         def check_time():
             delta_t = process_time() - self.start_time
-            return delta_t <= 3
+            return delta_t <= 5
 
         def sample_patient(diagnosis, patient_labels):
             patients = set(diag_to_patient[diagnosis].keys())
             sample_from = set(patient_labels).intersection(patients)
+            sample_from = sorted(list(sample_from))
             n = len(sample_from)
             idx = self.np_random.randint(0, n)
-            return list(sample_from)[idx]
+            return sample_from[idx]
 
         def sample_file_ids(p1, d1, p2, d2):
             def _sample(d, p):
@@ -572,6 +577,7 @@ class MRIDiagnosePairStream(MRISingleStream):
         if len(sampled) < n_pairs:
             warnings.warn("Sampled only {} pairs!!!".format(len(sampled)))
 
+        sampled = sorted(list(sampled))
         for i, s in enumerate(sampled):
             lll = s
             id1 = lll[0]

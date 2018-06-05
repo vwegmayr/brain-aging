@@ -174,9 +174,9 @@ class FileStream(abc.ABC):
         print("Achieved train ratio: {}".format(ratio))
 
         train_patients = set([self.get_patient_id(fid) for fid in train_ids])
-        test_patiens = set([self.get_patient_id(fid) for fid in test_ids])
+        test_patients = set([self.get_patient_id(fid) for fid in test_ids])
 
-        assert len(train_patients.intersection(test_patiens)) == 0
+        assert len(train_patients.intersection(test_patients)) == 0
 
     def print_stats(self, groups):
         group_size = len(self.groups[0].file_ids)
