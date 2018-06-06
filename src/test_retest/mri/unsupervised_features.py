@@ -9,6 +9,7 @@ import tensorflow as tf
 from subprocess import call, Popen
 import math
 from sklearn.decomposition import IncrementalPCA
+from functools import reduce
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -473,7 +474,7 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
         encoder = []
         shapes = []
         for layer_i, n_output in enumerate(n_filters):
-            print("layer {}".format(layer_i))
+            # print("layer {}".format(layer_i))
             n_input = current_input.get_shape().as_list()[4]
             shapes.append(current_input.get_shape().as_list())
             W_shape = [
@@ -506,6 +507,52 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
             current_input = output
 
         z = current_input
+        print("curr {}".format(current_input))
+        # Non-convolutional layer, if encoding size is still to large
+        dim_list = current_input.get_shape().as_list()[1:]
+        cur_dim = reduce(lambda x, y: x * y, dim_list)
+
+        if cur_dim > params["encoding_dim"]:
+            # print("Non conv layer needed")
+            current_input = tf.contrib.layers.flatten(current_input)
+            W = tf.get_variable(
+                "non_conv_w",
+                shape=[cur_dim, params["encoding_dim"]],
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            b = tf.get_variable(
+                "non_conv_b",
+                shape=[1, params["encoding_dim"]],
+                initializer=tf.initializers.zeros
+            )
+
+            current_input = tf.add(
+                tf.nn.relu(tf.matmul(current_input, W)),
+                b
+            )
+
+            z = current_input
+
+            if not params["tied_weights"]:
+                W = tf.get_variable(
+                    "non_conv_w_dec",
+                    shape=[cur_dim, params["encoding_dim"]],
+                    initializer=tf.contrib.layers.xavier_initializer(seed=40)
+                )
+
+            b = tf.get_variable(
+                "non_conv_b_dec",
+                shape=[1, cur_dim],
+                initializer=tf.initializers.zeros
+            )
+
+            current_input = tf.add(
+                tf.nn.relu(tf.matmul(current_input, tf.transpose(W))),
+                b
+            )
+            # Unflatten
+            current_input = tf.reshape(current_input, [-1] + dim_list)
+
         encoder.reverse()
         shapes.reverse()
         # Build the decoder
@@ -551,7 +598,7 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
         y_hook_train, y_hook_test = \
-            self.get_batch_dump_hook(y, features["file_name_0"])
+            self.get_batch_dump_hook(z, features["file_name_0"])
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
@@ -567,6 +614,9 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
             evaluation_hooks=[y_hook_test]
         )
 
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return self.streamer.get_input_fn(train)
+
 
 class MnistConv2DAutoEncoder(Conv2DAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
@@ -575,6 +625,7 @@ class MnistConv2DAutoEncoder(Conv2DAutoEncoder):
             self.data_params,
             input_fn_config=input_fn_config
         )
+
 
 class MnistConv3DAutoEncoder(Conv3DAutoEncoder):
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):

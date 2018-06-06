@@ -118,7 +118,7 @@ def mnist_input_fn(X, data_params, y=None, train=True,
     return tf.estimator.inputs.numpy_input_fn(
         x={
             "X_0": images,
-            "file_name_0": np.array([str(i) for i in range(len(images))])
+            "file_name_0": np.array([[str(i)] for i in range(len(images))])
         },
         y=labels,
         **input_fn_config,

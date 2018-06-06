@@ -94,10 +94,15 @@ class BatchDumpHook(tf.train.SessionRunHook):
 
     def after_run(self, run_context, run_values):
         batch, names = run_values.results
+
         for val, name in zip(batch, names):
+            if isinstance(name[0], int):
+                s_name = str(name[0])
+            else:
+                s_name = name[0].decode('utf-8')
             out_file = os.path.join(
                 self.out_dir,
-                name[0].decode('utf-8') + ".npy"
+                s_name + ".npy"
             )
             with open(out_file, 'wb') as f:
                 np.save(f, val)
