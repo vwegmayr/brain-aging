@@ -97,6 +97,7 @@ class RobustnessMeasureComputation(DataTransformer):
             Y = np.array(Y)
             for func in self.robustness_funcs:
                 r = func(Y)
+                r = float(r)
                 feature_dic[func.__name__] = r
 
         return computation_dic
@@ -148,6 +149,7 @@ class RobustnessMeasureComputation(DataTransformer):
         plt.legend(loc=1, ncol=1, fontsize=fs-2)
         plt.tight_layout()
         plt.savefig(file_path)
+        plt.close()
 
     def generate_streamer_histogram(self, computation_dic, file_path):
         """
