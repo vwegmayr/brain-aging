@@ -1,6 +1,13 @@
 import numpy as np
 from scipy.stats import pearsonr as sp_pearson
+import math
 
+
+def wrap_nan(r, default=0):
+    if math.isnan(r):
+        return default
+    else:
+        return r
 
 def MS_R(Y):
     n, k = Y.shape
@@ -63,7 +70,8 @@ def ICC_C1(Y):
     if MSR == 0 and MSE == 0:
         return 1
 
-    return (MSR - MSE) / (MSR + (k - 1) * MSE)
+    r = (MSR - MSE) / (MSR + (k - 1) * MSE)
+    return wrap_nan(r)
 
 
 def ICC_A1(Y):
@@ -77,7 +85,8 @@ def ICC_A1(Y):
     MSE = MS_E(Y)
     MSC = MS_C(Y)
 
-    return (MSR - MSE) / (MSR + (k - 1) * MSE + k / n * (MSC - MSE))
+    r = (MSR - MSE) / (MSR + (k - 1) * MSE + k / n * (MSC - MSE))
+    return wrap_nan(r)
 
 
 def per_feature_ICC(test, retest, icc_func):
@@ -135,7 +144,7 @@ def linccc(Y):
 
     ccc_est = num / denom
 
-    return ccc_est
+    return wrap_nan(ccc_est)
 
 
 def pearsonr(Y):
@@ -144,4 +153,4 @@ def pearsonr(Y):
         return 1
 
     r, p = sp_pearson(Y[:, 0], Y[:, 1])
-    return r
+    return wrap_nan(r)
