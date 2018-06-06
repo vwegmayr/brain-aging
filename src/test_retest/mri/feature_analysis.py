@@ -178,7 +178,7 @@ class RobustnessMeasureComputation(DataTransformer):
             file_path=file_path
         )
 
-    def compare_computations(self, comps, names, out_path):
+    def compare_computations(self, comps, names, out_path, same_patient=True):
         """
         Compare two computation dictionaries. A histogram is generated
         for every robustness measure comparing the two dictionaries.
@@ -190,7 +190,9 @@ class RobustnessMeasureComputation(DataTransformer):
         """
         dics = [self.get_robustness_dic(comp) for comp in comps]
         labels = names
-        s = "_vs_".join(names)
+        s = "same_patient_samplers"
+        if not same_patient:
+            s = "different_patient_samplers"
         for r_name in dics[0]:
             values = [dic[r_name] for dic in dics]
             file_name = "comparison_{}_{}.pdf".format(r_name, s)
