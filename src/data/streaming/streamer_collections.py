@@ -19,7 +19,7 @@ class MRIDiagnosePairStreamCollection(object):
             stream_config['same_patient'] = True
             streamer = MRIDiagnosePairStream(stream_config)
             name = self.diagnosis_pair_to_str(p)
-            streamer.name = 'different_patient_' + name
+            streamer.name = 'same_patient_' + name
             self.streamers.append(streamer)
             self.diag_pair_to_streamers[p].append(streamer)
             self.pair_to_same_patient[p] = streamer
@@ -32,7 +32,7 @@ class MRIDiagnosePairStreamCollection(object):
             stream_config['same_patient'] = False
             streamer = MRIDiagnosePairStream(stream_config)
             name = self.diagnosis_pair_to_str(p)
-            streamer.name = 'same_patient_' + name
+            streamer.name = 'different_patient_' + name
             self.streamers.append(streamer)
             self.diag_pair_to_streamers[p].append(streamer)
             self.pair_to_different_patient[p] = streamer

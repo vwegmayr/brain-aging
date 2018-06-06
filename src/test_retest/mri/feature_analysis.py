@@ -141,6 +141,7 @@ class RobustnessMeasureComputation(DataTransformer):
             - ylabel: label for y-axis
             - file_path: path for plot figure
         """
+        plt.clf()
         plt.figure(figsize=(10, 6))
         fs = 16
         plt.title(title, fontsize=fs)
@@ -279,12 +280,19 @@ class RobustnessMeasureComputation(DataTransformer):
                 key=lambda x: r_dic[x[0]]["pred_score"],
                 reverse=True
             )
-
+            sim_s = ",".join(["_".join(s.split("_")[2:]) for s in similar_names])
+            dissim_s = ",".join(["_".join(s.split("_")[2:]) for s in dissimilar_names])
             file_name = os.path.join(out_path, r_name + "_summary.csv")
             with open(file_name, 'w') as f:
-                f.write("FeatureName,PredictivePower\n")
+                f.write("FeatureName,PredictivePower,{},{}\n".format(sim_s, dissim_s))
                 for f_name, dic in items:
-                    f.write("{},{}\n".format(f_name, dic["pred_score"]))
+                    f.write("{},{}".format(f_name, dic["pred_score"]))
+                    # similarity and dissimilarity scores
+                    for i, s in enumerate(similar_names):
+                        f.write(",{}".format(dic["sim_scores"][i]))
+                    for i, s in enumerate(dissimilar_names):
+                        f.write(",{}".format(dic["dissim_scores"][i]))
+                    f.write("\n")
 
     def transform(self, X, y=None):
         """
