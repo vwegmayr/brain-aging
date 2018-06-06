@@ -216,20 +216,26 @@ class RobustnessMeasureComputation(DataTransformer):
 
         return robustness_names
 
-    def robustness_ratio(self, streamer_to_comp):
+    def robustness_ratio(self, streamer_to_comp, same_patient):
         """
         Arg:
             - streamer_to_comp: maps streamer object to
               computation dictionary
         """
-        out_path = os.path.join(self.output_path, "predictive_power")
+        f_patient = "same_patient"
+        if not same_patient:
+            f_patient = "different_patient"
+        out_path = os.path.join(self.output_path, "predictive_power", f_patient)
         os.makedirs(out_path)
 
         comp_dic = list(streamer_to_comp.values())[0]
         feature_names = self.get_feature_names(comp_dic)
         robustness_names = self.get_robustness_names(comp_dic)
 
-        streamers = self.streamer_collection.get_different_patient_streamers()
+        if not same_patient:
+            streamers = self.streamer_collection.get_different_patient_streamers()
+        else:
+            streamers = self.streamer_collection.get_same_patient_streamers()
         similar_streamers = [s for s in streamers if
                              s.get_diagnoses()[0] == s.get_diagnoses()[1]]
         dissimilar_streamers = [s for s in streamers if
@@ -281,8 +287,10 @@ class RobustnessMeasureComputation(DataTransformer):
                 key=lambda x: r_dic[x[0]]["pred_score"],
                 reverse=True
             )
-            sim_s = ",".join(["_".join(s.split("_")[2:]) for s in similar_names])
-            dissim_s = ",".join(["_".join(s.split("_")[2:]) for s in dissimilar_names])
+            sim_s = ",".join(["_".join(s.split("_")[2:])
+                              for s in similar_names])
+            dissim_s = ",".join(["_".join(s.split("_")[2:])
+                                 for s in dissimilar_names])
             file_name = os.path.join(out_path, r_name + "_summary.csv")
             with open(file_name, 'w') as f:
                 f.write("FeatureName,PredictivePower,{},{}\n".format(sim_s, dissim_s))
@@ -351,7 +359,8 @@ class RobustnessMeasureComputation(DataTransformer):
         self.compare_computations(comps, names, out_path)
 
         # Compute predictive power of features
-        self.robustness_ratio(streamer_to_comp)
+        self.robustness_ratio(streamer_to_comp, True)
+        self.robustness_ratio(streamer_to_comp, False)
 
         # Make pickable
         self.streamers = None
