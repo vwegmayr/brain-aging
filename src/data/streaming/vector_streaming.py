@@ -39,4 +39,7 @@ class FeatureVectorStream(MRISingleStream):
         X = np.array(X)
         Y = np.array(Y)
 
+        if Y.shape[1] == 1:
+            Y = Y.ravel()
+
         return X, Y
