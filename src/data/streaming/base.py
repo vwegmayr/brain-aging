@@ -87,7 +87,7 @@ class FileStream(abc.ABC):
 
         # Group files into tuples
         self.groups = self.group_data()
-        self.sample_shape = self.get_sample_shape()
+        self.sample_shape = None
 
         # Make train-test split based on grouping
         self.make_train_test_split()
@@ -349,7 +349,10 @@ class FileStream(abc.ABC):
             return ret  # return list of features
 
         def _parser(*to_parse):
-            sample_shape = self.sample_shape
+            if self.sample_shape is None:
+                sample_shape = self.get_sample_shape()
+            else:
+                sample_shape = self.sample_shape
             el_n_features = 1 + len(port_features)  # sample + csv features
             all_features = {}
 

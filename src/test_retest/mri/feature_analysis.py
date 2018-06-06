@@ -32,10 +32,6 @@ class RobustnessMeasureComputation(DataTransformer):
         self.file_name_key = file_name_key
         self.output_dir = output_dir
 
-    def get_file_name(self, file_id):
-        streamer = self.streamers[0]
-        return streamer.get_meta_info_by_key(file_id, self.file_name_key)
-
     def construct_file_path(self, file_name):
         return os.path.join(self.features_path, file_name + self.file_type)
 
@@ -74,8 +70,9 @@ class RobustnessMeasureComputation(DataTransformer):
             ids = group.get_file_ids()
             assert len(ids) == 2  # test-retest features
             # Read features for this group
-            file_name_1 = self.get_file_name(ids[0])
-            file_name_2 = self.get_file_name(ids[1])
+            file_name_1 = streamer.get_file_name(ids[0])
+            file_name_2 = streamer.get_file_name(ids[1])
+
             if self.features_exist(file_name_1) and \
                     self.features_exist(file_name_2):
                 f1 = self.load_features(file_name_1)
@@ -147,7 +144,7 @@ class RobustnessMeasureComputation(DataTransformer):
         plt.title(title, fontsize=fs)
         plt.xlabel(xlabel, fontsize=fs)
         plt.ylabel(ylabel, fontsize=fs)
-        plt.hist(values, edgecolor='black', label=labels)
+        plt.hist(values, edgecolor='black', label=labels, align='left')
         plt.legend(loc=1, ncol=1, fontsize=fs-2)
         plt.tight_layout()
         plt.savefig(file_path)

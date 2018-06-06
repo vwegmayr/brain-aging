@@ -445,7 +445,7 @@ class MRIDiagnosePairStream(MRISingleStream):
     pairs is expected in the config file under 'diagnoses'. For
     every sampled pair, there is one image for each of diagnoses
     specified.
-    """
+    """    
     def get_diagnoses(self):
         return self.config["diagnoses"]
 
