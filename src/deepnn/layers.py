@@ -423,14 +423,15 @@ class DeepNNLayers(object):
     def get_gaussian_filter(self, sigma, kernel_half_size=None):
         if kernel_half_size is None:
             kernel_half_size = int(4 * sigma)
-        coords = np.mgrid[
+        _mgrid = np.mgrid[
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
             -kernel_half_size:kernel_half_size+1,
         ]
-        sigma = tf.convert_to_tensor(sigma, dtype=tf.float64)
-        for i in range(len(coords)):
-            coords[i] = tf.convert_to_tensor(coords[i], dtype=tf.float64)
+        sigma = tf.convert_to_tensor(sigma, dtype=tf.float32)
+        coords = []
+        for i in range(len(_mgrid)):
+            coords.append(tf.convert_to_tensor(_mgrid[i], dtype=tf.float32))
         gauss_filter = coords[0] ** 2 + coords[1] ** 2 + coords[2] ** 2
         gauss_filter = tf.exp(-gauss_filter/(sigma * sigma * 2))
         gauss_filter = gauss_filter / tf.reduce_sum(gauss_filter)
