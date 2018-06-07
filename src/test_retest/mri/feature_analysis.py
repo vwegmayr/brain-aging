@@ -2,7 +2,10 @@ import os
 import json
 import numpy as np
 import importlib
+import matplotlib
+matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
+
 
 from modules.models.data_transform import DataTransformer
 
