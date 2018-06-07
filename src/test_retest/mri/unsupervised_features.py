@@ -59,11 +59,12 @@ class PyRadiomicsFeatures(DataTransformer):
 
 
 class PyRadiomicsFeaturesSpawn(DataTransformer):
-    def __init__(self, streamer, out_dir):
+    def __init__(self, streamer, out_dir, n_processes):
         # Initialize streamer
         _class = streamer["class"]
         self.streamer = _class(**streamer["params"])
         self.out_dir = out_dir
+        self.n_processes = n_processes
 
     def get_extractor(self):
         # Initialize extractor
@@ -95,7 +96,7 @@ class PyRadiomicsFeaturesSpawn(DataTransformer):
                     proc = Popen(cmd, shell=True)
                     processes.append(proc)
 
-                    if len(processes) >= 8:
+                    if len(processes) >= self.n_processes:
                         for p in processes:
                             p.wait()
                         processes = []
