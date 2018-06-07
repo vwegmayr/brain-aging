@@ -13,3 +13,7 @@ notebooks/.ipynb_checkpoints/
 .git/
 .hg/
 commit.sh
+produced_data/
+*.yaml
+notebooks/*.csv
+notebooks/.pdf
