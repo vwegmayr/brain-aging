@@ -1,17 +1,29 @@
 from sklearn.metrics import accuracy_score
 import importlib
+import abc
+from itertools import product
+import pandas as pd
+import numpy as np
+
+
+def str_to_func(s):
+    mod_name = ".".join(s.split(".")[:-1])
+    mod = importlib.import_module(mod_name)
+    f = getattr(mod, s.split(".")[-1])
+    return f
+
+
+def create_object(config):
+    _class = config["class"]
+    _params = config["params"]
+    return _class(**_params)
 
 
 class Sklearner(object):
     def __init__(self, config, estimator_config, streamer_config):
         self.config = config
-        self.est = self.create_object(estimator_config)
-        self.streamer = self.create_object(streamer_config)
-
-    def create_object(self, config):
-        _class = config["class"]
-        _params = config["params"]
-        return _class(**_params)
+        self.est = create_object(estimator_config)
+        self.streamer = create_object(streamer_config)
 
     def fit(self, X, y):
         # Read true data based on streamer
@@ -31,10 +43,105 @@ class Sklearner(object):
 
     def get_score_funcs(self):
         func_names = self.config["score_funcs"]
-        return [self.str_to_func(s) for s in func_names]
+        return [str_to_func(s) for s in func_names]
 
-    def str_to_func(self, s):
-        mod_name = ".".join(s.split(".")[:-1])
-        mod = importlib.import_module(mod_name)
-        f = getattr(mod, s.split(".")[-1])
-        return f
+
+class SklearnEvaluate(object):
+    """
+    Fit multiple sklearns with different parameters and compute
+    scores.
+    """
+    def __init__(self, estimators, score_funcs):
+        self.estimators = estimators
+        self.score_funcs = [
+            str_to_func(s) for s in score_funcs
+        ]
+
+    def set_save_path(self, path):
+        self.save_path = path
+
+    @abc.abstractmethod
+    def get_train_data(self):
+        pass
+
+    @abc.abstractmethod
+    def get_test_data(self):
+        pass
+
+    @abc.abstractmethod
+    def tear_down(self):
+        pass
+
+    def fit(self, X=None, y=None):
+        X_train, y_train = self.get_train_data()
+        X_test, y_test = self.get_test_data()
+
+        # Record all scores
+        score_names = [f.__name__.split(".")[-1] for f in self.score_funcs]
+        self.rows = []
+
+        for est_conf in self.estimators:
+            # create estimator
+            _class = est_conf["class"]
+            _params = est_conf["params"]
+            search = est_conf["search"]
+            param_lists = []
+            # build products of all possible parameters
+            for param, values in search.items():
+                # Replace None values
+                for i, v in enumerate(values):
+                    if v == 'None':
+                        values[i] = None
+                param_pairs = list(product([param], values))
+                param_lists.append(param_pairs)
+
+            combos = product(*param_lists)
+            # score estimator for different parameters
+            for combo in combos:
+                for param, val in combo:
+                    _params[param] = val
+
+                est = _class(**_params)
+                est.fit(X_train, y_train)
+                self.score_estimator(est, X_test, y_test, str(combo))
+
+        # build dataframe with score and dump it as csv
+        self.df = pd.DataFrame(
+            data=np.array(self.rows),
+            columns=["Estimator", "params"] + score_names
+        )
+        self.df.to_csv(self.save_path + "/" + "scores.csv")
+        self.tear_down()
+
+    def score_estimator(self, est, X_test, y_test, params_s):
+        pred = est.predict(X_test)
+        est_name = est.__class__.__name__
+        scores = []
+        # collect scores
+        for func in self.score_funcs:
+            sc = func(y_test, pred)
+            scores.append(sc)
+
+        row = [est_name, params_s] + scores
+        self.rows.append(row)
+
+
+class SklearnStreamerEvaluate(SklearnEvaluate):
+    """
+    Uses a streamer to get train and test data.
+    """
+    def __init__(self, streamer_config, *args, **kwargs):
+        super(SklearnStreamerEvaluate, self).__init__(
+            *args,
+            **kwargs
+        )
+        self.streamer = create_object(streamer_config)
+
+    def get_train_data(self):
+        return self.streamer.get_data_matrices(train=True)
+
+    def get_test_data(self):
+        return self.streamer.get_data_matrices(train=False)
+
+    def tear_down(self):
+        self.streamer = None
