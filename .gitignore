@@ -16,4 +16,4 @@ commit.sh
 produced_data/
 *.yaml
 notebooks/*.csv
-notebooks/.pdf
+notebooks/*.pdf
