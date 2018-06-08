@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 from time import process_time
+from collections import OrderedDict
 
 from .base import FileStream
 from .base import Group
@@ -106,7 +107,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             n_train = max(n_train, 0)
 
             # Group by patient
-            patient_to_groups = {}
+            patient_to_groups = OrderedDict()
             for g in remaining:
                 patient = self.get_patient_id(g.file_ids[0])
                 if patient not in patient_to_groups:
@@ -152,7 +153,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
         groups = []
         not_found = 0
         # Group by patient, same patient iff same patient_label
-        patient_to_file_ids = {}
+        patient_to_file_ids = OrderedDict()
         for file_id in self.file_id_to_meta:
             record = self.file_id_to_meta[file_id]
             if "file_path" in record:
@@ -203,12 +204,12 @@ class MRISamePatientPairStream(MRISingleStream):
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
 
         # Remap patient to diagnose to file_ids
-        patient_to_diags = {}
+        patient_to_diags = OrderedDict()
         for patient_label in patient_to_file_ids:
             file_ids = patient_to_file_ids[patient_label]
             diagnoses = [(fid, self.get_diagnose(fid)) for fid in file_ids]
 
-            dic = {}
+            dic = OrderedDict()
             for t in diagnoses:
                 fid, diag = t
                 if diag not in dic:
@@ -327,12 +328,12 @@ class MRIDifferentPatientPairStream(MRISingleStream):
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
 
         # Remap patient to diagnose to file_ids
-        patient_to_diags = {}
+        patient_to_diags = OrderedDict()
         for patient_label in patient_to_file_ids:
             file_ids = patient_to_file_ids[patient_label]
             diagnoses = [(fid, self.get_diagnose(fid)) for fid in file_ids]
 
-            dic = {}
+            dic = OrderedDict()
             for t in diagnoses:
                 fid, diag = t
                 if diag not in dic:
@@ -457,14 +458,14 @@ class MRIDiagnosePairStream(MRISingleStream):
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
 
         # Map diagnosis to patient to file_ids
-        diag_to_patient = {}
+        diag_to_patient = OrderedDict()
         for patient_label in patient_to_file_ids:
             file_ids = patient_to_file_ids[patient_label]
             diagnoses = [(fid, self.get_diagnose(fid)) for fid in file_ids]
 
             for fid, d in diagnoses:
                 if d not in diag_to_patient:
-                    diag_to_patient[d] = {}
+                    diag_to_patient[d] = OrderedDict()
                 if patient_label not in diag_to_patient[d]:
                     diag_to_patient[d][patient_label] = []
                 diag_to_patient[d][patient_label].append(fid)

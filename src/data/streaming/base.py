@@ -9,6 +9,7 @@ import copy
 import os
 from functools import reduce
 import copy
+from collections import OrderedDict
 
 from . import features as _features
 
@@ -44,7 +45,7 @@ class FileStream(abc.ABC):
         self.file_id_to_meta = self.parse_meta_csv()
         csv_len = len(self.file_id_to_meta)
 
-        self.name_to_data_source = {}
+        self.name_to_data_source = OrderedDict()
         # Create datasources
         for ds in self.data_sources_list:
             d = DataSource(
@@ -221,7 +222,7 @@ class FileStream(abc.ABC):
         Parse the csv file containing the meta information about the
         data.
         """
-        meta_info = {}
+        meta_info = OrderedDict()
         with open(self.meta_csv) as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
@@ -294,7 +295,7 @@ class FileStream(abc.ABC):
         return record[key]
 
     def get_patient_to_file_ids_mapping(self):
-        patient_to_file_ids = {}
+        patient_to_file_ids = OrderedDict()
         not_found = 0
         for file_id in self.file_id_to_meta:
             record = self.file_id_to_meta[file_id]
@@ -354,7 +355,7 @@ class FileStream(abc.ABC):
             else:
                 sample_shape = self.sample_shape
             el_n_features = 1 + len(port_features)  # sample + csv features
-            all_features = {}
+            all_features = OrderedDict()
 
             # parse features for every sample in group
             for i in range(group_size):
@@ -467,7 +468,7 @@ class DataSource(object):
         """
         paths = glob.glob(self.glob_pattern)
         self.file_paths = []
-        self.file_path_to_image_label = {}
+        self.file_path_to_image_label = OrderedDict()
 
         regexp = re.compile(self.id_from_filename["regexp"])
         group_id = self.id_from_filename["regex_id_group"]
