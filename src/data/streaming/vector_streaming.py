@@ -65,6 +65,9 @@ class PyRadiomicsStream(MRISingleStream):
         # construct vector
         feature_names = sorted(list(features_dic.keys()))
         fs = [features_dic[n] for n in feature_names]
+        for i, v in enumerate(fs):
+            if not np.isfinite(v):
+                fs[i] = 0
 
         return np.array(fs)
 
