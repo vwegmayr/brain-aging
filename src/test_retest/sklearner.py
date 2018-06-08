@@ -114,6 +114,7 @@ class SklearnEvaluate(object):
             columns=["Est", "para"] + score_names
         )
         self.df.to_csv(self.save_path + "/" + "scores.csv", index=False)
+        self.df.to_latex(self.save_path + "/" + "scores.tex", index=False)
         self.tear_down()
 
     def score_estimator(self, est, X_test, y_test, params_s):

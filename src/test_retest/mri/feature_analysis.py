@@ -5,6 +5,7 @@ import importlib
 import matplotlib
 matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 from modules.models.data_transform import DataTransformer
@@ -294,21 +295,31 @@ class RobustnessMeasureComputation(DataTransformer):
                 key=lambda x: r_dic[x[0]]["pred_score"],
                 reverse=True
             )
-            sim_s = ",".join(["_".join(s.split("_")[2:])
-                              for s in similar_names])
-            dissim_s = ",".join(["_".join(s.split("_")[2:])
-                                 for s in dissimilar_names])
+            sim_s = ["_".join(s.split("_")[2:])
+                     for s in similar_names]
+            dissim_s = ["_".join(s.split("_")[2:])
+                        for s in dissimilar_names]
             file_name = os.path.join(out_path, r_name + "_summary.csv")
-            with open(file_name, 'w') as f:
-                f.write("FeatureName,PredictivePower,{},{}\n".format(sim_s, dissim_s))
-                for f_name, dic in items:
-                    f.write("{},{}".format(f_name, dic["pred_score"]))
-                    # similarity and dissimilarity scores
-                    for i, s in enumerate(similar_names):
-                        f.write(",{}".format(dic["sim_scores"][i]))
-                    for i, s in enumerate(dissimilar_names):
-                        f.write(",{}".format(dic["dissim_scores"][i]))
-                    f.write("\n")
+            rows = []
+            for f_name, dic in items:
+                row = [f_name, dic["pred_score"]]
+                # similarity and dissimilarity scores
+                for i, s in enumerate(similar_names):
+                    row += [round(dic["sim_scores"][i], 3)]
+                for i, s in enumerate(dissimilar_names):
+                    row += [round(dic["dissim_scores"][i], 3)]
+                rows.append(row)
+
+            rows = np.array(rows)
+            df = pd.DataFrame(
+                data=rows,
+                columns=["Feature", "PredPower"] + sim_s + dissim_s
+            )
+            df.to_csv(file_name, index=False)
+            df.to_latex(
+                os.path.join(out_path, r_name + "_summary.tex"),
+                index=False
+            )
 
     def transform(self, X, y=None):
         """
