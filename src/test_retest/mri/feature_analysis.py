@@ -270,6 +270,10 @@ class RobustnessMeasureComputation(DataTransformer):
                     'dissim_std': np.std(dissimilar_scores),
                     'pred_score': sim_mean / dissim_mean,
                 }
+                for k, v in dic.items():
+                    if isinstance(v, list):
+                        continue
+                    dic[k] = round(v, 3)
 
                 if r_name not in robustness_to_feature_to_dic:
                     robustness_to_feature_to_dic[r_name] = {}
@@ -354,12 +358,12 @@ class RobustnessMeasureComputation(DataTransformer):
         streamers = self.streamer_collection.get_same_patient_streamers()
         names = [s.name for s in streamers]
         comps = [streamer_to_comp[s] for s in streamers]
-        self.compare_computations(comps, names, out_path)
+        self.compare_computations(comps, names, out_path, True)
         # Compare different patient pairs
         streamers = self.streamer_collection.get_different_patient_streamers()
         names = [s.name for s in streamers]
         comps = [streamer_to_comp[s] for s in streamers]
-        self.compare_computations(comps, names, out_path)
+        self.compare_computations(comps, names, out_path, False)
 
         # Compute predictive power of features
         self.robustness_ratio(streamer_to_comp, True)
