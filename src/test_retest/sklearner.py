@@ -78,6 +78,7 @@ class SklearnEvaluate(object):
 
         # Record all scores
         score_names = [f.__name__.split(".")[-1] for f in self.score_funcs]
+        score_names = [s.split("_")[0] for s in score_names]
         self.rows = []
 
         for est_conf in self.estimators:
@@ -103,14 +104,16 @@ class SklearnEvaluate(object):
 
                 est = _class(**_params)
                 est.fit(X_train, y_train)
+                train_acc = np.mean(y_train == est.predict(X_train))
+                print("Train acc: {}".format(train_acc))
                 self.score_estimator(est, X_test, y_test, str(combo))
 
         # build dataframe with score and dump it as csv
         self.df = pd.DataFrame(
             data=np.array(self.rows),
-            columns=["Estimator", "params"] + score_names
+            columns=["Est", "para"] + score_names
         )
-        self.df.to_csv(self.save_path + "/" + "scores.csv")
+        self.df.to_csv(self.save_path + "/" + "scores.csv", index=False)
         self.tear_down()
 
     def score_estimator(self, est, X_test, y_test, params_s):
@@ -120,7 +123,7 @@ class SklearnEvaluate(object):
         # collect scores
         for func in self.score_funcs:
             sc = func(y_test, pred)
-            scores.append(sc)
+            scores.append(round(sc, 4))
 
         row = [est_name, params_s] + scores
         self.rows.append(row)

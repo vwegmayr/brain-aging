@@ -11,5 +11,7 @@ def specificity_score(y_true, y_pred):
             TN += 1
         if y_t == 0 and y_p == 1:
             FP += 1
-    
+
+    if TN + FP == 0:
+        return 0
     return TN / (TN + FP)
