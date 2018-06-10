@@ -12,7 +12,7 @@ params:
     balanced_labels:
       - healthy
       - health_ad
-      - health_mci
+      #- health_mci
     diagnoses:
       - "healthy"
       - "health_ad"
