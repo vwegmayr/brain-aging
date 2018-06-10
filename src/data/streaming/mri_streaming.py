@@ -66,7 +66,8 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return im
 
-    def make_train_test_split(self):
+    def make_balanced_train_test_split(self):
+        print("Making balanced split")
         # these should be mutually exclusive
         balanced_labels = self.config["balanced_labels"]
         train_patients = set([])
@@ -146,6 +147,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
                         test_patients = test_patients.union(set([patient]))
 
             toggle = not toggle
+
+    def make_train_test_split(self):
+        return self.make_balanced_train_test_split()
 
 
 class MRISamePatientSameAgePairStream(MRISingleStream):
@@ -445,7 +449,8 @@ class MRIDiagnosePairStream(MRISingleStream):
     Allows for more exact sampling wrt. diagnoses. A diagnosis
     pairs is expected in the config file under 'diagnoses'. For
     every sampled pair, there is one image for each of diagnoses
-    specified.
+    specified. One can also specify if both images should belong
+    to the same patient or not.
     """    
     def get_diagnoses(self):
         return self.config["diagnoses"]
@@ -595,4 +600,112 @@ class MRIDiagnosePairStream(MRISingleStream):
 
     def make_train_test_split(self):
         # split is done during sampling
+        pass
+
+
+class SimilarPairStream(MRISingleStream):
+    """
+    For now, two images are considered as similar if they
+    have the same diagnosis.
+    """
+    def get_diagnoses(self):
+        """
+        Returns a list of strings designating diagnoses.
+        """
+        return self.config["diagnoses"]
+
+    def get_max_train_pairs(self):
+        return self.config["max_train_pairs"]
+
+    def sampling_iterator(self, file_ids):
+        # Group fids by patient
+        patient_to_iterator = OrderedDict()
+
+        patient_to_fids = OrderedDict()
+        for fid in file_ids:
+            p = self.get_patient_id(fid)
+            if p not in patient_to_fids:
+                patient_to_fids[p] = []
+            patient_to_fids[p].append(fid)
+
+        patients = list(patient_to_fids.keys())
+        # all file_ids sorted by patient
+        patient_to_range = OrderedDict()
+        all_fids = []
+        for p in patients:
+            p_fids = patient_to_fids[p]
+            patient_to_iterator[p] = itertools.cycle(p_fids)
+            s_idx = len(all_fids)
+            all_fids += p_fids
+            e_idx = len(all_fids)
+            patient_to_range[p] = (s_idx, e_idx)
+
+        print("all ids {}".format(len(all_fids)))
+        for p in itertools.cycle(patients):
+            fid = next(patient_to_iterator[p])
+            s_idx, e_idx = patient_to_range[p]
+            others = all_fids[0: s_idx] + all_fids[e_idx:]
+            # Sample from others
+            idx = self.np_random.randint(0, len(others))
+            yield fid, others[idx]
+
+    def group_data(self):
+        max_train_pairs = self.get_max_train_pairs()
+        diagnoses = self.get_diagnoses()
+
+        # Use train-test split of MRISingleStream. Makes balanced split
+        # with respect to diagnoses. In addition, the train and test set
+        # of patients is distinct.
+        self.groups = self.make_one_sample_groups()
+        self.make_balanced_train_test_split()
+
+        # Collect train and test patients
+        train_files = [g.file_ids[0] for g in self.groups
+                       if g.is_train == True]
+        test_files = [g.file_ids[0] for g in self.groups
+                      if g.is_train == False]
+
+        self.groups = None
+        # Make arbitrary test 
+        groups = []
+        test_groups = self.produce_test_groups(test_files, 2)
+        groups += test_groups
+
+        # Sample train pairs
+        # Group train pairs by diagnose
+        diag_to_fids = OrderedDict()
+        for d in diagnoses:
+            diag_to_fids[d] = []
+
+        if self.shuffle:
+            self.np_random.shuffle(train_files)
+
+        for fid in train_files:
+            d = self.get_diagnose(fid)
+            if d in diag_to_fids:
+                diag_to_fids[d].append(fid)
+
+        # Sample same number of pairs per diagnose
+        for d in diagnoses:
+            fids = diag_to_fids[d]
+            d_train = []
+            for p in self.sampling_iterator(fids):
+                # Check if we have already enough pairs
+                if max_train_pairs >= 0:
+                    if len(d_train) >= max_train_pairs / len(diagnoses):
+                        break
+
+                patient1 = self.get_patient_label(p[0])
+                patient2 = self.get_patient_label(p[1])
+
+                if patient1 != patient2:
+                    g = Group(list(p))
+                    g.is_train = True
+                    d_train.append(g)
+
+            groups += d_train
+
+        return groups
+
+    def make_train_test_split(self):
         pass

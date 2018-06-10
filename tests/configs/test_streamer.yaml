@@ -7,6 +7,8 @@ params:
     prefetch: 1
     train_ratio: 1
     n_pairs: 10
+    max_train_pairs: 600
+    train_ratio: 0.8
     balanced_labels:
       - healthy
       - health_ad
