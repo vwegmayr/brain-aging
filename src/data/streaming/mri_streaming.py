@@ -640,38 +640,13 @@ class SimilarPairStream(MRISingleStream):
             e_idx = len(all_fids)
             patient_to_range[p] = (s_idx, e_idx)
 
-        fid_to_last_idx = OrderedDict()
-        fids_exhausted = set([])
-        patients_exhausted = set([])
+        print("all ids {}".format(len(all_fids)))
         for p in itertools.cycle(patients):
-            if len(patients_exhausted) >= len(patients):
-                break
-
             fid = next(patient_to_iterator[p])
-            c = 1
-            ex = False
-            while fid in fids_exhausted:
-                fid = next(patient_to_iterator[p])
-                c += 1
-                if c >= len(patient_to_fids[p]):
-                    # No more pairs possible for this patient
-                    patients_exhausted = patients_exhausted.add([p])
-                    ex = True
-                    break
-
-            if ex:
-                continue
-
             s_idx, e_idx = patient_to_range[p]
             others = all_fids[0: s_idx] + all_fids[e_idx:]
             # Sample from others
-            if fid not in fid_to_last_idx:
-                fid_to_last_idx[fid] = -1
-
-            idx = fid_to_last_idx[fid]
-            if idx == len(others) - 1:
-                fids_exhausted = fids_exhausted.add([fid])
-
+            idx = self.np_random.randint(0, len(others))
             yield fid, others[idx]
 
     def group_data(self):
@@ -685,8 +660,10 @@ class SimilarPairStream(MRISingleStream):
         self.make_balanced_train_test_split()
 
         # Collect train and test patients
-        train_files = [g.file_ids[0] for g in self.groups if g.is_train]
-        test_files = [g.file_ids[0] for g in self.groups if not g.is_train]
+        train_files = [g.file_ids[0] for g in self.groups
+                       if g.is_train == True]
+        test_files = [g.file_ids[0] for g in self.groups
+                      if g.is_train == False]
 
         self.groups = None
         # Make arbitrary test 
