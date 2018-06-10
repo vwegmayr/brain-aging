@@ -156,7 +156,7 @@ class FileStream(abc.ABC):
     def get_set_file_ids(self, train=True):
         groups = [group for group in self.groups if group.is_train == train]
         fids = [fid for group in groups for fid in group.file_ids]
-        return fids
+        return set(fids)
 
     def sanity_checks(self):
         """
@@ -293,6 +293,39 @@ class FileStream(abc.ABC):
     def get_meta_info_by_key(self, file_id, key):
         record = self.file_id_to_meta[file_id]
         return record[key]
+
+    def produce_test_groups(self, fids, group_size):
+        if len(fids) == 0:
+            return []
+
+        groups = [[]]
+        for fid in fids:
+            last_group = groups[-1]
+            if len(last_group) == group_size:
+                groups.append([fid])
+            else:
+                last_group.append(fid)
+
+        last_group = groups[-1]
+        if len(last_group) < group_size:
+            d = group_size - len(last_group)
+            last_group += d * [last_group[-1]]
+
+        groups = [Group(group_ids) for group_ids in groups]
+        for group in groups:
+            group.is_train = False
+
+        return groups
+
+    def make_one_sample_groups(self):
+        groups = []
+        for key in self.file_id_to_meta:
+            if "file_path" in self.file_id_to_meta[key]:
+                g = Group([key])
+                g.patient_label = self.get_patient_label(key)
+                groups.append(g)
+
+        return groups
 
     def get_patient_to_file_ids_mapping(self):
         patient_to_file_ids = OrderedDict()

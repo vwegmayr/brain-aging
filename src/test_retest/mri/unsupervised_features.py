@@ -392,17 +392,21 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
             )
             current_input = output
 
+            #current_input = tf.layers.max_pooling2d(current_input, 2, 1)
+
         z = current_input
         encoder.reverse()
         shapes.reverse()
         # Build the decoder
         for layer_i, shape in enumerate(shapes):
             # deconv
-            if params["tied_weights"]:
-                W_shape = encoder[layer_i].get_shape().aslist()
+            if not params["tied_weights"]:
+                W_shape = encoder[layer_i].get_shape().as_list()
+                print(shape)
+                print(W_shape)
                 W = tf.get_variable(
                     name="filters_deconv_layer_" + str(layer_i),
-                    shape=W_shape,
+                    shape=[W_shape[0], W_shape[1], W_shape[2], W_shape[3]],
                     initializer=tf.contrib.layers.xavier_initializer(seed=40)
                 )
             else:
@@ -413,6 +417,9 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                 initializer=tf.initializers.zeros
             )
 
+            input_shapes = current_input.get_shape().as_list()
+            print("input shape {}".format(input_shapes))
+            print("W {}".format(W))
             output = tf.nn.relu(
                 tf.add(
                     tf.nn.conv2d_transpose(
@@ -423,9 +430,11 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                     b
                 )
             )
+            print("out shape {}".format(output.get_shape().as_list()))
             current_input = output
 
         y = current_input
+        print("y {}".format(y))
         predictions = {
             "hidden_rep": z,
             "reconstruction": y
@@ -635,4 +644,3 @@ class MnistConv3DAutoEncoder(Conv3DAutoEncoder):
             self.data_params,
             input_fn_config=input_fn_config
         )
-

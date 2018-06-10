@@ -2,7 +2,8 @@ import unittest
 import yaml
 import importlib
 from src.data.streaming.mri_streaming import \
-    MRISingleStream, MRIDiagnosePairStream, MRISamePatientSameAgePairStream
+    MRISingleStream, MRIDiagnosePairStream, MRISamePatientSameAgePairStream, \
+    SimilarPairStream
 
 import subprocess
 
@@ -85,6 +86,11 @@ class TestReproducibility(unittest.TestCase):
         self.config["class"] = qualified_path(MRISamePatientSameAgePairStream)
         self.reproducibility_within_run()
         self.reproducibility_accross_runs()
+
+    def test_similar_pair_stream(self):
+        self.config["class"] = qualified_path(SimilarPairStream)
+        self.reproducibility_within_run()
+        # self.reproducibility_accross_runs()
 
 
 if __name__ == "__main__":
