@@ -173,8 +173,30 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
 
         if not_found > 0:
             warnings.warn("{} files not found".format(not_found))
+
+        self.groups = self.make_one_sample_groups()
+        self.make_balanced_train_test_split()
+
+        # Collect train and test patients
+        train_files = [g.file_ids[0] for g in self.groups
+                       if g.is_train == True]
+        test_files = [g.file_ids[0] for g in self.groups
+                      if g.is_train == False]
+
+        self.groups = None
+        # Make arbitrary test 
+        groups = []
+        test_groups = self.produce_test_groups(test_files, 2)
+        groups += test_groups
+
+        # Get train patient labels
+        train_patients = set([])
+        for fid in train_files:
+            patient = self.get_patient_label(fid)
+            train_patients = train_patients.union(set([patient]))
+
         # Sort by age, then image_label
-        for patient_label in patient_to_file_ids:
+        for patient_label in train_patients:
             ids = patient_to_file_ids[patient_label]
             id_with_age = list(map(
                 lambda x: (x, self.file_id_to_meta[x]["age"]),
@@ -194,10 +216,15 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
                 if (age_1 == age_2) and (diag_1 == diag_2):
                     assert id_1 != id_2
                     g = Group([id_1, id_2])
+                    g.is_train = True
                     g.patient_label = patient_label
                     groups.append(g)
 
         return groups
+
+    def make_train_test_split(self):
+        # Train test split done above
+        pass
 
 
 class MRISamePatientPairStream(MRISingleStream):
@@ -640,7 +667,6 @@ class SimilarPairStream(MRISingleStream):
             e_idx = len(all_fids)
             patient_to_range[p] = (s_idx, e_idx)
 
-        print("all ids {}".format(len(all_fids)))
         for p in itertools.cycle(patients):
             fid = next(patient_to_iterator[p])
             s_idx, e_idx = patient_to_range[p]
