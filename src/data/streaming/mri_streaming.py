@@ -519,7 +519,6 @@ class MRIDiagnosePairStream(MRISingleStream):
         n_train_pairs = int(self.config["train_ratio"] * n_pairs)
         train_labels = patient_labels[:n_train]
         test_labels = patient_labels[n_train:]
-        print("Num of training labels {}".format(len(train_labels)))
 
         def check_time():
             delta_t = process_time() - self.start_time

@@ -31,6 +31,7 @@ class FileStream(abc.ABC):
         self.data_sources_list = config["data_sources"]
         self.seed = config["seed"]
         self.shuffle = config["shuffle"]
+        self.silent = ("silent" in config and config["silent"])
 
         if "feature_collection" in config:
             self.feature_desc = _features.collections[
@@ -62,7 +63,8 @@ class FileStream(abc.ABC):
         for name in self.name_to_data_source:
             ds = self.name_to_data_source[name]
             new_paths = ds.get_file_paths()
-            print("{} has {} files".format(name, len(new_paths)))
+            if not self.silent:
+                print("{} has {} files".format(name, len(new_paths)))
             # Add path as meta information
             for p in new_paths:
                 image_label = ds.get_file_image_label(p)
@@ -80,11 +82,12 @@ class FileStream(abc.ABC):
                 else:
                     n_files_not_used += 1
 
-        print("{} files found but not specified meta csv"
-              .format(n_files_not_used))
-        print("Number of files: {}".format(len(self.all_file_paths)))
-        n_missing = csv_len - len(self.all_file_paths)
-        print("Number of files missing: {}".format(n_missing))
+        if not self.silent:
+            print("{} files found but not specified meta csv"
+                .format(n_files_not_used))
+            print("Number of files: {}".format(len(self.all_file_paths)))
+            n_missing = csv_len - len(self.all_file_paths)
+            print("Number of files missing: {}".format(n_missing))
 
         # Group files into tuples
         self.groups = self.group_data()
@@ -93,15 +96,17 @@ class FileStream(abc.ABC):
         # Make train-test split based on grouping
         self.make_train_test_split()
         self.sanity_checks()
-        print(">>>>>>>>> Sanity checks OK")
+        if not self.silent:
+            print(">>>>>>>>> Sanity checks OK")
 
         # Print stats
-        train_groups = [group for group in self.groups if group.is_train]
-        test_groups = [group for group in self.groups if not group.is_train]
-        print(">>>>>>>> Train stats")
-        self.print_stats(train_groups)
-        print(">>>>>>>> Test stats")
-        self.print_stats(test_groups)
+        if not self.silent:
+            train_groups = [group for group in self.groups if group.is_train]
+            test_groups = [group for group in self.groups if not group.is_train]
+            print(">>>>>>>> Train stats")
+            self.print_stats(train_groups)
+            print(">>>>>>>> Test stats")
+            self.print_stats(test_groups)
 
     @abc.abstractmethod
     def get_batches(self, train=True):
@@ -171,8 +176,13 @@ class FileStream(abc.ABC):
         train_ids = self.get_set_file_ids(True)
         test_ids = self.get_set_file_ids(False)
 
-        ratio = len(train_ids)/(len(test_ids) + len(train_ids))
-        print("Achieved train ratio: {}".format(ratio))
+        if len(train_ids) == 0:
+            ratio = 0
+        else:
+            ratio = len(train_ids)/(len(test_ids) + len(train_ids))
+        
+        if not self.silent:
+            print("Achieved train ratio: {}".format(ratio))
 
         train_patients = set([self.get_patient_id(fid) for fid in train_ids])
         test_patients = set([self.get_patient_id(fid) for fid in test_ids])

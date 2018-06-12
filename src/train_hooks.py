@@ -124,7 +124,7 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
         self.feature_folder = feature_folder
         self.robustness_streamer_config = robustness_streamer_config        
 
-    def after_run(self, run_context, run_values):
+    def end(self, session):
         if self.train:
             suff = "train_"
         else:
@@ -135,7 +135,7 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
         output_dir = self.out_dir
         file_type = ".npy"
         file_name_key = "image_label"
-        robustness_folder = "robustness_measures_" + suff
+        robustness_folder = "robustness_" + suff
         features_path = self.feature_folder
         self.streamer_collection = {}
         robustness_funcs = [
@@ -147,7 +147,6 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
 
         rs = self.robustness_streamer_config
         # Fix datasources
-        print(rs)
         rs["params"]["stream_config"]["data_sources"][0]["glob_pattern"] = \
             self.feature_folder + "/*_*.npy"
 

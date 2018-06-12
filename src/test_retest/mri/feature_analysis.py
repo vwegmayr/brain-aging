@@ -262,6 +262,11 @@ class RobustnessMeasureComputation(DataTransformer):
 
                 sim_mean = np.mean(similar_scores)
                 dissim_mean = np.mean(dissimilar_scores)
+                if dissim_mean == 0:
+                    pred_score = 0
+                else:
+                    pred_score = sim_mean / dissim_mean
+
                 dic = {
                     'sim_names': similar_names,
                     'dissim_names': dissimilar_names,
@@ -271,7 +276,7 @@ class RobustnessMeasureComputation(DataTransformer):
                     'sim_std': np.std(similar_scores),
                     'dissim_mean': np.mean(dissimilar_scores),
                     'dissim_std': np.std(dissimilar_scores),
-                    'pred_score': sim_mean / dissim_mean,
+                    'pred_score': pred_score
                 }
                 for k, v in dic.items():
                     if isinstance(v, list):
@@ -329,9 +334,10 @@ class RobustnessMeasureComputation(DataTransformer):
         by 'self.streamer'.
         """
         smt_label = os.path.split(self.save_path)[-1]
-        self.output_path = os.path.join(self.output_dir, smt_label)
-        out_path = os.path.join(self.output_path, self.robustness_folder)
-        os.makedirs(out_path)
+        self.output_path = os.path.join(self.output_dir, smt_label, self.robustness_folder)
+        out_path = os.path.join(self.output_path, "robusntess_measures")
+        if not os.path.exists(out_path):
+            os.makedirs(out_path)
 
         # Compute robustness for features and streamers
         streamer_to_comp = {}

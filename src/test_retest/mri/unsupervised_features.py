@@ -310,13 +310,13 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         hidden_1_hook_train, hidden_1_hook_test = \
             self.get_batch_dump_hook(hidden_1, features["file_name_1"])
 
-        robustness_hook_test = RobustnessComputationHook(
-            model_save_path=self.save_path,
-            out_dir=self.data_params["dump_out_dir"],
-            epoch=self.current_epoch,
-            train=False,
+        robustness_hook_train = self.get_robusntess_analysis_hook(
+            feature_folder=hidden_0_hook_train.get_feature_folder_path(),
+            train=True
+        )
+        robustness_hook_test = self.get_robusntess_analysis_hook(
             feature_folder=hidden_0_hook_test.get_feature_folder_path(),
-            robustness_streamer_config=self.hooks["robustness_streamer_config"]
+            train=False
         )
 
         if mode == tf.estimator.ModeKeys.TRAIN:
@@ -324,7 +324,11 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                training_hooks=[hidden_0_hook_train, hidden_1_hook_train]
+                training_hooks=[
+                    hidden_0_hook_train,
+                    hidden_1_hook_train,
+                    robustness_hook_train
+                ]
             )
 
         return tf.estimator.EstimatorSpec(

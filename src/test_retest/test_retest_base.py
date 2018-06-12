@@ -9,7 +9,8 @@ from modules.models.utils import custom_print
 from src.logging import MetricLogger
 import src.test_retest.regularizer as regularizer
 from src.data.mnist import read as mnist_read
-from src.train_hooks import ConfusionMatrixHook, ICCHook, BatchDumpHook
+from src.train_hooks import ConfusionMatrixHook, ICCHook, BatchDumpHook, \
+    RobustnessComputationHook
 
 
 def test_retest_evaluation_spec(
@@ -395,6 +396,18 @@ class EvaluateEpochsBaseTF(BaseTF):
             train=False
         )
         return train_hook, test_hook
+
+    def get_robusntess_analysis_hook(self, feature_folder, train):
+        hook = RobustnessComputationHook(
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=train,
+            feature_folder=feature_folder,
+            robustness_streamer_config=self.hooks["robustness_streamer_config"]
+        )
+
+        return hook
 
     def score(self, X, y):
         pass

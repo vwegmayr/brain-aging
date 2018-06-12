@@ -5,6 +5,8 @@ import sys
 
 
 N_FILES = 200
+FILE_B = 200
+FILE_E = 400
 CSV_PATH = "data/raw/csv/adni_aibl.csv"
 REMOTE_PATH = "/local/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images"
 LOCAL_PATH = "brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/"
@@ -20,7 +22,9 @@ def main():
         c = 0
         for row in reader:
             c += 1
-            if c > N_FILES:
+            if c < FILE_B:
+                continue
+            if c > FILE_E:
                 break
 
             file_path = row["image_label"] + "_mni_aligned.nii.gz"

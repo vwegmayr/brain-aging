@@ -70,7 +70,13 @@ def ICC_C1(Y):
     if MSR == 0 and MSE == 0:
         return 1
 
-    r = (MSR - MSE) / (MSR + (k - 1) * MSE)
+    num = MSR - MSE
+    denom = MSR + (k - 1) * MSE
+
+    if denom == 0:
+        return 0
+
+    r = num / denom
     return wrap_nan(r)
 
 
@@ -85,7 +91,13 @@ def ICC_A1(Y):
     MSE = MS_E(Y)
     MSC = MS_C(Y)
 
-    r = (MSR - MSE) / (MSR + (k - 1) * MSE + k / n * (MSC - MSE))
+    num = MSR - MSE
+    denom = MSR + (k - 1) * MSE + k / n * (MSC - MSE)
+
+    if denom == 0:
+        return 0
+
+    r = num / denom
     return wrap_nan(r)
 
 
