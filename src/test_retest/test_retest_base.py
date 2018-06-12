@@ -301,11 +301,15 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.hooks = hooks
 
         # Initialize streamer
+        self.streamer = None
         if streamer is not None:
             _class = streamer["class"]
             self.streamer = _class(**streamer["params"])
 
     def fit_main_training_loop(self, X, y):
+        if self.streamer is not None:
+            self.streamer.dump_split(self.save_path)
+
         n_epochs = self.input_fn_config["num_epochs"]
         self.input_fn_config["num_epochs"] = 1
 

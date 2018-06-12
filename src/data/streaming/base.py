@@ -84,7 +84,7 @@ class FileStream(abc.ABC):
 
         if not self.silent:
             print("{} files found but not specified meta csv"
-                .format(n_files_not_used))
+                  .format(n_files_not_used))
             print("Number of files: {}".format(len(self.all_file_paths)))
             n_missing = csv_len - len(self.all_file_paths)
             print("Number of files missing: {}".format(n_missing))
@@ -108,7 +108,6 @@ class FileStream(abc.ABC):
             print(">>>>>>>> Test stats")
             self.print_stats(test_groups)
 
-    @abc.abstractmethod
     def get_batches(self, train=True):
         groups = [group for group in self.groups
                   if group.is_train == train]
@@ -155,8 +154,29 @@ class FileStream(abc.ABC):
     def load_sample(self):
         pass
 
+    def dump_groups(self, outfolder, train, sep):
+        groups = self.get_groups(train)
+        if train:
+            pref = "train"
+        else:
+            pref = "test"
+
+        with open(os.path.join(outfolder, pref + "_groups.csv"), 'w') as f:
+            for g in groups:
+                f.write(sep.join(fid for fid in g.file_ids))
+                f.write("\n")
+
+    def dump_split(self, outfolder, sep="\t"):
+        # one group per line
+        # file IDs are tab separated
+        self.dump_groups(outfolder, True, sep)
+        self.dump_groups(outfolder, False, sep)
+
     def get_data_source_by_name(self, name):
         return self.name_to_data_source[name]
+
+    def get_groups(self, train):
+        return [g for g in self.groups if g.is_train == train]
 
     def get_set_file_ids(self, train=True):
         groups = [group for group in self.groups if group.is_train == train]
