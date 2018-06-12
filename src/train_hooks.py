@@ -190,6 +190,38 @@ class ICCHook(tf.train.SessionRunHook):
         np.save(out_file, X)
 
 
+class SumatraLoggingHook(tf.train.SessionRunHook):
+    def __init__(self, ops, names, logger, namespace):
+        self.ops = ops
+        self.names = names
+        self.logger = logger
+        self.namespace = namespace
+        self.name_to_values = {
+            name: []
+            for name in names
+        }
+
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(fetches=self.ops)
+
+    def after_run(self, run_context, run_values):
+        values = run_values.results
+
+        for vals, name in zip(values, self.names):
+            self.name_to_values[name].extend(vals)
+
+    def end(self, session):
+        # Compute average over batches
+        evals = {}
+        for name, values in self.name_to_values.items():
+            evals[name] = np.mean(values)
+
+        self.logger.add_evaluations(
+            namespace=self.namespace,
+            evaluation_dic=evals
+        )
+
+
 class PrintAndLogTensorHook(tf.train.LoggingTensorHook):
     def __init__(
         self,

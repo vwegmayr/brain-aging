@@ -17,7 +17,8 @@ from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
-from src.train_hooks import BatchDumpHook, RobustnessComputationHook
+from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
+    SumatraLoggingHook
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -284,7 +285,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         loss = loss_0 / 2 + loss_1 / 2
 
         # Regularization
-        reg = 0
+        reg = tf.constant(0, dtype=tf.int32, shape=[1])
         reg_lambda = params["hidden_lambda"]
         if reg_lambda != 0:
             reg_name = params["hidden_regularizer"]
@@ -298,6 +299,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
 
         reg = tf.cast(reg, loss.dtype)
         loss += reg
+
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
@@ -319,6 +321,14 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             train=False
         )
 
+        # log embedding loss
+        log_hook = SumatraLoggingHook(
+            ops=[reg],
+            names=["hidden_reg_loss"],
+            logger=self.metric_logger,
+            namespace="test"
+        )
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
@@ -337,7 +347,8 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             evaluation_hooks=[
                 hidden_0_hook_test,
                 hidden_1_hook_test,
-                robustness_hook_test
+                robustness_hook_test,
+                log_hook
             ]
         )
 
