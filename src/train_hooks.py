@@ -207,8 +207,8 @@ class SumatraLoggingHook(tf.train.SessionRunHook):
     def after_run(self, run_context, run_values):
         values = run_values.results
 
-        for vals, name in zip(values, self.names):
-            self.name_to_values[name].extend(vals)
+        for val, name in zip(values, self.names):
+            self.name_to_values[name].append(val)
 
     def end(self, session):
         # Compute average over batches

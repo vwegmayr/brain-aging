@@ -285,21 +285,40 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         loss = loss_0 / 2 + loss_1 / 2
 
         # Regularization
-        reg = tf.constant(0, dtype=tf.int32, shape=[1])
+        to_reg_0 = hidden_0
+        to_reg_1 = hidden_1
+        diagnose_dim = params["diagnose_dim"]
+        if diagnose_dim > 0:
+            patient_dim = hidden_dim - diagnose_dim
+            patient_encs_0, diag_encs_0 = tf.split(
+                hidden_0,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            patient_encs_1, diag_encs_1 = tf.split(
+                hidden_1,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            to_reg_0 = diag_encs_0
+            to_reg_1 = diag_encs_1
+
+        reg = tf.constant(0, dtype=tf.int32, shape=None)
         reg_lambda = params["hidden_lambda"]
         if reg_lambda != 0:
             reg_name = params["hidden_regularizer"]
             reg = name_to_hidden_regularization(
                 0,
                 reg_name,
-                hidden_0,
-                hidden_1
+                to_reg_0,
+                to_reg_1
             )
             reg *= reg_lambda
 
         reg = tf.cast(reg, loss.dtype)
         loss += reg
-
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
