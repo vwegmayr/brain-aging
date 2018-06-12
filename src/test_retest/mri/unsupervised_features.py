@@ -17,7 +17,7 @@ from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
-from src.train_hooks import BatchDumpHook
+from src.train_hooks import BatchDumpHook, RobustnessComputationHook
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -310,6 +310,15 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         hidden_1_hook_train, hidden_1_hook_test = \
             self.get_batch_dump_hook(hidden_1, features["file_name_1"])
 
+        robustness_hook_test = RobustnessComputationHook(
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            train=False,
+            feature_folder=hidden_0_hook_test.get_feature_folder_path(),
+            robustness_streamer_config=self.hooks["robustness_streamer_config"]
+        )
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
@@ -321,7 +330,11 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            evaluation_hooks=[hidden_0_hook_test, hidden_1_hook_test]
+            evaluation_hooks=[
+                hidden_0_hook_test,
+                hidden_1_hook_test,
+                robustness_hook_test
+            ]
         )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):

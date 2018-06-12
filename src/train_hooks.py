@@ -5,6 +5,9 @@ from tensorflow.python.summary import summary as core_summary
 import numpy as np
 
 
+from src.test_retest.mri.feature_analysis import RobustnessMeasureComputation
+
+
 class CollectValuesHook(tf.train.SessionRunHook):
     """
     Collect values and write them to sumatra_outcome.json
@@ -87,6 +90,9 @@ class BatchDumpHook(tf.train.SessionRunHook):
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
+    def get_feature_folder_path(self):
+        return self.out_dir
+
     def before_run(self, run_context):
         return tf.train.SessionRunArgs(
             fetches=[self.tensor_batch, self.batch_names]
@@ -106,6 +112,56 @@ class BatchDumpHook(tf.train.SessionRunHook):
             )
             with open(out_file, 'wb') as f:
                 np.save(f, val)
+
+
+class RobustnessComputationHook(tf.train.SessionRunHook):
+    def __init__(self, model_save_path, out_dir, epoch, train,
+                 feature_folder, robustness_streamer_config):
+        self.model_save_path = model_save_path
+        self.out_dir = out_dir
+        self.epoch = epoch
+        self.train = train
+        self.feature_folder = feature_folder
+        self.robustness_streamer_config = robustness_streamer_config        
+
+    def after_run(self, run_context, run_values):
+        if self.train:
+            suff = "train_"
+        else:
+            suff = "test_"
+
+        suff += str(self.epoch)
+        # Construct robustness analyzer
+        output_dir = self.out_dir
+        file_type = ".npy"
+        file_name_key = "image_label"
+        robustness_folder = "robustness_measures_" + suff
+        features_path = self.feature_folder
+        self.streamer_collection = {}
+        robustness_funcs = [
+            "src.test_retest.numpy_utils.ICC_C1",
+            "src.test_retest.numpy_utils.ICC_A1",
+            "src.test_retest.numpy_utils.pearsonr",
+            "src.test_retest.numpy_utils.linccc",
+        ]
+
+        rs = self.robustness_streamer_config
+        # Fix datasources
+        print(rs)
+        rs["params"]["stream_config"]["data_sources"][0]["glob_pattern"] = \
+            self.feature_folder + "/*_*.npy"
+
+        self.analyzer = RobustnessMeasureComputation(
+            robustness_funcs=robustness_funcs,
+            features_path=features_path,
+            file_type=file_type,
+            streamer_collection=rs,
+            file_name_key=file_name_key,
+            output_dir=output_dir,
+            robustness_folder=robustness_folder
+        )
+        self.analyzer.set_save_path(self.model_save_path)
+        self.analyzer.transform(None, None)
 
 
 class ICCHook(tf.train.SessionRunHook):

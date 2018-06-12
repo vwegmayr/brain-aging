@@ -17,7 +17,8 @@ FILE_TYPES = [JSON_TYPE, NUMPY_TYPE]
 
 class RobustnessMeasureComputation(DataTransformer):
     def __init__(self, robustness_funcs, features_path, file_type,
-                 streamer_collection, file_name_key, output_dir):
+                 streamer_collection, file_name_key, output_dir,
+                 robustness_folder):
         # Parse functions
         self.robustness_funcs = []
         for f in robustness_funcs:
@@ -35,6 +36,7 @@ class RobustnessMeasureComputation(DataTransformer):
         self.file_type = file_type
         self.file_name_key = file_name_key
         self.output_dir = output_dir
+        self.robustness_folder = robustness_folder
 
     def construct_file_path(self, file_name):
         return os.path.join(self.features_path, file_name + self.file_type)
@@ -328,7 +330,7 @@ class RobustnessMeasureComputation(DataTransformer):
         """
         smt_label = os.path.split(self.save_path)[-1]
         self.output_path = os.path.join(self.output_dir, smt_label)
-        out_path = os.path.join(self.output_path, "robustness_measures")
+        out_path = os.path.join(self.output_path, self.robustness_folder)
         os.makedirs(out_path)
 
         # Compute robustness for features and streamers
