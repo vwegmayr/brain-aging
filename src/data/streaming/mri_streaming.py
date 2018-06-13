@@ -54,6 +54,10 @@ class MRISingleStream(FileStream, MRIImageLoader):
             bi = n_batches * self.batch_size
             batches.append(groups[bi:])
 
+        n_groups = 0
+        for batch in batches:
+            n_groups += len(batch)
+        assert n_groups == len(groups)
         return batches
 
     def group_data(self):

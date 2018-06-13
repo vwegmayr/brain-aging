@@ -282,7 +282,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         else:
             loss_0 = tf.losses.mean_squared_error(x_0, rec_0)
             loss_1 = tf.losses.mean_squared_error(x_1, rec_1)
-        loss = loss_0 / 2 + loss_1 / 2
+        reconstruction_loss = loss_0 / 2 + loss_1 / 2
 
         # Regularization
         to_reg_0 = hidden_0
@@ -305,20 +305,20 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             to_reg_0 = diag_encs_0
             to_reg_1 = diag_encs_1
 
-        reg = tf.constant(0, dtype=tf.int32, shape=None)
+        reg_loss = tf.constant(0, dtype=tf.int32, shape=None)
         reg_lambda = params["hidden_lambda"]
         if reg_lambda != 0:
             reg_name = params["hidden_regularizer"]
-            reg = name_to_hidden_regularization(
+            reg_loss = name_to_hidden_regularization(
                 0,
                 reg_name,
                 to_reg_0,
                 to_reg_1
             )
-            reg *= reg_lambda
+            reg_loss *= reg_lambda
 
-        reg = tf.cast(reg, loss.dtype)
-        loss += reg
+        reg_loss = tf.cast(reg_loss, reconstruction_loss.dtype)
+        loss = reconstruction_loss + reg_loss
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
@@ -342,8 +342,8 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
 
         # log embedding loss
         log_hook = SumatraLoggingHook(
-            ops=[reg],
-            names=["hidden_reg_loss"],
+            ops=[reg_loss, reconstruction_loss],
+            names=["hidden_reg_loss", "reconstruction_loss"],
             logger=self.metric_logger,
             namespace="test"
         )

@@ -156,6 +156,7 @@ class FileStream(abc.ABC):
 
     def dump_groups(self, outfolder, train, sep):
         groups = self.get_groups(train)
+
         if train:
             pref = "train"
         else:
