@@ -229,6 +229,30 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
 
 
 class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
+    def normalize_single_image(self, im):
+        mean, var = tf.nn.moments(im, axes=[0])
+        std = tf.sqrt(var)
+        std += 0.001
+        return (im - mean) / std
+
+    def normalize_image_batch(self, batch, voxel_means, voxel_stds):
+        # normalize every image
+        batch = tf.map_fn(
+            self.normalize_single_image,
+            batch
+        )
+
+        # voxel normalization computed across train set
+        batch = (batch - voxel_means) / voxel_stds
+
+        # normalize every image
+        batch = tf.map_fn(
+            self.normalize_single_image,
+            batch
+        )
+
+        return batch
+
     def model_fn(self, features, labels, mode, params):
         input_dim = params["input_dim"]
         x_0 = tf.reshape(
@@ -239,6 +263,22 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             features["X_1"],
             [-1, input_dim]
         )
+
+        if params["normalize_images"]:
+            voxel_means = tf.constant(
+                self.streamer.get_voxel_means(),
+                dtype=x_0.dtype
+            )
+            voxel_means = tf.reshape(voxel_means, [-1, input_dim])
+
+            voxel_stds = tf.constant(
+                self.streamer.get_voxel_stds(),
+                dtype=x_0.dtype
+            )
+            voxel_stds = tf.reshape(voxel_stds, [-1, input_dim])
+
+            x_0 = self.normalize_image_batch(x_0, voxel_means, voxel_stds)
+            x_1 = self.normalize_image_batch(x_1, voxel_means, voxel_stds)
 
         hidden_dim = params["hidden_dim"]
         w = tf.get_variable(

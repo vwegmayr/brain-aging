@@ -125,8 +125,15 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         if not self.silent:
             print(">>>>> Normalization computed!!")
+            print(">> min std voxel {}".format(np.min(self.voxel_stds)))
 
         self.normalization_computed = True
+
+    def get_voxel_means(self):
+        return self.voxel_means
+
+    def get_voxel_stds(self):
+        return self.voxel_stds
 
     def normalize_image(self, im):
         assert self.normalization_computed
@@ -159,11 +166,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             im = np.random.rand(*shape)
             return im
 
-        # Normalize images
-        if self.normalize_images:
-            return self.normalize_image(im)
-        else:
-            return im
+        return im
 
     def make_balanced_train_test_split(self):
         print("Making balanced split")

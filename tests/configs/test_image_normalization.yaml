@@ -1,4 +1,4 @@
-class: src.data.streaming.mri_streaming.MRISingleStream
+class: src.data.streaming.mri_streaming.SimilarPairStream
 params:
   stream_config:
     meta_csv: data/raw/csv/adni_aibl__ad_hc.csv
@@ -8,6 +8,7 @@ params:
     train_ratio: 1
     normalize_images: True
     train_ratio: 0.6
+    max_train_pairs: 10
     balanced_labels:
       - healthy
       - health_ad
