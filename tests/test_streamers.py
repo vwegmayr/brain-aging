@@ -101,7 +101,7 @@ class TestImageNormalization(unittest.TestCase):
 
         self.config = config
 
-    def test_normalization(self):
+    def test_normalization_on_few_images(self):
         streamer = create_object(self.config)
 
         file_ids = list(streamer.get_set_file_ids(True))
@@ -122,6 +122,10 @@ class TestImageNormalization(unittest.TestCase):
 
         self.assertTrue(np.allclose(streamer_mu, mu, atol=0.0001))
         self.assertTrue(np.allclose(streamer_s, s, atol=0.0001))
+
+    def test_normalization_all_images(self):
+        self.config["params"]["stream_config"]["train_ratio"] = 1
+        create_object(self.config)
 
 
 if __name__ == "__main__":

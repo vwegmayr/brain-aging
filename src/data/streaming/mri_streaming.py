@@ -94,6 +94,8 @@ class MRISingleStream(FileStream, MRIImageLoader):
         for fid in file_ids:
             p = self.get_file_path(fid)
             im = self.load_image(p)
+            if np.isclose(np.std(im), 0):
+                print(p)
             im = (im - np.mean(im)) / np.std(im)
 
             # Keep running average for every voxel intensity
@@ -118,6 +120,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
         self.voxel_means = voxel_mean
         voxel_var = voxel_mean_sq - self.voxel_means ** 2
         self.voxel_stds = np.sqrt(voxel_var)
+
+        if not self.silent:
+            print(">>>>> Normalization computed!!")
 
         self.normalization_computed = True
 

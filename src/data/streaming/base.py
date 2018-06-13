@@ -237,8 +237,9 @@ class FileStream(abc.ABC):
         ages = np.array(ages)
 
         print(">>>>>>>>>>>>>>>>")
-        print(">>>> Age stats, mean={}, std={}"
-              .format(np.mean(ages), np.std(ages)))
+        if len(ages) > 0:
+            print(">>>> Age stats, mean={}, std={}"
+                .format(np.mean(ages), np.std(ages)))
 
         if len(age_diffs) > 0:
             print(">>>> Age diffences stats, mean={}, std={}"
