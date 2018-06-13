@@ -94,9 +94,11 @@ class MRISingleStream(FileStream, MRIImageLoader):
         for fid in file_ids:
             p = self.get_file_path(fid)
             im = self.load_image(p)
-            if np.isclose(np.std(im), 0):
-                print(p)
-            im = (im - np.mean(im)) / np.std(im)
+            std = np.std(im)
+
+            if np.isclose(std, 0):
+                std = 1
+            im = (im - np.mean(im)) / std
 
             # Keep running average for every voxel intensity
             cur_sums += im
@@ -128,9 +130,14 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
     def normalize_image(self, im):
         assert self.normalization_computed
-        im = (im - np.mean(im)) / np.std(im)
+        std = np.std(im)
+        if np.isclose(0, std):
+            std = 1
+        im = (im - np.mean(im)) / std
         im = (im - self.voxel_means) / self.voxel_stds
-        im = (im - np.mean(im)) / np.std(im)
+        if np.isclose(0, std):
+            std = 1
+        im = (im - np.mean(im)) / std
         return im
 
     def load_raw_sample(self, file_path):
