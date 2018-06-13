@@ -335,7 +335,7 @@ class RobustnessMeasureComputation(DataTransformer):
         """
         smt_label = os.path.split(self.save_path)[-1]
         self.output_path = os.path.join(self.output_dir, smt_label, self.robustness_folder)
-        out_path = os.path.join(self.output_path, "robusntess_measures")
+        out_path = os.path.join(self.output_path, "robustness_measures")
         if not os.path.exists(out_path):
             os.makedirs(out_path)
 
