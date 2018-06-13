@@ -6,6 +6,7 @@ from src.data.streaming.mri_streaming import \
     SimilarPairStream
 
 import subprocess
+import numpy as np
 
 
 def str_to_module(s):
@@ -91,6 +92,36 @@ class TestReproducibility(unittest.TestCase):
         self.config["class"] = qualified_path(SimilarPairStream)
         self.reproducibility_within_run()
         # self.reproducibility_accross_runs()
+
+
+class TestImageNormalization(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_single_streamer.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def test_normalization(self):
+        streamer = create_object(self.config)
+
+        file_ids = list(streamer.get_set_file_ids(True))
+        all_images = []
+
+        for fid in file_ids:
+            p = streamer.get_file_path(fid)
+            im = streamer.load_image(p)
+            im = (im - np.mean(im)) / np.std(im)
+            all_images.append(im)
+
+        all_images = np.array(all_images)
+        mu = np.mean(all_images, axis=0)
+        s = np.std(all_images, axis=0)
+
+        streamer_mu = streamer.voxel_means
+        streamer_s = streamer.voxel_stds
+
+        self.assertTrue(np.allclose(streamer_mu, mu, atol=0.0001))
+        self.assertTrue(np.allclose(streamer_s, s, atol=0.0001))
 
 
 if __name__ == "__main__":

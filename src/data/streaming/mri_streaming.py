@@ -16,10 +16,21 @@ class MRIImageLoader(object):
         mri_image = nib.load(image_path)
         mri_image = mri_image.get_data()
 
-        return mri_image.astype(np.float16)
+        return mri_image.astype(np.float32)
 
 
 class MRISingleStream(FileStream, MRIImageLoader):
+    def __init__(self, *args, **kwargs):
+        super(MRISingleStream, self).__init__(
+            *args,
+            **kwargs
+        )
+        # train-test split is performed by parent
+        self.normalization_computed = False
+        self.normalize_images = self.config["normalize_images"]
+        if self.normalize_images:
+            self.compute_image_normalization()
+
     def get_batches(self, train=True):
         groups = [group for group in self.groups
                   if group.is_train == train]
@@ -56,6 +67,66 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return groups
 
+    def compute_image_normalization(self):
+        """
+        1. Normalize every image to 0 mean and 1 std.
+        2. Normalize every voxel accross the whole dataset.
+        3. Normalize every image again.
+
+        Normalization should be computed on the train set only.
+        """
+        # collect train file IDs
+        file_ids = list(self.get_set_file_ids(train=True))
+        n = len(file_ids)
+        shape = self.get_sample_shape()
+        voxel_mean = np.zeros(shape)
+        voxel_mean_sq = np.zeros(shape)
+
+        lim = int(0.1 * n)
+        # Try to avoid overflows
+        cur_sums = np.zeros(shape)
+        cur_sums_sq = np.zeros(shape)
+        c = 0
+        for fid in file_ids:
+            p = self.get_file_path(fid)
+            im = self.load_image(p)
+            im = (im - np.mean(im)) / np.std(im)
+
+            # Keep running average for every voxel intensity
+            cur_sums += im
+            cur_sums_sq += im ** 2
+            c += 1
+            if c >= lim:
+                c = 0
+                voxel_mean += cur_sums / n
+                voxel_mean_sq += cur_sums_sq / n
+                cur_sums = np.zeros(shape)
+                cur_sums_sq = np.zeros(shape)
+
+        if c != 0:
+            voxel_mean += cur_sums / n
+            voxel_mean_sq += cur_sums_sq / n
+
+        self.voxel_means = np.zeros(shape)
+        self.voxel_stds = np.zeros(shape)
+
+        # Compute mean and standard deviation
+        self.voxel_means = voxel_mean
+        voxel_var = voxel_mean_sq - self.voxel_means ** 2
+        self.voxel_stds = np.sqrt(voxel_var)
+
+        self.normalization_computed = True
+
+    def normalize_image(self, im):
+        assert self.normalization_computed
+        im = (im - np.mean(im)) / np.std(im)
+        im = (im - self.voxel_means) / self.voxel_stds
+        im = (im - np.mean(im)) / np.std(im)
+        return im
+
+    def load_raw_sample(self, file_path):
+        return self.load_image(file_path)
+
     def load_sample(self, file_path):
         im = self.load_image(file_path)
         if self.config["downsample"]["enabled"]:
@@ -63,8 +134,13 @@ class MRISingleStream(FileStream, MRIImageLoader):
             shape = tuple(self.config["downsample"]["shape"])
             # im = resize(im, shape, anti_aliasing=False)
             im = np.zeros(shape)
+            return im
 
-        return im
+        # Normalize images
+        if self.normalize_images:
+            return self.normalize_image(im)
+        else:
+            return im
 
     def make_balanced_train_test_split(self):
         print("Making balanced split")
