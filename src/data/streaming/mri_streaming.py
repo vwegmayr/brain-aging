@@ -125,7 +125,14 @@ class MRISingleStream(FileStream, MRIImageLoader):
         return im
 
     def load_raw_sample(self, file_path):
-        return self.load_image(file_path)
+        im = self.load_image(file_path)
+        if self.config["downsample"]["enabled"]:
+            # im = im / np.max(im)
+            shape = tuple(self.config["downsample"]["shape"])
+            # im = resize(im, shape, anti_aliasing=False)
+            im = np.random.rand(*shape)
+
+        return im
 
     def load_sample(self, file_path):
         im = self.load_image(file_path)
@@ -133,7 +140,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # im = im / np.max(im)
             shape = tuple(self.config["downsample"]["shape"])
             # im = resize(im, shape, anti_aliasing=False)
-            im = np.zeros(shape)
+            im = np.random.rand(*shape)
             return im
 
         # Normalize images
