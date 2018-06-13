@@ -20,12 +20,22 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
             activations_retest,
             name=str(layer_id) + "_softmax_retest"
         )
-        return regularizer.js_divergence(s_test, s_retest)
+        n = activations_test.get_shape().as_list()[1]
+        batch_div = regularizer.batch_divergence(
+            s_test,
+            s_retest,
+            n,
+            regularizer.js_divergence
+        )
+        return tf.reduce_mean(batch_div)
+
     elif reg_name == regularizer.L2_SQUARED_LABEL:
         return regularizer.l2_squared_mean_batch(
                     activations_test - activations_retest,
                     name=str(layer_id) + "_l2_activations"
                )
+    #elif reg_name == "cosine_sim":
+     #   return regularizer.cosine_similarity
     else:
         raise ValueError("regularization name '{}' is unknown".format(
                          reg_name))
