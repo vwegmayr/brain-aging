@@ -96,7 +96,7 @@ class TestReproducibility(unittest.TestCase):
 
 class TestImageNormalization(unittest.TestCase):
     def setUp(self):
-        with open("tests/configs/test_single_streamer.yaml") as f:
+        with open("tests/configs/test_image_normalization.yaml") as f:
             config = yaml.load(f)
 
         self.config = config

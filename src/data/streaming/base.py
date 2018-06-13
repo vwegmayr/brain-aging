@@ -466,6 +466,9 @@ class FileStream(abc.ABC):
             for fname in port_features
         ])
 
+        num_calls = 4
+        if "parallel_readers" in self.config:
+            num_calls = self.config["parallel_readers"]
         dataset = dataset.map(
             lambda file_ids, label: tuple(tf.py_func(
                 _read_files,
@@ -474,7 +477,7 @@ class FileStream(abc.ABC):
                 stateful=False,
                 name="read_files"
             )),
-            num_parallel_calls=12
+            num_parallel_calls=num_calls
         )
 
         prefetch = 4
