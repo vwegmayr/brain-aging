@@ -4,7 +4,7 @@ import tensorflow as tf
 # Labels for regularizers
 JS_DIVERGENCE_LABEL = "js_divergence"
 L2_SQUARED_LABEL = "l2_sq"
-
+COSINE_SIMILARITY = "cosine_sim"
 
 # Traditional norm regularizers
 def l1(weights, name):
@@ -88,6 +88,26 @@ def batch_divergence(batch_p, batch_q, n, div_fn):
     divergences = tf.map_fn(fn, all_probs)
 
     return divergences
+
+
+def cosine_similarities(A, B):
+    """
+    Args:
+        - A: tensor containing samples row-wise
+        - B: tensor containing samples row-wise
+
+    Return:
+        - similarities: tensor containing cosine
+          similarities of paired samples
+    """
+    dot_prods = tf.reduce_sum(A * B, axis=1)
+
+    A_norms = tf.sqrt(tf.reduce_sum(A * A, axis=1))
+    B_norms = tf.sqrt(tf.reduce_sum(B * B, axis=1))
+
+    similarities = (dot_prods / A_norms) / B_norms
+
+    return similarities
 
 
 # Reliability measures for ICC computation

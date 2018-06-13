@@ -34,8 +34,12 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
                     activations_test - activations_retest,
                     name=str(layer_id) + "_l2_activations"
                )
-    #elif reg_name == "cosine_sim":
-     #   return regularizer.cosine_similarity
+    elif reg_name == regularizer.COSINE_SIMILARITY:
+        similarities = regularizer.cosine_similarities(
+            activations_test,
+            activations_retest
+        )
+        return tf.reduce_mean(similarities)
     else:
         raise ValueError("regularization name '{}' is unknown".format(
                          reg_name))
