@@ -30,8 +30,8 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
         return tf.reduce_mean(batch_div)
 
     elif reg_name == regularizer.L2_SQUARED_LABEL:
-        return regularizer.l2_squared_mean_batch(
-                    activations_test - activations_retest,
+        return tf.losses.mean_squared_error(
+                    activations_test, activations_retest,
                     name=str(layer_id) + "_l2_activations"
                )
     elif reg_name == regularizer.COSINE_SIMILARITY:
@@ -183,7 +183,7 @@ class DeepTestRetestClassifier(EvaluateEpochsBaseTF):
                 probs_test,
                 probs_retest,
                 params["n_classes"],
-                regularizer.kl_divergence
+                regularizer.js_divergence
             )
             loss_o = tf.reduce_mean(loss_o)
         else:

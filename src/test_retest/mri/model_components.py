@@ -1,6 +1,8 @@
 import abc
 import tensorflow as tf
 from src.test_retest import regularizer
+from src.test_retest.test_retest_base import \
+    linear_trafo_multiple_input_tensors
 
 
 def name_to_hidden_regularization(layer_id, reg_name, activations_test,
@@ -24,8 +26,8 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
         return tf.reduce_mean(batch_div)
 
     elif reg_name == regularizer.L2_SQUARED_LABEL:
-        return regularizer.l2_squared_mean_batch(
-                    activations_test - activations_retest,
+        return tf.losses.mean_squared_error(
+                    activations_test, activations_retest,
                     name=str(layer_id) + "_l2_activations"
                )
     elif reg_name == regularizer.COSINE_SIMILARITY:
@@ -225,3 +227,122 @@ class MultiLayerPairDecoder(Head):
 
     def get_nodes(self):
         return self.rec_0, self.rec_1
+
+
+class PairClassificationHead(Head):
+    def __init__(self, features, params, encoder):
+        self.features = features
+        self.params = params
+        self.encoder = encoder
+
+        self.construct_graph()
+
+    def construct_graph(self):
+        params = self.params
+        features = self.features
+
+        enc_0, enc_1 = self.encoder.get_encodings()
+        # Extract labels
+        key = params["target_label_key"]
+        labels_0 = features[key + "_0"]
+        labels_1 = features[key + "_1"]
+
+        # Compute logits
+        w, b, out = linear_trafo_multiple_input_tensors(
+            Xs=[enc_0, enc_1],
+            out_dim=params["n_classes"],
+            weight_names=["logit_weight", "logit_bias"],
+            output_names=["logits_0", "logits_1"]
+        )
+
+        self.logits_0, self.logits_1 = out
+
+        self.probs_0 = tf.nn.softmax(self.logits_0)
+        self.probs_1 = tf.nn.softmax(self.logits_1)
+
+        self.preds_0 = tf.argmax(input=self.logits_0, axis=1)
+        self.preds_1 = tf.argmax(input=self.logits_1, axis=1)
+
+        self.loss_0 = tf.losses.sparse_softmax_cross_entropy(
+            labels=labels_0,
+            logits=self.logits_0
+        )
+
+        self.loss_1 = tf.losses.sparse_softmax_cross_entropy(
+            labels=labels_1,
+            logits=self.logits_1
+        )
+
+        self.loss_clf = self.loss_0 / 2 + self.loss_1 / 2
+
+        self.acc_0 = tf.reduce_mean(
+            tf.cast(tf.equal(self.preds_0, labels_0), tf.int32)
+        )
+
+        self.acc_1 = tf.reduce_mean(
+            tf.cast(tf.equal(self.preds_1, labels_1), tf.int32)
+        )
+
+        # Set some regularizers
+        self.loss_o = tf.constant(0, dtype=self.loss_clf.dtype)
+        if params["lambda_o"] != 0:
+            self.output_regularization()
+
+        self.loss_h = tf.constant(0, dtype=self.loss_clf.dtype)
+        if params["hidden_lambda"] != 0:
+            self.hidden_regularization()
+
+    def output_regularization(self):
+        params = self.params
+        lam = params["lambda_o"]
+        key = "output_regularizer"
+
+        if params[key] == "kl_divergence":
+            loss_o = regularizer.batch_divergence(
+                self.probs_0,
+                self.probs_1,
+                params["n_classes"],
+                regularizer.kl_divergence
+            )
+            loss_o = tf.reduce_mean(loss_o)
+        elif params[key] == "js_divergence":
+            loss_o = regularizer.batch_divergence(
+                self.probs_0,
+                self.probs_1,
+                params["n_classes"],
+                regularizer.js_divergence
+            )
+            loss_o = tf.reduce_mean(loss_o)
+        else:
+            raise ValueError("Regularizer not found")
+
+        self.loss_o = lam * loss_o
+
+    def hidden_regularization(self):
+        enc_0, enc_1 = self.encoder.get_encodings()
+        params = self.params
+        reg = name_to_hidden_regularization(
+            "last",
+            params["hidden_regularizer"],
+            enc_0,
+            enc_1
+        )
+
+        self.loss_h = params["hidden_lambda"] * reg
+
+    def get_losses_with_names(self):
+        ops = [self.loss_o, self.loss_h, self.loss_clf]
+        names = ["output_loss", "hidden_loss", "cross_entropy"]
+        return ops, names
+
+    def get_accuracy(self):
+        return self.acc_0 / 2 + self.acc_1 / 2
+
+    def get_total_loss(self):
+        return self.loss_clf + self.loss_o + self.loss_h
+
+    def get_predictions(self):
+        return self.preds_0, self.preds_1
+
+    def get_nodes(self):
+        return self.get_predictions(), self.get_total_loss()
