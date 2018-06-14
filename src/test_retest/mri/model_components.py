@@ -157,8 +157,16 @@ class MultiLayerPairDecoder(Head):
 
         self.construct_graph()
 
+    def batch_mean(self, encodings, labels, hc=1):
+        comp = 0 * labels + hc
+        eq = tf.cast(tf.equal(labels, comp), encodings.dtype)
+        batch_mean = tf.reduce_mean(eq * encodings, axis=0)
+
+        return batch_mean
+
     def construct_graph(self):
         params = self.params
+        features = self.features
         x_0, x_1, enc_0, enc_1 = self.encoder.get_nodes()
         w = self.encoder.get_encoding_weights()[0]
 
@@ -200,6 +208,33 @@ class MultiLayerPairDecoder(Head):
 
             to_reg_0 = diag_encs_0
             to_reg_1 = diag_encs_1
+
+        if params["global_diag_encoding"] and diagnose_dim > 0:
+            global_diag_ad = tf.get_variable(
+                name="global_diag_ad",
+                shape=[1, diagnose_dim],
+                trainable=False,
+                initializer=tf.initializers.zeros
+            )
+
+            global_diag_hc = tf.get_variable(
+                name="global_diag_hc",
+                shape=[1, diagnose_dim],
+                trainable=False,
+                initializer=tf.initializers.zeros
+            )
+
+            labels_0 = features["healthy_0"]
+            ad_batch_0 = self.batch_mean(diag_encs_0, labels_0, 0)
+            ad_batch_1 = self.batch_mean(diag_encs_1, labels_0, 0)
+            ad_batch = ad_batch_0 / 2 + ad_batch_1 / 2
+
+            hc_batch_0 = self.batch_mean(diag_encs_0, labels_0, 1)
+            hc_batch_1 = self.batch_mean(diag_encs_1, labels_0, 1)
+            hc_batch = hc_batch_0 / 2 + hc_batch_1 / 2
+
+            global_diag_ad = 0.9 * global_diag_ad + 0.1 * ad_batch
+            global_diag_hc = 0.9 * global_diag_hc + 0.1 * hc_batch
 
         reg_loss = tf.constant(0, dtype=tf.int32, shape=None)
         reg_lambda = params["hidden_lambda"]
