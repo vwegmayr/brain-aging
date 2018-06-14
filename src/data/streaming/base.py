@@ -151,7 +151,7 @@ class FileStream(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def load_sample(self):
+    def load_sample(self, file_path):
         pass
 
     def dump_groups(self, outfolder, train, sep):
@@ -201,7 +201,7 @@ class FileStream(abc.ABC):
             ratio = 0
         else:
             ratio = len(train_ids)/(len(test_ids) + len(train_ids))
-        
+
         if not self.silent:
             print("Achieved train ratio: {}".format(ratio))
 

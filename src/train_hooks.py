@@ -3,8 +3,12 @@ import json
 import tensorflow as tf
 from tensorflow.python.summary import summary as core_summary
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, recall_score
+import pandas as pd
 
 
+from src.test_retest.metrics import specificity_score
 from src.test_retest.mri.feature_analysis import RobustnessMeasureComputation
 
 
@@ -162,6 +166,100 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
         )
         self.analyzer.set_save_path(self.model_save_path)
         self.analyzer.transform(None, None)
+
+
+class LogisticPredictionHook(tf.train.SessionRunHook):
+    """
+    Makes predictions based on the learnt embeddings for
+    a target label of choice. Embeddings for train and
+    test set should be stored in to different folders.
+    """
+    def __init__(self, train_folder, test_folder, streamer,
+                 model_save_path, out_dir, epoch, target_label):
+        """
+        Args:
+            - train_folder: folder containing train embeddings
+            - test_folder: folder containing test embeddings
+            - streamer: used to retrieve target labels
+            - model_save_path: sumatra folder
+            - out_dir: folder containing produced files that should
+              not be tracked by sumatra
+            - epoch: i-th epoch
+            - target_label: label we want to predict
+        """
+        self.train_folder = train_folder
+        self.test_folder = test_folder
+        self.model_save_path = model_save_path
+        smt_label = os.path.split(model_save_path)[-1]
+        self.out_dir = os.path.join(
+            out_dir,
+            smt_label,
+            "predictions_" + str(epoch)
+        )
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
+        self.streamer = streamer
+        self.target_label = target_label
+
+    def load_data(self, folder):
+        vecs = []
+        labels = []
+        for f in os.listdir(folder):
+            p = os.path.join(folder, f)
+            x = np.load(p)
+            vecs.append(x)
+            # Retrieve label
+            file_name = f.split("_")[0]
+            label = self.streamer.get_meta_info_by_key(
+                file_name, self.target_label
+            )
+            labels.append(int(label))
+
+        return np.array(vecs), np.array(labels)
+
+    def evaluate(self, est, X_train, y_train, X_test, y_test):
+        name = est.__class__.__name__
+        est.fit(X_train, y_train)
+        preds = est.predict(X_test)
+        scores = []
+        self.funcs = [
+            accuracy_score,
+            recall_score,
+            specificity_score,
+            f1_score
+        ]
+        for f in self.funcs:
+            sc = f(y_test, preds)
+            scores.append(round(sc, 4))
+
+        balanced = est.get_params()["class_weight"]
+        row = [name, balanced] + scores
+        self.rows.append(row)
+
+    def end(self, session):
+        # Make predictions using logistic regression
+        # Assumes labels are retrievable by image label
+        X_train, y_train = self.load_data(self.train_folder)
+        X_test, y_test = self.load_data(self.test_folder)
+
+        ests = [
+            LogisticRegression(class_weight='balanced'),
+            LogisticRegression()
+        ]
+
+        self.rows = []
+        for est in ests:
+            self.evaluate(est, X_train, y_train, X_test, y_test)
+
+        func_names = [f.__name__.split("_")[0] for f in self.funcs]
+        self.df = pd.DataFrame(
+            data=np.array(self.rows),
+            columns=["Est", "para"] + func_names
+        )
+
+        self.df.to_csv(self.out_dir + "/" + "scores.csv", index=False)
+        self.df.to_latex(self.out_dir + "/" + "scores.tex", index=False)
 
 
 class ICCHook(tf.train.SessionRunHook):

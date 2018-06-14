@@ -18,7 +18,7 @@ from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
 from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
-    SumatraLoggingHook
+    SumatraLoggingHook, LogisticPredictionHook
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -371,13 +371,25 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         hidden_1_hook_train, hidden_1_hook_test = \
             self.get_batch_dump_hook(hidden_1, features["file_name_1"])
 
+        train_feature_folder = hidden_0_hook_train.get_feature_folder_path()
+        test_feature_folder = hidden_0_hook_test.get_feature_folder_path() 
         robustness_hook_train = self.get_robusntess_analysis_hook(
-            feature_folder=hidden_0_hook_train.get_feature_folder_path(),
+            feature_folder=train_feature_folder,
             train=True
         )
         robustness_hook_test = self.get_robusntess_analysis_hook(
-            feature_folder=hidden_0_hook_test.get_feature_folder_path(),
+            feature_folder=test_feature_folder,
             train=False
+        )
+
+        prediction_hook = LogisticPredictionHook(
+            train_folder=train_feature_folder,
+            test_folder=test_feature_folder,
+            streamer=self.streamer,
+            model_save_path=self.save_path,
+            out_dir=self.data_params["dump_out_dir"],
+            epoch=self.current_epoch,
+            target_label="healthy"
         )
 
         # log embedding loss
@@ -396,7 +408,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
                 training_hooks=[
                     hidden_0_hook_train,
                     hidden_1_hook_train,
-                    robustness_hook_train
+                    #robustness_hook_train
                 ]
             )
 
@@ -406,8 +418,9 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             evaluation_hooks=[
                 hidden_0_hook_test,
                 hidden_1_hook_test,
-                robustness_hook_test,
-                log_hook
+                #robustness_hook_test,
+                log_hook,
+                prediction_hook
             ]
         )
 
