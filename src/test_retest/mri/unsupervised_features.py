@@ -20,6 +20,9 @@ from src.test_retest.non_linear_estimator import name_to_hidden_regularization
 from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
     SumatraLoggingHook, LogisticPredictionHook
 
+from .model_components import MultiLayerPairEncoder
+from .model_components import MultiLayerPairDecoder
+
 
 class PyRadiomicsFeatures(DataTransformer):
     def __init__(self, streamer):
@@ -229,83 +232,25 @@ class PCAAutoEncoder(EvaluateEpochsBaseTF):
 
 
 class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
-    def normalize_single_image(self, im):
-        mean, var = tf.nn.moments(im, axes=[0])
-        std = tf.sqrt(var)
-        std += 0.001
-        return (im - mean) / std
-
-    def normalize_image_batch(self, batch, voxel_means, voxel_stds):
-        # normalize every image
-        batch = tf.map_fn(
-            self.normalize_single_image,
-            batch
-        )
-
-        # voxel normalization computed across train set
-        batch = (batch - voxel_means) / voxel_stds
-
-        # normalize every image
-        batch = tf.map_fn(
-            self.normalize_single_image,
-            batch
-        )
-
-        return batch
-
     def model_fn(self, features, labels, mode, params):
-        input_dim = params["input_dim"]
-        x_0 = tf.reshape(
-            features["X_0"],
-            [-1, input_dim]
-        )
-        x_1 = tf.reshape(
-            features["X_1"],
-            [-1, input_dim]
+        encoder = MultiLayerPairEncoder(
+            features=features,
+            params=params,
+            streamer=self.streamer
         )
 
-        if params["normalize_images"]:
-            voxel_means = tf.constant(
-                self.streamer.get_voxel_means(),
-                dtype=x_0.dtype
-            )
-            voxel_means = tf.reshape(voxel_means, [-1, input_dim])
-
-            voxel_stds = tf.constant(
-                self.streamer.get_voxel_stds(),
-                dtype=x_0.dtype
-            )
-            voxel_stds = tf.reshape(voxel_stds, [-1, input_dim])
-
-            x_0 = self.normalize_image_batch(x_0, voxel_means, voxel_stds)
-            x_1 = self.normalize_image_batch(x_1, voxel_means, voxel_stds)
-
-        hidden_dim = params["hidden_dim"]
-        w = tf.get_variable(
-            name="weights",
-            shape=[input_dim, hidden_dim],
-            dtype=x_0.dtype,
-            initializer=tf.contrib.layers.xavier_initializer(seed=43)
+        decoder = MultiLayerPairDecoder(
+            features=features,
+            params=params,
+            encoder=encoder
         )
 
-        hidden_0 = tf.matmul(x_0, w, name="hidden_rep_0")
-        hidden_1 = tf.matmul(x_1, w, name="hidden_rep_1")
-
-        rec_0 = tf.matmul(
-            hidden_0,
-            tf.transpose(w),
-            name="reconstruction_0"
-        )
-
-        rec_1 = tf.matmul(
-            hidden_1,
-            tf.transpose(w),
-            name="reconstruction_1"
-        )
+        hidden_0, hidden_1 = encoder.get_encodings()
+        rec_0, rec_1 = decoder.get_nodes()
 
         predictions = {
-            "hidden_rep": hidden_0,
-            "reconstruction": rec_0
+            "encoding": hidden_0,
+            "decoding": rec_0
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -315,56 +260,14 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             )
 
         # Compute loss
-        # loss = tf.reduce_sum(tf.square(input_mri - reconstruction))
-        if params["asymmetric"]:
-            loss_0 = tf.losses.mean_squared_error(x_0, rec_1)
-            loss_1 = tf.losses.mean_squared_error(x_1, rec_0)
-        else:
-            loss_0 = tf.losses.mean_squared_error(x_0, rec_0)
-            loss_1 = tf.losses.mean_squared_error(x_1, rec_1)
-        reconstruction_loss = loss_0 / 2 + loss_1 / 2
-
-        # Regularization
-        to_reg_0 = hidden_0
-        to_reg_1 = hidden_1
-        diagnose_dim = params["diagnose_dim"]
-        if diagnose_dim > 0:
-            patient_dim = hidden_dim - diagnose_dim
-            patient_encs_0, diag_encs_0 = tf.split(
-                hidden_0,
-                [patient_dim, diagnose_dim],
-                axis=1
-            )
-
-            patient_encs_1, diag_encs_1 = tf.split(
-                hidden_1,
-                [patient_dim, diagnose_dim],
-                axis=1
-            )
-
-            to_reg_0 = diag_encs_0
-            to_reg_1 = diag_encs_1
-
-        reg_loss = tf.constant(0, dtype=tf.int32, shape=None)
-        reg_lambda = params["hidden_lambda"]
-        if reg_lambda != 0:
-            reg_name = params["hidden_regularizer"]
-            reg_loss = name_to_hidden_regularization(
-                0,
-                reg_name,
-                to_reg_0,
-                to_reg_1
-            )
-            reg_loss *= reg_lambda
-
-        reg_loss = tf.cast(reg_loss, reconstruction_loss.dtype)
-        loss = reconstruction_loss + reg_loss
+        reg_loss = decoder.get_regularization_loss()
+        reconstruction_loss = decoder.get_reconstruction_loss()
+        loss = decoder.get_total_loss()
 
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
-
 
         # Set up hooks
         train_hooks = []
