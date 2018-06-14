@@ -365,63 +365,81 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         )
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
-        hidden_0_hook_train, hidden_0_hook_test = \
-            self.get_batch_dump_hook(hidden_0, features["file_name_0"])
 
-        hidden_1_hook_train, hidden_1_hook_test = \
-            self.get_batch_dump_hook(hidden_1, features["file_name_1"])
+        # Set up hooks
+        train_hooks = []
+        eval_hooks = []
 
-        train_feature_folder = hidden_0_hook_train.get_feature_folder_path()
-        test_feature_folder = hidden_0_hook_test.get_feature_folder_path() 
-        robustness_hook_train = self.get_robusntess_analysis_hook(
-            feature_folder=train_feature_folder,
-            train=True
-        )
-        robustness_hook_test = self.get_robusntess_analysis_hook(
-            feature_folder=test_feature_folder,
-            train=False
-        )
+        train_hook_names = params["train_hooks"]
+        eval_hook_names = params["eval_hooks"]
 
-        prediction_hook = LogisticPredictionHook(
-            train_folder=train_feature_folder,
-            test_folder=test_feature_folder,
-            streamer=self.streamer,
-            model_save_path=self.save_path,
-            out_dir=self.data_params["dump_out_dir"],
-            epoch=self.current_epoch,
-            target_label="healthy"
-        )
+        if "embeddings" in train_hook_names:
+            hidden_0_hook_train, hidden_0_hook_test = \
+                self.get_batch_dump_hook(hidden_0, features["file_name_0"])
+            train_hooks.append(hidden_0_hook_train)
+            eval_hooks.append(hidden_0_hook_test)
+
+            hidden_1_hook_train, hidden_1_hook_test = \
+                self.get_batch_dump_hook(hidden_1, features["file_name_1"])
+            train_hooks.append(hidden_1_hook_train)
+            eval_hooks.append(hidden_1_hook_test)
+
+            train_feature_folder = hidden_0_hook_train.get_feature_folder_path()
+            test_feature_folder = hidden_0_hook_test.get_feature_folder_path()
+
+        if "robustness" in train_hook_names:
+            robustness_hook_train = self.get_robusntess_analysis_hook(
+                feature_folder=train_feature_folder,
+                train=True
+            )
+            robustness_hook_test = self.get_robusntess_analysis_hook(
+                feature_folder=test_feature_folder,
+                train=False
+            )
+            train_hooks.append(robustness_hook_train)
+            eval_hooks.append(robustness_hook_test)
+
+        if "predictions" in eval_hook_names:
+            prediction_hook = LogisticPredictionHook(
+                train_folder=train_feature_folder,
+                test_folder=test_feature_folder,
+                streamer=self.streamer,
+                model_save_path=self.save_path,
+                out_dir=self.data_params["dump_out_dir"],
+                epoch=self.current_epoch,
+                target_label="healthy"
+            )
+            eval_hooks.append(prediction_hook)
 
         # log embedding loss
-        log_hook = SumatraLoggingHook(
+        log_hook_train = SumatraLoggingHook(
+            ops=[reg_loss, reconstruction_loss],
+            names=["hidden_reg_loss", "reconstruction_loss"],
+            logger=self.metric_logger,
+            namespace="train"
+        )
+        train_hooks.append(log_hook_train)
+
+        log_hook_test = SumatraLoggingHook(
             ops=[reg_loss, reconstruction_loss],
             names=["hidden_reg_loss", "reconstruction_loss"],
             logger=self.metric_logger,
             namespace="test"
         )
+        eval_hooks.append(log_hook_test)
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                training_hooks=[
-                    hidden_0_hook_train,
-                    hidden_1_hook_train,
-                    #robustness_hook_train
-                ]
+                training_hooks=train_hooks
             )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            evaluation_hooks=[
-                hidden_0_hook_test,
-                hidden_1_hook_test,
-                #robustness_hook_test,
-                log_hook,
-                prediction_hook
-            ]
+            evaluation_hooks=eval_hooks
         )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):

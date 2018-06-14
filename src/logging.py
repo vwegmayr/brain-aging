@@ -26,7 +26,7 @@ class MetricLogger(object):
             n = len(self.metrics[k])
             det = {
                 "x_label": "i-th evaluation",
-                "x": list(range(1, n)),
+                "x": list(range(1, n + 1)),
                 "y": self.metrics[k]
             }
             metrics[k] = det
