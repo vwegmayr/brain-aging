@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import itertools
 from time import process_time
 from collections import OrderedDict
+import os
 
 from .base import FileStream
 from .base import Group
@@ -146,6 +147,15 @@ class MRISingleStream(FileStream, MRIImageLoader):
             std = 1
         im = (im - np.mean(im)) / std
         return im
+
+    def dump_normalization(self, outdir):
+        if self.normalization_computed and self.normalize_images:
+            np.savez_compressed(
+                os.path.join(outdir, "normalization"),
+                mean=self.voxel_means,
+                std=self.voxel_stds
+            )
+
 
     def load_raw_sample(self, file_path):
         im = self.load_image(file_path)

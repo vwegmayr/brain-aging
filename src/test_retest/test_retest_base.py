@@ -309,6 +309,7 @@ class EvaluateEpochsBaseTF(BaseTF):
     def fit_main_training_loop(self, X, y):
         if self.streamer is not None:
             self.streamer.dump_split(self.save_path)
+            self.streamer.dump_normalization(self.save_path)
 
         n_epochs = self.input_fn_config["num_epochs"]
         self.input_fn_config["num_epochs"] = 1

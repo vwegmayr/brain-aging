@@ -173,6 +173,9 @@ class FileStream(abc.ABC):
         self.dump_groups(outfolder, True, sep)
         self.dump_groups(outfolder, False, sep)
 
+    def dump_normalization(self, outfolder):
+        pass
+
     def get_data_source_by_name(self, name):
         return self.name_to_data_source[name]
 
