@@ -213,7 +213,7 @@ def linear_trafo(X, out_dim, names, types=[tf.float32, tf.float32]):
         name=names[1],
         shape=[1, out_dim],
         dtype=types[1],
-        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+        initializer=tf.initializers.zeros
     )
 
     Y = tf.add(
@@ -251,7 +251,7 @@ def linear_trafo_multiple_input_tensors(Xs, out_dim, weight_names,
     b = tf.get_variable(
         name=weight_names[1],
         shape=[1, out_dim],
-        initializer=tf.contrib.layers.xavier_initializer(seed=43)
+        initializer=tf.initializers.zeros
     )
 
     Ys = []

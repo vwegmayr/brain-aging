@@ -39,8 +39,7 @@ class FileStream(abc.ABC):
             ].feature_info
 
         if self.seed is not None:
-            np.random.seed(self.seed)
-            self.np_random = np.random
+            self.np_random = np.random.RandomState(seed=self.seed)
 
         # Parse meta information
         self.file_id_to_meta = self.parse_meta_csv()
