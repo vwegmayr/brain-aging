@@ -8,7 +8,9 @@ params:
     train_ratio: 1
     n_pairs: 10
     max_train_pairs: 600
+    normalize_images: False
     train_ratio: 0.8
+    silent: True
     balanced_labels:
       - healthy
       - health_ad

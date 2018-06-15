@@ -8,6 +8,8 @@ from src.data.streaming.mri_streaming import \
 import subprocess
 import numpy as np
 
+N_RUNS = 10
+
 
 def str_to_module(s):
     mod_name = ".".join(s.split(".")[:-1])
@@ -58,12 +60,14 @@ class TestReproducibility(unittest.TestCase):
     def reproducibility_within_run(self):
         streamer = create_object(self.config)
         self.assertTrue(streamer is not None)
+        print(streamer.__class__)
 
         i_train_groups = [g for g in streamer.groups if g.is_train]
         i_test_groups = [g for g in streamer.groups if not g.is_train]
 
         # Should always produce the same split and groups
-        for i in range(5):
+        for i in range(N_RUNS):
+            print(">>>> run {}".format(i + 1))
             streamer = create_object(self.config)
             self.assertTrue(streamer is not None)
 
@@ -126,6 +130,49 @@ class TestImageNormalization(unittest.TestCase):
     def test_normalization_all_images(self):
         self.config["params"]["stream_config"]["train_ratio"] = 1
         create_object(self.config)
+
+
+class TestBatchOrder(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_streamer.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def groups_are_equal(self, groups_1, groups_2):
+        self.assertEqual(len(groups_1), len(groups_2))
+        for g1, g2 in zip(groups_1, groups_2):
+            fids1 = g1.file_ids
+            fids2 = g2.file_ids
+            self.assertEqual(len(fids1), len(fids2))
+            for f1, f2 in zip(fids1, fids2):
+                self.assertEqual(f1, f2)
+
+    def reproducible_batches(self):
+        streamer = create_object(self.config)
+        self.assertTrue(streamer is not None)
+
+        batches = streamer.get_batches(train=True)
+        i_train_groups = [g for b in batches for g in b]
+        batches = streamer.get_batches(train=False)
+        i_test_groups = [g for b in batches for g in b]
+
+        # Should always produce the same split and groups
+        for i in range(N_RUNS):
+            streamer = create_object(self.config)
+            self.assertTrue(streamer is not None)
+
+            batches = streamer.get_batches(train=True)
+            train_groups = [g for b in batches for g in b]
+            batches = streamer.get_batches(train=False)
+            test_groups = [g for b in batches for g in b]
+
+            self.groups_are_equal(i_train_groups, train_groups)
+            self.groups_are_equal(i_test_groups, test_groups)
+
+    def test_mri_single_stream(self):
+        self.config["class"] = qualified_path(MRISingleStream)
+        self.reproducible_batches()
 
 
 if __name__ == "__main__":

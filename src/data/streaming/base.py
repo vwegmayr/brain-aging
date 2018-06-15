@@ -215,7 +215,7 @@ class FileStream(abc.ABC):
     def print_stats(self, groups):
         group_size = len(self.groups[0].file_ids)
 
-        dignosis_count = {}
+        dignosis_count = OrderedDict()
         ages = []
         age_diffs = []
         for group in groups:

@@ -308,6 +308,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
             train_patients = train_patients.union(set([patient]))
 
         # Sort by age, then image_label
+        train_patients = sorted(list(train_patients))
         for patient_label in train_patients:
             ids = patient_to_file_ids[patient_label]
             id_with_age = list(map(
@@ -597,6 +598,34 @@ class MRIDiagnosePairStream(MRISingleStream):
     def group_data(self):
         self.start_time = process_time()
         n_pairs = self.config["n_pairs"]
+        n_train_pairs = int(self.config["train_ratio"] * n_pairs)
+
+        # Make balanced split
+        self.groups = self.make_one_sample_groups()
+        self.make_balanced_train_test_split()
+
+        # Collect train and test patients
+        train_files = [g.file_ids[0] for g in self.groups
+                       if g.is_train == True]
+        test_files = [g.file_ids[0] for g in self.groups
+                      if g.is_train == False]
+
+        train_labels = []
+        for fid in train_files:
+            label = self.get_patient_label(fid)
+            train_labels.append(label)
+        train_labels = set(train_labels)
+
+        test_labels = []
+        for fid in test_files:
+            label = self.get_patient_label(fid)
+            test_labels.append(label)
+        test_labels = set(test_labels)
+
+        assert len(train_labels.intersection(test_labels)) == 0
+
+        self.groups = None
+        # Make arbitrary test 
         groups = []
 
         patient_to_file_ids = self.get_patient_to_file_ids_mapping()
@@ -618,19 +647,6 @@ class MRIDiagnosePairStream(MRISingleStream):
         assert len(diagnoses_to_sample) == 2
         self.config["same_diagnosis"] = \
             (diagnoses_to_sample[0] == diagnoses_to_sample[1])
-        # collect patient labels
-        patient_labels = set([])
-        for d in diagnoses_to_sample:
-            labels = set(diag_to_patient[d].keys())
-            patient_labels = patient_labels.union(labels)
-
-        # prepare train-test split
-        patient_labels = sorted(list(patient_labels))
-        n_patients = len(patient_labels)
-        n_train = int(self.config["train_ratio"] * n_patients)
-        n_train_pairs = int(self.config["train_ratio"] * n_pairs)
-        train_labels = patient_labels[:n_train]
-        test_labels = patient_labels[n_train:]
 
         def check_time():
             delta_t = process_time() - self.start_time
@@ -702,6 +718,12 @@ class MRIDiagnosePairStream(MRISingleStream):
             age2 = self.get_age(p[1])
             if age1 > age2:
                 p = p[::-1]
+
+            if i < n_train_pairs:
+                p = tuple([p[0], p[1], True])
+            else:
+                p = tuple([p[0], p[1], False])
+
             return p
 
         sampled = set([])
@@ -725,7 +747,7 @@ class MRIDiagnosePairStream(MRISingleStream):
             id1 = lll[0]
             id2 = lll[1]
             groups.append(Group([id1, id2]))
-            groups[-1].is_train = (i < n_train_pairs)
+            groups[-1].is_train = lll[2]
             if self.config["same_diagnosis"]:
                 assert self.get_diagnose(id1) == self.get_diagnose(id2)
             else:
