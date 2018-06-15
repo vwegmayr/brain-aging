@@ -94,7 +94,6 @@ class BatchDumpHook(tf.train.SessionRunHook):
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
-
     def get_feature_folder_path(self):
         return self.out_dir
 

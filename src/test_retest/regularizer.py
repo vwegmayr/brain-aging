@@ -107,7 +107,7 @@ def cosine_similarities(A, B):
 
     similarities = (dot_prods / A_norms) / B_norms
 
-    return similarities
+    return tf.abs(similarities)
 
 
 # Reliability measures for ICC computation
