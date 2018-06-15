@@ -246,6 +246,11 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         )
 
         hidden_0, hidden_1 = encoder.get_encodings()
+
+        # Make sure embedinngs have the correct dimension
+        dim = hidden_0.get_shape().as_list()[-1]
+        assert dim == params["hidden_dim"]
+
         rec_0, rec_1 = decoder.get_nodes()
 
         predictions = {

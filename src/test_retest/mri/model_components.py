@@ -143,7 +143,7 @@ class MultiLayerPairEncoder(Body):
         return [self.w]
 
     def get_encodings(self):
-        return self.x_0, self.x_1
+        return self.enc_0, self.enc_1
 
     def get_nodes(self):
         return self.x_0, self.x_1, self.enc_0, self.enc_1
