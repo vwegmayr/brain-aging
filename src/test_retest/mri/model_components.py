@@ -1,5 +1,7 @@
 import abc
 import tensorflow as tf
+from functools import reduce
+
 from src.test_retest import regularizer
 from src.test_retest.test_retest_base import \
     linear_trafo_multiple_input_tensors
@@ -82,6 +84,25 @@ class Body(abc.ABC):
     @abc.abstractmethod
     def get_nodes(self):
         pass
+
+    def normalize_voxels(self, x):
+        input_dim = self.params["input_dim"]
+        voxel_means = tf.constant(
+            self.streamer.get_voxel_means(),
+            dtype=x.dtype
+        )
+        voxel_means = tf.reshape(voxel_means, [-1, input_dim])
+
+        voxel_stds = tf.constant(
+            self.streamer.get_voxel_stds(),
+            dtype=x.dtype
+        )
+        voxel_stds = tf.reshape(voxel_stds, [-1, input_dim])
+
+        x = tf.reshape(x, [-1, input_dim])
+        x = normalize_image_batch(x, voxel_means, voxel_stds)
+
+        return x
 
 
 class Head(abc.ABC):
@@ -381,3 +402,89 @@ class PairClassificationHead(Head):
 
     def get_nodes(self):
         return self.get_predictions(), self.get_total_loss()
+
+
+class Conv3DEncoder(Body):
+    def construct_graph(self):
+        features = self.features
+        params = self.params
+
+        x = features["X_0"]
+        n_filters = params["n_filters"]
+        filter_sizes = params["filter_sizes"]
+
+        if params["normalize_images"]:
+            x = self.normalize_voxels(x)
+
+        input_shape = params["input_shape"]
+        # Reshape to have one explicit channel
+        x = tf.reshape(
+            x,
+            [-1, input_shape[0], input_shape[1], input_shape[2], 1]
+        )
+
+        current_input = x
+
+        encoder = []
+        shapes = []
+        for layer_i, n_output in enumerate(n_filters):
+            # print("layer {}".format(layer_i))
+            n_input = current_input.get_shape().as_list()[4]
+            shapes.append(current_input.get_shape().as_list())
+            W_shape = [
+                filter_sizes[layer_i],
+                filter_sizes[layer_i],
+                filter_sizes[layer_i],
+                n_input,
+                n_output
+            ]
+            W = tf.get_variable(
+                name="filters_layer_" + str(layer_i),
+                shape=W_shape,
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            b = tf.get_variable(
+                name="bias_layer_" + str(layer_i),
+                shape=[n_output],
+                initializer=tf.initializers.zeros
+            )
+
+            encoder.append(W)
+            output = tf.nn.relu(
+                tf.add(
+                    tf.nn.conv3d(
+                        current_input, W, strides=[1, 2, 2, 2, 1], padding='SAME'
+                    ),
+                    b
+                )
+            )
+            current_input = output
+
+        self.z = current_input
+
+        dim_list = current_input.get_shape().as_list()[1:]
+        cur_dim = reduce(lambda x, y: x * y, dim_list)
+
+        if cur_dim > params["encoding_dim"]:
+            # print("Non conv layer needed")
+            current_input = tf.contrib.layers.flatten(current_input)
+            W = tf.get_variable(
+                "non_conv_w",
+                shape=[cur_dim, params["encoding_dim"]],
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            b = tf.get_variable(
+                "non_conv_b",
+                shape=[1, params["encoding_dim"]],
+                initializer=tf.initializers.zeros
+            )
+
+            current_input = tf.add(
+                tf.nn.relu(tf.matmul(current_input, W)),
+                b
+            )
+
+            self.z = current_input
+
+    def get_encoding(self):
+        return self.z
