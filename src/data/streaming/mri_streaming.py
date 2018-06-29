@@ -14,6 +14,12 @@ from .base import Group
 def merge_list_of_lists_by_size(l1, l2):
     ll1 = sum([len(e) for e in l1])
     ll2 = sum([len(e) for e in l2])
+
+    if ll2 == 0:
+        return l1
+    elif ll1 == 0:
+        return l2
+
     if ll1 > ll2:
         tmp = l1
         l1 = l2

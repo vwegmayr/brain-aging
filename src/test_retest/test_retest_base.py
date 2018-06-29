@@ -312,6 +312,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.streamer.dump_normalization(self.save_path)
 
         n_epochs = self.input_fn_config["num_epochs"]
+        self.n_epochs = n_epochs
         self.input_fn_config["num_epochs"] = 1
 
         output_dir = self.config["model_dir"]

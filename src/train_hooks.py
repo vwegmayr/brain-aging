@@ -86,6 +86,14 @@ class HookFactory(object):
         )
         return hook
 
+    def get_file_summarizer_hook(self, folder_prefixes):
+        hook = FileSummarizer(
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            folder_prefixes=folder_prefixes
+        )
+        return hook
+
 
 class CollectValuesHook(tf.train.SessionRunHook):
     """
@@ -151,6 +159,88 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
         )
 
         np.save(out_file, self.confusion.astype(int))
+
+
+class FileSummarizer(tf.train.SessionRunHook):
+    def __init__(self, model_save_path, out_dir,
+                 folder_prefixes):
+        self.model_save_path = model_save_path
+        self.smt_label = os.path.split(model_save_path)[-1]     
+
+        self.intput_dir = os.path.join(
+            out_dir,
+            self.smt_label
+        )
+        self.out_dir = os.path.join(
+            out_dir,
+            self.smt_label,
+            "summary"
+        )
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+        self.folder_prefixes = folder_prefixes
+
+    def process_json_files(self, fname, file_paths):
+        dic = {}
+        for p in file_paths:
+            with open(p, 'r') as f:
+                cur = json.load(f)
+
+            for k in cur:
+                if k not in dic:
+                    dic[k] = []
+                dic[k].append(cur[k])
+
+        with open(os.path.join(self.out_dir, fname + ".json"), 'w') as f:
+            json.dump(dic, f, indent=2)
+
+    def process_csv_files(self, fname, file_paths):
+        combined_csv = pd.concat([pd.read_csv(f) for f in file_paths])
+        combined_csv.to_csv(
+            os.path.join(self.out_dir, fname + ".csv"),
+            index=False
+        )
+
+    def process(self, folder_prefix):
+        # collect folders
+        file_groups = {}
+        names = os.listdir(self.intput_dir)
+        names = sorted(names)
+        for f in names:
+            p = os.path.join(
+                self.intput_dir,
+                f
+            )
+            if f.startswith(folder_prefix) and os.path.isdir(p):
+                for file_name in os.listdir(p):
+                    s = file_name.split(".")[0]
+                    t = file_name.split(".")[-1]
+                    if t not in [".tex", ".csv"]:
+                        continue
+                    if s not in file_groups:
+                        file_groups[s] = []
+                    file_path = os.path.join(
+                        p,
+                        file_name
+                    )
+
+                    file_groups[s].append(file_path)
+
+        for fname, file_paths in file_groups.items():
+            if len(file_paths) <= 1:
+                continue
+
+            # Determine type
+            p = file_paths[0]
+            t = p.split(".")[-1]
+            if t == "json":
+                self.process_json_files(fname, file_paths)
+            elif t == "csv":
+                self.process_csv_files(fname, file_paths)
+
+    def end(self, session):
+        for p in self.folder_prefixes:
+            self.process(p)
 
 
 class BatchDumpHook(tf.train.SessionRunHook):

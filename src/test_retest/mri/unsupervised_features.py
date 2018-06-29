@@ -348,6 +348,11 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         )
         eval_hooks.append(log_hook_test)
 
+        if self.current_epoch == self.n_epochs - 1:
+            eval_hooks.append(hook_factory.get_file_summarizer_hook(
+                ["prediction_robustness", "predictions"]
+            ))
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
