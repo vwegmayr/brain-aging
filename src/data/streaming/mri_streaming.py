@@ -5,6 +5,7 @@ import itertools
 from time import process_time
 from collections import OrderedDict
 import os
+import copy
 
 from .base import FileStream
 from .base import Group

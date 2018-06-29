@@ -166,3 +166,13 @@ def pearsonr(Y):
 
     r, p = sp_pearson(Y[:, 0], Y[:, 1])
     return wrap_nan(r)
+
+
+def equal_pairs(Y):
+    n = len(Y)
+    return np.sum(Y[:, 0] == Y[:, 1]) / n
+
+
+def not_equal_pairs(Y):
+    n = len(Y)
+    return np.sum(Y[:, 0] != Y[:, 1]) / n

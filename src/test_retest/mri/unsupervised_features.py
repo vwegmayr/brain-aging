@@ -18,7 +18,8 @@ from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
 from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
-    SumatraLoggingHook, LogisticPredictionHook
+    SumatraLoggingHook, LogisticPredictionHook, PredictionRobustnessHook
+from src.train_hooks import HookFactory
 
 from .model_components import MultiLayerPairEncoder
 from .model_components import MultiLayerPairDecoder
@@ -281,14 +282,26 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         train_hook_names = params["train_hooks"]
         eval_hook_names = params["eval_hooks"]
 
+        hook_factory = HookFactory(
+            streamer=self.streamer,
+            logger=self.metric_logger,
+            out_dir=self.data_params["dump_out_dir"],
+            model_save_path=self.save_path,
+            epoch=self.current_epoch
+        )
+
         if "embeddings" in train_hook_names:
             hidden_0_hook_train, hidden_0_hook_test = \
-                self.get_batch_dump_hook(hidden_0, features["file_name_0"])
+                hook_factory.get_batch_dump_hook(
+                    hidden_0, features["file_name_0"]
+                )
             train_hooks.append(hidden_0_hook_train)
             eval_hooks.append(hidden_0_hook_test)
 
             hidden_1_hook_train, hidden_1_hook_test = \
-                self.get_batch_dump_hook(hidden_1, features["file_name_1"])
+                hook_factory.get_batch_dump_hook(
+                    hidden_1, features["file_name_1"]
+                )
             train_hooks.append(hidden_1_hook_train)
             eval_hooks.append(hidden_1_hook_test)
 
@@ -308,17 +321,15 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             eval_hooks.append(robustness_hook_test)
 
         if "predictions" in eval_hook_names:
-            prediction_hook = LogisticPredictionHook(
-                train_folder=train_feature_folder,
-                test_folder=test_feature_folder,
-                streamer=self.streamer,
-                model_save_path=self.save_path,
-                out_dir=self.data_params["dump_out_dir"],
-                epoch=self.current_epoch,
-                target_label="healthy",
-                logger=self.metric_logger
+            prediction_hook = hook_factory.get_logistic_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                target_label="healthy"
             )
             eval_hooks.append(prediction_hook)
+
+            pred_robustness_hook = hook_factory.get_prediction_robustness_hook()
+            eval_hooks.append(pred_robustness_hook)
 
         # log embedding loss
         log_hook_train = SumatraLoggingHook(

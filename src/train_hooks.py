@@ -6,10 +6,85 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, recall_score
 import pandas as pd
+import csv
 
 
+from src.test_retest import numpy_utils
 from src.test_retest.metrics import specificity_score
 from src.test_retest.mri.feature_analysis import RobustnessMeasureComputation
+
+
+class HookFactory(object):
+    def __init__(self,
+                 streamer,
+                 logger,
+                 out_dir,
+                 model_save_path,
+                 epoch):
+        self.streamer = streamer
+        self.logger = logger
+        self.out_dir = out_dir
+        self.model_save_path = model_save_path
+        self.epoch = epoch
+
+    def get_batch_dump_hook(self, tensor_val, tensor_name):
+        train_hook = BatchDumpHook(
+            tensor_batch=tensor_val,
+            batch_names=tensor_name,
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            epoch=self.epoch,
+            train=True
+        )
+        test_hook = BatchDumpHook(
+            tensor_batch=tensor_val,
+            batch_names=tensor_name,
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            epoch=self.epoch,
+            train=False
+        )
+        return train_hook, test_hook
+
+    def get_robustness_analysis_hook(self, feature_folder, train,
+                                     streamer_config):
+        hook = RobustnessComputationHook(
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            epoch=self.epoch,
+            train=train,
+            feature_folder=feature_folder,
+            robustness_streamer_config=streamer_config
+        )
+
+        return hook
+
+    def get_logistic_prediction_hook(
+            self,
+            train_feature_folder,
+            test_feature_folder,
+            target_label):
+        hook = LogisticPredictionHook(
+            train_folder=train_feature_folder,
+            test_folder=test_feature_folder,
+            streamer=self.streamer,
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            epoch=self.epoch,
+            target_label=target_label,
+            logger=self.logger
+        )
+
+        return hook
+
+    def get_prediction_robustness_hook(self):
+        hook = PredictionRobustnessHook(
+                epoch=self.epoch,
+                out_dir=self.out_dir,
+                model_save_path=self.model_save_path,
+                streamer=self.streamer
+        )
+        return hook
 
 
 class CollectValuesHook(tf.train.SessionRunHook):
@@ -70,7 +145,10 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
         # Check how many confusion matrices there are in the folder
         names = os.listdir(self.out_dir)
         count = len(list(filter(lambda x: "confusion" in x, names)))
-        out_file = os.path.join(self.out_dir, "confusion_" + str(count) + ".npy")
+        out_file = os.path.join(
+            self.out_dir,
+            "confusion_" + str(count) + ".npy"
+        )
 
         np.save(out_file, self.confusion.astype(int))
 
@@ -206,6 +284,7 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
     def load_data(self, folder):
         vecs = []
         labels = []
+        image_labels = []
         for f in os.listdir(folder):
             p = os.path.join(folder, f)
             x = np.load(p)
@@ -216,13 +295,54 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
                 file_name, self.target_label
             )
             labels.append(int(label))
+            image_labels.append(file_name)
 
-        return np.array(vecs), np.array(labels)
+        return np.array(vecs), np.array(labels), image_labels
+
+    def dump_predictions(self, image_labels, predictions, pred_id, train):
+        """
+        Dump predictions to csv file.
+        Args:
+            - image_labels: images labels used to identify samples in
+              raw ADNI csv file.
+            - predictions: predicted labels for source images
+            - pred_id: string used to identify the dumped csv file
+            - train: True iff predictions correspond to training data
+        """
+        rows = []
+        for label, pred in zip(image_labels, predictions):
+            rows.append([label, pred])
+
+        if train:
+            pred_id += "_train"
+        else:
+            pred_id += "_test"
+
+        df = pd.DataFrame(
+            data=np.array(rows),
+            columns=["image_label", "prediction"]
+        )
+        df.to_csv(
+            os.path.join(self.out_dir, pred_id + "_predictions.csv"),
+            index=False
+        )
 
     def evaluate(self, est, X_train, y_train, X_test, y_test):
         name = est.__class__.__name__
         est.fit(X_train, y_train)
+        balanced = est.get_params()["class_weight"]
+        if balanced is None:
+            balanced = "not_balanced"
+        else:
+            balanced = "balanced"
+
+        pred_id = name + "_" + balanced
+        preds = est.predict(X_train)
+        self.dump_predictions(self.train_image_labels, preds, pred_id, True)
+
         preds = est.predict(X_test)
+        self.dump_predictions(self.test_image_labels, preds, pred_id, False)
+
         scores = []
         self.funcs = [
             accuracy_score,
@@ -232,22 +352,18 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
         ]
 
         evals = {}
-        balanced = est.get_params()["class_weight"]
-        if balanced is None:
-            balanced = "not_balanced"
-        else:
-            balanced = "balanced"
 
+        # Compute scores
         for f in self.funcs:        
             sc = f(y_test, preds)
             scores.append(round(sc, 4))
-            k = name + "_" + balanced + "_" + f.__name__.split("_")[0]
+            k = pred_id + "_" + f.__name__.split("_")[0]
             evals[k] = sc
 
         row = [name, balanced] + scores
 
+        # Log scores
         if self.logger is not None:
-
             self.logger.add_evaluations(
                 evaluation_dic=evals,
                 namespace="test"
@@ -257,8 +373,10 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
     def end(self, session):
         # Make predictions using logistic regression
         # Assumes labels are retrievable by image label
-        X_train, y_train = self.load_data(self.train_folder)
-        X_test, y_test = self.load_data(self.test_folder)
+        X_train, y_train, self.train_image_labels = \
+            self.load_data(self.train_folder)
+        X_test, y_test, self.test_image_labels = \
+            self.load_data(self.test_folder)
 
         ests = [
             LogisticRegression(class_weight='balanced'),
@@ -277,6 +395,112 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
 
         self.df.to_csv(self.out_dir + "/" + "scores.csv", index=False)
         self.df.to_latex(self.out_dir + "/" + "scores.tex", index=False)
+
+
+class PredictionRobustnessHook(tf.train.SessionRunHook):
+    def __init__(self, epoch, out_dir, model_save_path, streamer):
+        """
+        Analyze robustness of all predictions located
+        in prediction folder. There may be multiple files
+        of multiple tasks and multiple estimators.
+        """
+        self.model_save_path = model_save_path
+        smt_label = os.path.split(model_save_path)[-1]
+        self.input_folder = os.path.join(
+            out_dir,
+            smt_label,
+            "predictions_" + str(epoch)
+        )
+        self.out_dir = os.path.join(
+            out_dir,
+            smt_label,
+            'prediction_robustness_' + str(epoch)
+        )
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
+        self.streamer = streamer
+
+        # Read test pairs dumped by input streamer
+        self.train_pairs = self.read_pairs(train=True)
+        self.test_pairs = self.read_pairs(train=False)
+
+    def read_pairs(self, train):
+        """"
+        Build test-retest pairs.
+        """
+        file_name = "train_groups.csv"
+        if not train:
+            file_name = "test_groups.csv"
+        p = os.path.join(self.model_save_path, file_name)
+        image_labels = []
+        with open(p) as csvfile:
+            reader = csv.reader(csvfile, delimiter='\t')
+            for row in reader:
+                for el in row:
+                    image_label = os.path.split(el)[-1].split("_")[0]
+                    image_labels.append(image_label)
+
+        groups = self.streamer.get_test_retest_pairs(image_labels)
+
+        return [g.file_ids for g in groups]
+
+    def analyze_robustness(self, file_name, predictions):
+        funcs = [
+            numpy_utils.ICC_C1,
+            numpy_utils.ICC_A1,
+            numpy_utils.not_equal_pairs,
+            numpy_utils.equal_pairs
+        ]
+
+        scores = {
+            "n_pairs": len(predictions)
+        }
+        for f in funcs:
+            scores[f.__name__] = f(predictions)
+
+        with open(os.path.join(self.out_dir, file_name + ".json"), 'w') as f:
+            json.dump(scores, f, indent=2)
+
+    def analyze_file(self, file_path):
+        image_label_to_pred = {}
+        with open(file_path) as csvfile:
+            fname = os.path.split(file_path)[-1].split(".")[0]
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                k = row["image_label"]
+                y = row["prediction"]
+                try:
+                    y = int(y)
+                except ValueError:
+                    y = float(y)
+                image_label_to_pred[k] = y
+
+            if "train" in fname:
+                pairs = self.train_pairs
+            elif "test" in fname:
+                pairs = self.test_pairs
+
+            predictions = []
+            for pa in pairs:
+                cur = []
+                for el in pa:
+                    image_label = self.streamer.get_image_label(el)
+                    cur.append(image_label_to_pred[image_label])
+                predictions.append(cur)
+
+            self.analyze_robustness(fname, np.array(predictions))
+
+    def end(self, session):
+        self.input_paths = []
+        for fname in os.listdir(self.input_folder):
+            if not fname.endswith("predictions.csv"):
+                continue
+            p = os.path.join(self.input_folder, fname)
+            self.input_paths.append(p)
+
+        for p in self.input_paths:
+            self.analyze_file(p)
 
 
 class ICCHook(tf.train.SessionRunHook):
@@ -301,7 +525,10 @@ class ICCHook(tf.train.SessionRunHook):
         # Check how many confusion matrices there are in the folder
         names = os.listdir(self.out_dir)
         count = len(list(filter(lambda x: self.icc_name in x, names)))
-        out_file = os.path.join(self.out_dir, self.icc_name + "_" + str(count) + ".npy")
+        out_file = os.path.join(
+            self.out_dir,
+            self.icc_name + "_" + str(count) + ".npy"
+        )
 
         np.save(out_file, X)
 

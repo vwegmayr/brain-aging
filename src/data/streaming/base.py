@@ -259,6 +259,8 @@ class FileStream(abc.ABC):
             print(">>>> {} count: {}".format(diag, c))
 
         s = gender_0 * 1.0 + gender_1
+        if s == 0:
+            s = 0.00001
         print(">>>> Gender 0: {} ({})".format(gender_0, gender_0 / s))
         print(">>>> Gender 1: {} ({})".format(gender_1, gender_1 / s))
         print(">>>>>>>>>>>>>>>>")
@@ -282,6 +284,44 @@ class FileStream(abc.ABC):
                 meta_info[key] = row
 
         return meta_info
+
+    def get_test_retest_pairs(self, image_labels):
+        # Groupy by patient
+        image_labels = sorted(list(set(image_labels)))
+        patient_to_image_labels = OrderedDict()
+        for label in image_labels:
+            patient = self.get_meta_info_by_key(label, "patient_label")
+            if patient not in patient_to_image_labels:
+                patient_to_image_labels[patient] = []
+            patient_to_image_labels[patient].append(label)
+
+        patients = sorted(list(patient_to_image_labels.keys()))
+        groups = []
+        for patient_label in patients:
+            ids = patient_to_image_labels[patient_label]
+            id_with_age = list(map(
+                lambda x: (x, self.file_id_to_meta[x]["age"]),
+                ids
+            ))
+            s = sorted(id_with_age, key=lambda x: (x[1], x[0]))
+
+            # build pairs
+            L = len(s)
+            for i in range(1, L):
+                id_1 = s[i - 1][0]
+                id_2 = s[i][0]
+                diag_1 = self.get_diagnose(id_1)
+                diag_2 = self.get_diagnose(id_2)
+                age_1 = self.get_age(id_1)
+                age_2 = self.get_age(id_2)
+                if (age_1 == age_2) and (diag_1 == diag_2):
+                    assert id_1 != id_2
+                    g = Group([id_1, id_2])
+                    g.is_train = True
+                    g.patient_label = patient_label
+                    groups.append(g)
+
+        return groups
 
     def get_file_path(self, file_id):
         """
