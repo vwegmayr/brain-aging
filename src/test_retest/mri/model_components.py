@@ -29,8 +29,7 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
 
     elif reg_name == regularizer.L2_SQUARED_LABEL:
         return tf.losses.mean_squared_error(
-                    activations_test, activations_retest,
-                    name=str(layer_id) + "_l2_activations"
+                    activations_test, activations_retest
                )
     elif reg_name == regularizer.COSINE_SIMILARITY:
         similarities = regularizer.cosine_similarities(
@@ -453,7 +452,8 @@ class Conv3DEncoder(Body):
             output = tf.nn.relu(
                 tf.add(
                     tf.nn.conv3d(
-                        current_input, W, strides=[1, 2, 2, 2, 1], padding='SAME'
+                        current_input, W, strides=[1, 2, 2, 2, 1],
+                        padding='SAME'
                     ),
                     b
                 )

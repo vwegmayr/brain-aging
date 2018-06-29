@@ -174,7 +174,8 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
     test set should be stored in to different folders.
     """
     def __init__(self, train_folder, test_folder, streamer,
-                 model_save_path, out_dir, epoch, target_label):
+                 model_save_path, out_dir, epoch, target_label,
+                 logger=None):
         """
         Args:
             - train_folder: folder containing train embeddings
@@ -200,6 +201,7 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
 
         self.streamer = streamer
         self.target_label = target_label
+        self.logger = logger
 
     def load_data(self, folder):
         vecs = []
@@ -228,12 +230,28 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
             specificity_score,
             f1_score
         ]
-        for f in self.funcs:
+
+        evals = {}
+        balanced = est.get_params()["class_weight"]
+        if balanced is None:
+            balanced = "not_balanced"
+        else:
+            balanced = "balanced"
+
+        for f in self.funcs:        
             sc = f(y_test, preds)
             scores.append(round(sc, 4))
+            k = name + "_" + balanced + "_" + f.__name__.split("_")[0]
+            evals[k] = sc
 
-        balanced = est.get_params()["class_weight"]
         row = [name, balanced] + scores
+
+        if self.logger is not None:
+
+            self.logger.add_evaluations(
+                evaluation_dic=evals,
+                namespace="test"
+            )
         self.rows.append(row)
 
     def end(self, session):

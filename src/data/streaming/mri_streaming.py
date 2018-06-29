@@ -1,8 +1,6 @@
 import nibabel as nib
 import warnings
-from skimage.transform import resize
 import numpy as np
-import matplotlib.pyplot as plt
 import itertools
 from time import process_time
 from collections import OrderedDict
@@ -155,7 +153,6 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 mean=self.voxel_means,
                 std=self.voxel_stds
             )
-
 
     def load_raw_sample(self, file_path):
         im = self.load_image(file_path)

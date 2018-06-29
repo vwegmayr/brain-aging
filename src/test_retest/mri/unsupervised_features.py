@@ -315,7 +315,8 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
                 model_save_path=self.save_path,
                 out_dir=self.data_params["dump_out_dir"],
                 epoch=self.current_epoch,
-                target_label="healthy"
+                target_label="healthy",
+                logger=self.metric_logger
             )
             eval_hooks.append(prediction_hook)
 
