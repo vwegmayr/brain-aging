@@ -10,6 +10,39 @@ from .base import FileStream
 from .base import Group
 
 
+def merge_list_of_lists_by_size(l1, l2):
+    ll1 = sum([len(e) for e in l1])
+    ll2 = sum([len(e) for e in l2])
+    if ll1 > ll2:
+        tmp = l1
+        l1 = l2
+        l2 = tmp
+
+    ll1 = sum([len(e) for e in l1])
+    ll2 = sum([len(e) for e in l2])
+    r = ll2 / ll1
+
+    l1_p = 0
+    l1_s = 0
+    l2_p = 0
+    l2_s = 0
+    res = []
+    while (l1_p < len(l1) and l2_p < len(l2)):
+        if l2_s < r * l1_s:
+            res.append(l2[l2_p])
+            l2_s += len(l2[l2_p])
+            l2_p += 1
+        else:
+            res.append(l1[l1_p])
+            l1_s += len(l1[l1_p])
+            l1_p += 1
+
+    res.extend(l1[l1_p:])
+    res.extend(l2[l2_p:])
+
+    return res
+
+
 class MRIImageLoader(object):
     def load_image(self, image_path):
         mri_image = nib.load(image_path)
@@ -226,8 +259,22 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 patient_to_groups[patient].append(g)
 
             remaining = list(patient_to_groups.values())
+
             if self.shuffle:
                 self.np_random.shuffle(remaining)
+
+            # balance gender
+            gender_0 = []
+            gender_1 = []
+            for g in remaining:
+                fid = g[0].file_ids[0]
+                gender = self.get_gender(fid)
+                if gender == 0:
+                    gender_0.append(g)
+                elif gender == 1:
+                    gender_1.append(g)
+
+            remaining = merge_list_of_lists_by_size(gender_0, gender_1)
 
             # Compute split index
             split = len(remaining)

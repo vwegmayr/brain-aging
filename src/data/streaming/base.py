@@ -218,6 +218,8 @@ class FileStream(abc.ABC):
         dignosis_count = OrderedDict()
         ages = []
         age_diffs = []
+        gender_0 = 0
+        gender_1 = 0
         for group in groups:
             for fid in group.file_ids:
                 ages.append(self.get_age(fid))
@@ -225,6 +227,12 @@ class FileStream(abc.ABC):
                 if diag not in dignosis_count:
                     dignosis_count[diag] = 0
                 dignosis_count[diag] += 1
+
+                g = self.get_gender(fid)
+                if g == 0:
+                    gender_0 += 1
+                elif g == 1:
+                    gender_1 += 1
 
             if group_size == 1:
                 continue
@@ -241,7 +249,7 @@ class FileStream(abc.ABC):
         print(">>>>>>>>>>>>>>>>")
         if len(ages) > 0:
             print(">>>> Age stats, mean={}, std={}"
-                .format(np.mean(ages), np.std(ages)))
+                  .format(np.mean(ages), np.std(ages)))
 
         if len(age_diffs) > 0:
             print(">>>> Age diffences stats, mean={}, std={}"
@@ -249,6 +257,10 @@ class FileStream(abc.ABC):
 
         for diag, c in dignosis_count.items():
             print(">>>> {} count: {}".format(diag, c))
+
+        s = gender_0 * 1.0 + gender_1
+        print(">>>> Gender 0: {} ({})".format(gender_0, gender_0 / s))
+        print(">>>> Gender 1: {} ({})".format(gender_1, gender_1 / s))
         print(">>>>>>>>>>>>>>>>")
 
     def parse_meta_csv(self):
@@ -298,6 +310,10 @@ class FileStream(abc.ABC):
     def get_age(self, file_id):
         record = self.file_id_to_meta[file_id]
         return record["age"]
+
+    def get_gender(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["sex"]
 
     def get_patient_label(self, file_id):
         record = self.file_id_to_meta[file_id]
