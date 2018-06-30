@@ -21,8 +21,8 @@ from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
     SumatraLoggingHook, PredictionHook, PredictionRobustnessHook
 from src.train_hooks import HookFactory
 
-from .model_components import MultiLayerPairEncoder
-from .model_components import MultiLayerPairDecoder
+from .model_components import MultiLayerPairEncoder, Conv3DEncoder
+from .model_components import MultiLayerPairDecoder, Conv3DDecoder
 
 
 class PyRadiomicsFeatures(DataTransformer):
@@ -524,126 +524,12 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
 
 class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
-        input_shape = params["input_shape"]
-        x = features["X_0"]
+        encoder = Conv3DEncoder(features, params, self.streamer)
+        decoder = Conv3DDecoder(features, params, encoder)
 
-        n_filters = params["n_filters"]
-        filter_sizes = params["filter_sizes"]
-
-        x = tf.reshape(
-            x,
-            [-1, input_shape[0], input_shape[1], input_shape[2], 1]
-        )
-        current_input = x
-
-        # Build the encoder
-        encoder = []
-        shapes = []
-        for layer_i, n_output in enumerate(n_filters):
-            # print("layer {}".format(layer_i))
-            n_input = current_input.get_shape().as_list()[4]
-            shapes.append(current_input.get_shape().as_list())
-            W_shape = [
-                filter_sizes[layer_i],
-                filter_sizes[layer_i],
-                filter_sizes[layer_i],
-                n_input,
-                n_output
-            ]
-            W = tf.get_variable(
-                name="filters_layer_" + str(layer_i),
-                shape=W_shape,
-                initializer=tf.contrib.layers.xavier_initializer(seed=40)
-            )
-            b = tf.get_variable(
-                name="bias_layer_" + str(layer_i),
-                shape=[n_output],
-                initializer=tf.initializers.zeros
-            )
-
-            encoder.append(W)
-            output = tf.nn.relu(
-                tf.add(
-                    tf.nn.conv3d(
-                        current_input, W, strides=[1, 2, 2, 2, 1], padding='SAME'
-                    ),
-                    b
-                )
-            )
-            current_input = output
-
-        z = current_input
-        print("curr {}".format(current_input))
-        # Non-convolutional layer, if encoding size is still to large
-        dim_list = current_input.get_shape().as_list()[1:]
-        cur_dim = reduce(lambda x, y: x * y, dim_list)
-
-        if cur_dim > params["encoding_dim"]:
-            # print("Non conv layer needed")
-            current_input = tf.contrib.layers.flatten(current_input)
-            W = tf.get_variable(
-                "non_conv_w",
-                shape=[cur_dim, params["encoding_dim"]],
-                initializer=tf.contrib.layers.xavier_initializer(seed=40)
-            )
-            b = tf.get_variable(
-                "non_conv_b",
-                shape=[1, params["encoding_dim"]],
-                initializer=tf.initializers.zeros
-            )
-
-            current_input = tf.add(
-                tf.nn.relu(tf.matmul(current_input, W)),
-                b
-            )
-
-            z = current_input
-
-            if not params["tied_weights"]:
-                W = tf.get_variable(
-                    "non_conv_w_dec",
-                    shape=[cur_dim, params["encoding_dim"]],
-                    initializer=tf.contrib.layers.xavier_initializer(seed=40)
-                )
-
-            b = tf.get_variable(
-                "non_conv_b_dec",
-                shape=[1, cur_dim],
-                initializer=tf.initializers.zeros
-            )
-
-            current_input = tf.add(
-                tf.nn.relu(tf.matmul(current_input, tf.transpose(W))),
-                b
-            )
-            # Unflatten
-            current_input = tf.reshape(current_input, [-1] + dim_list)
-
-        encoder.reverse()
-        shapes.reverse()
-        # Build the decoder
-        for layer_i, shape in enumerate(shapes):
-            # deconv
-            W = encoder[layer_i]
-            b = tf.get_variable(
-                name="bias_deconv_layer_" + str(layer_i),
-                shape=W.get_shape().as_list()[3],
-                initializer=tf.initializers.zeros
-            )
-
-            output = tf.nn.relu(
-                tf.add(
-                    tf.nn.conv3d_transpose(
-                        current_input, W,
-                        tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3], shape[4]]),
-                        strides=[1, 2, 2, 2, 1], padding='SAME'
-                    ),
-                    b
-                )
-            )
-            current_input = output
-
-        y = current_input
+        z = encoder.get_encoding()
+        y = decoder.get_reconstruction()
+        x = encoder.get_reconstruction_target()
 
         predictions = {
             "hidden_rep": z,
