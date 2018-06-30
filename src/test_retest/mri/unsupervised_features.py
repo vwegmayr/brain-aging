@@ -18,7 +18,7 @@ from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
 from src.test_retest.non_linear_estimator import name_to_hidden_regularization
 from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
-    SumatraLoggingHook, LogisticPredictionHook, PredictionRobustnessHook
+    SumatraLoggingHook, PredictionHook, PredictionRobustnessHook
 from src.train_hooks import HookFactory
 
 from .model_components import MultiLayerPairEncoder
@@ -321,10 +321,19 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
             eval_hooks.append(robustness_hook_test)
 
         if "predictions" in eval_hook_names:
-            prediction_hook = hook_factory.get_logistic_prediction_hook(
+            prediction_hook = hook_factory.get_prediction_hook(
                 train_feature_folder=train_feature_folder,
                 test_feature_folder=test_feature_folder,
-                target_label="healthy"
+                classify=True,
+                target_label="healthy",
+            )
+            eval_hooks.append(prediction_hook)
+
+            prediction_hook = hook_factory.get_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                classify=False,
+                target_label="age",
             )
             eval_hooks.append(prediction_hook)
 

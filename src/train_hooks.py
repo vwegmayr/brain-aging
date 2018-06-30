@@ -3,8 +3,9 @@ import json
 import tensorflow as tf
 from tensorflow.python.summary import summary as core_summary
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, recall_score
+from sklearn.linear_model import LogisticRegression, Ridge, Lasso
+from sklearn.metrics import accuracy_score, f1_score, recall_score, \
+        mean_squared_error
 import pandas as pd
 import csv
 
@@ -59,12 +60,13 @@ class HookFactory(object):
 
         return hook
 
-    def get_logistic_prediction_hook(
+    def get_prediction_hook(
             self,
             train_feature_folder,
             test_feature_folder,
+            classify,
             target_label):
-        hook = LogisticPredictionHook(
+        hook = PredictionHook(
             train_folder=train_feature_folder,
             test_folder=test_feature_folder,
             streamer=self.streamer,
@@ -72,6 +74,7 @@ class HookFactory(object):
             out_dir=self.out_dir,
             epoch=self.epoch,
             target_label=target_label,
+            classify=classify,
             logger=self.logger
         )
 
@@ -339,7 +342,7 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
         self.analyzer.transform(None, None)
 
 
-class LogisticPredictionHook(tf.train.SessionRunHook):
+class PredictionHook(tf.train.SessionRunHook):
     """
     Makes predictions based on the learnt embeddings for
     a target label of choice. Embeddings for train and
@@ -347,7 +350,7 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
     """
     def __init__(self, train_folder, test_folder, streamer,
                  model_save_path, out_dir, epoch, target_label,
-                 logger=None):
+                 classify, logger=None):
         """
         Args:
             - train_folder: folder containing train embeddings
@@ -358,9 +361,11 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
               not be tracked by sumatra
             - epoch: i-th epoch
             - target_label: label we want to predict
+            - classify: True iff it is a classification task
         """
         self.train_folder = train_folder
         self.test_folder = test_folder
+        self.classify = classify
         self.model_save_path = model_save_path
         smt_label = os.path.split(model_save_path)[-1]
         self.out_dir = os.path.join(
@@ -424,13 +429,17 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
     def evaluate(self, est, X_train, y_train, X_test, y_test):
         name = est.__class__.__name__
         est.fit(X_train, y_train)
-        balanced = est.get_params()["class_weight"]
-        if balanced is None:
-            balanced = "not_balanced"
-        else:
-            balanced = "balanced"
 
-        pred_id = name + "_" + balanced
+        if self.classify:
+            balanced = est.get_params()["class_weight"]
+            if balanced is None:
+                balanced = "_not_balanced"
+            else:
+                balanced = "_balanced"
+        else:
+            balanced = ""
+
+        pred_id = self.target_label + "_" + name + balanced
         preds = est.predict(X_train)
         self.dump_predictions(self.train_image_labels, preds, pred_id, True)
 
@@ -438,17 +447,22 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
         self.dump_predictions(self.test_image_labels, preds, pred_id, False)
 
         scores = []
-        self.funcs = [
-            accuracy_score,
-            recall_score,
-            specificity_score,
-            f1_score
-        ]
+        if self.classify:
+            self.funcs = [
+                accuracy_score,
+                recall_score,
+                specificity_score,
+                f1_score
+            ]
+        else:
+            self.funcs = [
+                mean_squared_error
+            ]
 
         evals = {}
 
         # Compute scores
-        for f in self.funcs:        
+        for f in self.funcs:
             sc = f(y_test, preds)
             scores.append(round(sc, 4))
             k = pred_id + "_" + f.__name__.split("_")[0]
@@ -472,23 +486,35 @@ class LogisticPredictionHook(tf.train.SessionRunHook):
         X_test, y_test, self.test_image_labels = \
             self.load_data(self.test_folder)
 
-        ests = [
-            LogisticRegression(class_weight='balanced'),
-            LogisticRegression()
-        ]
+        if self.classify:
+            ests = [
+                LogisticRegression(class_weight='balanced'),
+                LogisticRegression()
+            ]
+        else:
+            ests = [
+                Ridge(),
+                Lasso(random_state=44)
+            ]
 
         self.rows = []
         for est in ests:
             self.evaluate(est, X_train, y_train, X_test, y_test)
 
-        func_names = [f.__name__.split("_")[0] for f in self.funcs]
+        func_names = ["_".join(f.__name__.split("_")[:-1]) for f in self.funcs]
         self.df = pd.DataFrame(
             data=np.array(self.rows),
             columns=["Est", "para"] + func_names
         )
 
-        self.df.to_csv(self.out_dir + "/" + "scores.csv", index=False)
-        self.df.to_latex(self.out_dir + "/" + "scores.tex", index=False)
+        self.df.to_csv(
+            self.out_dir + "/" + self.target_label + "_" + "scores.csv",
+            index=False
+        )
+        self.df.to_latex(
+            self.out_dir + "/" + self.target_label + "_" + "scores.tex",
+            index=False
+        )
 
 
 class PredictionRobustnessHook(tf.train.SessionRunHook):
