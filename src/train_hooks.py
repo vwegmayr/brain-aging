@@ -163,10 +163,10 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
 
 class FileSummarizer(tf.train.SessionRunHook):
     def __init__(self, model_save_path, out_dir,
-                 folder_prefixes):
+                 folder_prefixes, size_lim=1000):
         self.model_save_path = model_save_path
         self.smt_label = os.path.split(model_save_path)[-1]     
-
+        self.size_lim = size_lim
         self.intput_dir = os.path.join(
             out_dir,
             self.smt_label
@@ -180,7 +180,7 @@ class FileSummarizer(tf.train.SessionRunHook):
             os.makedirs(self.out_dir)
         self.folder_prefixes = folder_prefixes
 
-    def process_json_files(self, fname, file_paths):
+    def process_json_files(self, folder_prefix, fname, file_paths):
         dic = {}
         for p in file_paths:
             with open(p, 'r') as f:
@@ -191,13 +191,17 @@ class FileSummarizer(tf.train.SessionRunHook):
                     dic[k] = []
                 dic[k].append(cur[k])
 
-        with open(os.path.join(self.out_dir, fname + ".json"), 'w') as f:
+        with open(
+                os.path.join(
+                    self.out_dir,
+                    folder_prefix + "_" + fname + ".json"
+                ), 'w') as f:
             json.dump(dic, f, indent=2)
 
-    def process_csv_files(self, fname, file_paths):
+    def process_csv_files(self, folder_prefix, fname, file_paths):
         combined_csv = pd.concat([pd.read_csv(f) for f in file_paths])
         combined_csv.to_csv(
-            os.path.join(self.out_dir, fname + ".csv"),
+            os.path.join(self.out_dir, folder_prefix + "_" + fname + ".csv"),
             index=False
         )
 
@@ -215,7 +219,7 @@ class FileSummarizer(tf.train.SessionRunHook):
                 for file_name in os.listdir(p):
                     s = file_name.split(".")[0]
                     t = file_name.split(".")[-1]
-                    if t not in [".tex", ".csv"]:
+                    if t not in ["json", "csv"]:
                         continue
                     if s not in file_groups:
                         file_groups[s] = []
@@ -223,8 +227,8 @@ class FileSummarizer(tf.train.SessionRunHook):
                         p,
                         file_name
                     )
-
-                    file_groups[s].append(file_path)
+                    if os.path.getsize(file_path) < self.size_lim:
+                        file_groups[s].append(file_path)
 
         for fname, file_paths in file_groups.items():
             if len(file_paths) <= 1:
@@ -234,9 +238,9 @@ class FileSummarizer(tf.train.SessionRunHook):
             p = file_paths[0]
             t = p.split(".")[-1]
             if t == "json":
-                self.process_json_files(fname, file_paths)
+                self.process_json_files(folder_prefix, fname, file_paths)
             elif t == "csv":
-                self.process_csv_files(fname, file_paths)
+                self.process_csv_files(folder_prefix, fname, file_paths)
 
     def end(self, session):
         for p in self.folder_prefixes:
