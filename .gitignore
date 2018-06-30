@@ -17,3 +17,5 @@ produced_data/
 ./*.yaml
 notebooks/*.csv
 notebooks/*.pdf
+generate_configs.py
+run_configs.py
