@@ -301,10 +301,13 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.hooks = hooks
 
         # Initialize streamer
+        # Create a session to lock GPU during initialization
+        sess = tf.Session()
         self.streamer = None
         if streamer is not None:
             _class = streamer["class"]
             self.streamer = _class(**streamer["params"])
+        sess.close()
 
     def fit_main_training_loop(self, X, y):
         if self.streamer is not None:
