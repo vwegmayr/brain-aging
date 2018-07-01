@@ -587,7 +587,7 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
 
         with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
             encoder_1 = Conv3DEncoder(
-                input_key="X_0",
+                input_key="X_1",
                 features=features,
                 params=params,
                 streamer=self.streamer
