@@ -85,7 +85,8 @@ class Body(abc.ABC):
         pass
 
     def normalize_voxels(self, x):
-        input_dim = self.params["input_dim"]
+        input_shape = self.params["input_shape"]
+        input_dim = reduce(lambda a, b: a * b, input_shape)
         voxel_means = tf.constant(
             self.streamer.get_voxel_means(),
             dtype=x.dtype
@@ -404,11 +405,18 @@ class PairClassificationHead(Head):
 
 
 class Conv3DEncoder(Body):
+    def __init__(self, input_key, *args, **kwargs):
+        self.input_key = input_key
+        super(Conv3DEncoder, self).__init__(
+            *args,
+            **kwargs
+        )
+
     def construct_graph(self):
         features = self.features
         params = self.params
 
-        x = features["X_0"]
+        x = features[self.input_key]
         n_filters = params["n_filters"]
         filter_sizes = params["filter_sizes"]
 
@@ -438,6 +446,7 @@ class Conv3DEncoder(Body):
                 n_input,
                 n_output
             ]
+
             W = tf.get_variable(
                 name="filters_layer_" + str(layer_i),
                 shape=W_shape,
@@ -466,9 +475,12 @@ class Conv3DEncoder(Body):
         dim_list = current_input.get_shape().as_list()[1:]
         cur_dim = reduce(lambda x, y: x * y, dim_list)
 
-        """
+        self.linear_trafo = False
         if cur_dim > params["encoding_dim"]:
-            # print("Non conv layer needed")
+            print("Non conv layer needed")
+            self.linear_trafo = True
+            self.dim_before_linear_trafo = cur_dim
+            self.dim_list = dim_list
             current_input = tf.contrib.layers.flatten(current_input)
             W = tf.get_variable(
                 "non_conv_w",
@@ -488,7 +500,6 @@ class Conv3DEncoder(Body):
             )
 
             self.z = current_input
-        """
 
         self.encoder_weights = encoder
         self.encoder_shapes = shapes
@@ -513,43 +524,27 @@ class Conv3DDecoder(Head):
 
     def construct_graph(self):
         params = self.params
-        features = self.features
 
         x = self.encoder.get_reconstruction_target()
         z = self.encoder.get_encoding()
+        encoder_weights = self.encoder.encoder_weights
+        encoder_shapes = self.encoder.encoder_shapes
 
-        #if cur_dim > params["encoding_dim"]:
-            # print("Non conv layer needed")
-        """
-            current_input = tf.contrib.layers.flatten(current_input)
-            W = tf.get_variable(
-                "non_conv_w",
-                shape=[cur_dim, params["encoding_dim"]],
-                initializer=tf.contrib.layers.xavier_initializer(seed=40)
-            )
-            b = tf.get_variable(
-                "non_conv_b",
-                shape=[1, params["encoding_dim"]],
-                initializer=tf.initializers.zeros
-            )
-
-            current_input = tf.add(
-                tf.nn.relu(tf.matmul(current_input, W)),
-                b
-            )
-
-            z = current_input
-
+        current_input = z
+        if self.encoder.linear_trafo:
+            dim = self.encoder.dim_before_linear_trafo
             if not params["tied_weights"]:
                 W = tf.get_variable(
                     "non_conv_w_dec",
-                    shape=[cur_dim, params["encoding_dim"]],
+                    shape=[dim, params["encoding_dim"]],
                     initializer=tf.contrib.layers.xavier_initializer(seed=40)
                 )
+            else:
+                W = encoder_weights[-1]
 
             b = tf.get_variable(
                 "non_conv_b_dec",
-                shape=[1, cur_dim],
+                shape=[1, dim],
                 initializer=tf.initializers.zeros
             )
 
@@ -558,19 +553,16 @@ class Conv3DDecoder(Head):
                 b
             )
             # Unflatten
+            dim_list = self.encoder.dim_list
             current_input = tf.reshape(current_input, [-1] + dim_list)
-        """
+            encoder_weights = encoder_weights[:-1]
 
-        encoder = self.encoder.encoder_weights
-        shapes = self.encoder.encoder_shapes
-
-        current_input = z
-        encoder.reverse()
-        shapes.reverse()
+        encoder_weights.reverse()
+        encoder_shapes.reverse()
         # Build the decoder
-        for layer_i, shape in enumerate(shapes):
+        for layer_i, shape in enumerate(encoder_shapes):
             # deconv
-            W = encoder[layer_i]
+            W = encoder_weights[layer_i]
             b = tf.get_variable(
                 name="bias_deconv_layer_" + str(layer_i),
                 shape=W.get_shape().as_list()[3],
@@ -581,7 +573,8 @@ class Conv3DDecoder(Head):
                 tf.add(
                     tf.nn.conv3d_transpose(
                         current_input, W,
-                        tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3], shape[4]]),
+                        tf.stack([tf.shape(x)[0], shape[1], shape[2],
+                                  shape[3], shape[4]]),
                         strides=[1, 2, 2, 2, 1], padding='SAME'
                     ),
                     b
@@ -590,10 +583,13 @@ class Conv3DDecoder(Head):
             current_input = output
 
         self.y = current_input
+        self.reconstruction_loss = tf.losses.mean_squared_error(x, self.y)
+
+    def get_reconstruction_loss(self):
+        return self.reconstruction_loss
 
     def get_reconstruction(self):
         return self.y
 
     def get_nodes(self):
         return [self.y]
-

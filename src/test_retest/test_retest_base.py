@@ -10,7 +10,7 @@ from src.logging import MetricLogger
 import src.test_retest.regularizer as regularizer
 from src.data.mnist import read as mnist_read
 from src.train_hooks import ConfusionMatrixHook, ICCHook, BatchDumpHook, \
-    RobustnessComputationHook
+    RobustnessComputationHook, HookFactory, SumatraLoggingHook
 
 
 def test_retest_evaluation_spec(
@@ -414,6 +414,100 @@ class EvaluateEpochsBaseTF(BaseTF):
         )
 
         return hook
+
+    def get_mri_ae_hooks(self, reg_loss, rec_loss, enc_0, enc_1, features,
+                         params):
+        # Set up hooks
+        train_hooks = []
+        eval_hooks = []
+
+        train_hook_names = params["train_hooks"]
+        eval_hook_names = params["eval_hooks"]
+
+        hook_factory = HookFactory(
+            streamer=self.streamer,
+            logger=self.metric_logger,
+            out_dir=self.data_params["dump_out_dir"],
+            model_save_path=self.save_path,
+            epoch=self.current_epoch
+        )
+
+        if "embeddings" in train_hook_names:
+            hidden_0_hook_train, hidden_0_hook_test = \
+                hook_factory.get_batch_dump_hook(
+                    enc_0, features["file_name_0"]
+                )
+            train_hooks.append(hidden_0_hook_train)
+            eval_hooks.append(hidden_0_hook_test)
+
+            hidden_1_hook_train, hidden_1_hook_test = \
+                hook_factory.get_batch_dump_hook(
+                    enc_1, features["file_name_1"]
+                )
+            train_hooks.append(hidden_1_hook_train)
+            eval_hooks.append(hidden_1_hook_test)
+
+            train_feature_folder = \
+                hidden_0_hook_train.get_feature_folder_path()
+            test_feature_folder = \
+                hidden_0_hook_test.get_feature_folder_path()
+
+        if "robustness" in train_hook_names:
+            robustness_hook_train = self.get_robusntess_analysis_hook(
+                feature_folder=train_feature_folder,
+                train=True
+            )
+            robustness_hook_test = self.get_robusntess_analysis_hook(
+                feature_folder=test_feature_folder,
+                train=False
+            )
+            train_hooks.append(robustness_hook_train)
+            eval_hooks.append(robustness_hook_test)
+
+        if "predictions" in eval_hook_names:
+            prediction_hook = hook_factory.get_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                classify=True,
+                target_label="healthy",
+            )
+            eval_hooks.append(prediction_hook)
+
+            prediction_hook = hook_factory.get_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                classify=False,
+                target_label="age",
+            )
+            eval_hooks.append(prediction_hook)
+
+            pred_robustness_hook = \
+                hook_factory.get_prediction_robustness_hook()
+            eval_hooks.append(pred_robustness_hook)
+
+        # log embedding loss
+        log_hook_train = SumatraLoggingHook(
+            ops=[reg_loss, rec_loss],
+            names=["hidden_reg_loss", "reconstruction_loss"],
+            logger=self.metric_logger,
+            namespace="train"
+        )
+        train_hooks.append(log_hook_train)
+
+        log_hook_test = SumatraLoggingHook(
+            ops=[reg_loss, rec_loss],
+            names=["hidden_reg_loss", "reconstruction_loss"],
+            logger=self.metric_logger,
+            namespace="test"
+        )
+        eval_hooks.append(log_hook_test)
+
+        if self.current_epoch == self.n_epochs - 1:
+            eval_hooks.append(hook_factory.get_file_summarizer_hook(
+                ["prediction_robustness", "predictions"]
+            ))
+
+        return train_hooks, eval_hooks
 
     def score(self, X, y):
         pass

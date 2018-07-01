@@ -448,8 +448,6 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
             )
             current_input = output
 
-            #current_input = tf.layers.max_pooling2d(current_input, 2, 1)
-
         z = current_input
         encoder.reverse()
         shapes.reverse()
@@ -480,7 +478,8 @@ class Conv2DAutoEncoder(EvaluateEpochsBaseTF):
                 tf.add(
                     tf.nn.conv2d_transpose(
                         current_input, W,
-                        tf.stack([tf.shape(x)[0], shape[1], shape[2], shape[3]]),
+                        tf.stack([tf.shape(x)[0], shape[1],
+                                  shape[2], shape[3]]),
                         strides=[1, 2, 2, 1], padding='SAME'
                     ),
                     b
@@ -531,8 +530,12 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
         y = decoder.get_reconstruction()
         x = encoder.get_reconstruction_target()
 
+        flattened_z = tf.contrib.layers.flatten(z)
+        dim = flattened_z.get_shape().as_list()[-1]
+        assert dim == params["encoding_dim"]
+
         predictions = {
-            "hidden_rep": z,
+            "hidden_rep": flattened_z,
             "reconstruction": y
         }
 
@@ -564,6 +567,92 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
             mode=mode,
             loss=loss,
             evaluation_hooks=[y_hook_test]
+        )
+
+    def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
+        return self.streamer.get_input_fn(train)
+
+
+class Conv3DTupleAE(EvaluateEpochsBaseTF):
+    def model_fn(self, features, labels, mode, params):
+        with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
+            encoder_0 = Conv3DEncoder(
+                input_key="X_0",
+                features=features,
+                params=params,
+                streamer=self.streamer
+            )
+        with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
+            decoder_0 = Conv3DDecoder(features, params, encoder_0)
+
+        with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
+            encoder_1 = Conv3DEncoder(
+                input_key="X_0",
+                features=features,
+                params=params,
+                streamer=self.streamer
+            )
+        with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
+            decoder_1 = Conv3DDecoder(features, params, encoder_1)
+
+        z_0 = encoder_0.get_encoding()
+        y_0 = decoder_0.get_reconstruction()
+        rec_0 = encoder_0.get_reconstruction_target()
+
+        z_1 = encoder_1.get_encoding()
+        y_1 = decoder_1.get_reconstruction()
+        rec_1 = encoder_1.get_reconstruction_target()
+
+        flattened_z_0 = tf.contrib.layers.flatten(z_0)
+        flattened_z_1 = tf.contrib.layers.flatten(z_1)
+        dim = flattened_z_0.get_shape().as_list()[-1]
+        assert dim == params["encoding_dim"]
+
+        predictions = {
+            "encoding": flattened_z_0,
+            "decoding": rec_0
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
+
+        rec_loss_0 = decoder_0.get_reconstruction_loss()
+        rec_loss_1 = decoder_1.get_reconstruction_loss()
+        rec_loss = rec_loss_0 / 2 + rec_loss_1 / 2
+        reg_loss = tf.constant(0, dtype=rec_loss.dtype)
+
+        loss = rec_loss + reg_loss
+
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=params["learning_rate"]
+        )
+
+        train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        train_hooks, eval_hooks = self.get_mri_ae_hooks(
+            reg_loss=reg_loss,
+            rec_loss=rec_loss,
+            enc_0=flattened_z_0,
+            enc_1=flattened_z_1,
+            features=features,
+            params=params
+        )
+
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op,
+                training_hooks=train_hooks
+            )
+
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=loss,
+            evaluation_hooks=eval_hooks
         )
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
