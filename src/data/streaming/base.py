@@ -166,11 +166,22 @@ class FileStream(abc.ABC):
                 f.write(sep.join(fid for fid in g.file_ids))
                 f.write("\n")
 
+    def dump_stats(self, outfolder):
+        self.print_stats(
+            self.get_groups(train=True),
+            os.path.join(outfolder, "train_info.txt")
+        )
+        self.print_stats(
+            self.get_groups(train=False),
+            os.path.join(outfolder, "test_info.txt")
+        )
+
     def dump_split(self, outfolder, sep="\t"):
         # one group per line
         # file IDs are tab separated
         self.dump_groups(outfolder, True, sep)
         self.dump_groups(outfolder, False, sep)
+        self.dump_stats(outfolder)
 
     def dump_normalization(self, outfolder):
         pass
@@ -212,7 +223,7 @@ class FileStream(abc.ABC):
 
         assert len(train_patients.intersection(test_patients)) == 0
 
-    def print_stats(self, groups):
+    def print_stats(self, groups, outfile=None):
         group_size = len(self.groups[0].file_ids)
 
         dignosis_count = OrderedDict()
@@ -246,24 +257,47 @@ class FileStream(abc.ABC):
         age_diffs = np.array(age_diffs)
         ages = np.array(ages)
 
-        print(">>>>>>>>>>>>>>>>")
+        of = None
+        if outfile is not None:
+            of = open(outfile, 'w')
+        else:
+            print(">>>>>>>>>>>>>>>>")
         if len(ages) > 0:
-            print(">>>> Age stats, mean={}, std={}"
-                  .format(np.mean(ages), np.std(ages)))
+            if of is None:
+                print(">>>> Age stats, mean={}, std={}"
+                      .format(np.mean(ages), np.std(ages)))
+            else:
+                of.write("Age stats, mean={}, std={}\n"
+                         .format(np.mean(ages), np.std(ages)))
 
         if len(age_diffs) > 0:
-            print(">>>> Age diffences stats, mean={}, std={}"
-                  .format(np.mean(age_diffs), np.std(age_diffs)))
+            if of is None:
+                print(">>>> Age diffences stats, mean={}, std={}"
+                      .format(np.mean(age_diffs), np.std(age_diffs)))
+            else:
+                of.write("Age diffences stats, mean={}, std={}\n"
+                         .format(np.mean(age_diffs), np.std(age_diffs)))
 
         for diag, c in dignosis_count.items():
-            print(">>>> {} count: {}".format(diag, c))
+            if of is None:
+                print(">>>> {} count: {}".format(diag, c))
+            else:
+                of.write("{} count: {}\n".format(diag, c))
 
         s = gender_0 * 1.0 + gender_1
         if s == 0:
             s = 0.00001
-        print(">>>> Gender 0: {} ({})".format(gender_0, gender_0 / s))
-        print(">>>> Gender 1: {} ({})".format(gender_1, gender_1 / s))
-        print(">>>>>>>>>>>>>>>>")
+        if of is None:
+            print(">>>> Gender 0: {} ({})".format(gender_0, gender_0 / s))
+            print(">>>> Gender 1: {} ({})".format(gender_1, gender_1 / s))
+        else:
+            of.write("Gender 0: {} ({})\n".format(gender_0, gender_0 / s))
+            of.write("Gender 1: {} ({})\n".format(gender_1, gender_1 / s))
+
+        if of is not None:
+            of.close()
+        else:
+            print(">>>>>>>>>>>>>>>>")
 
     def parse_meta_csv(self):
         """

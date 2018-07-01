@@ -85,7 +85,8 @@ class HookFactory(object):
                 epoch=self.epoch,
                 out_dir=self.out_dir,
                 model_save_path=self.model_save_path,
-                streamer=self.streamer
+                streamer=self.streamer,
+                logger=self.logger
         )
         return hook
 
@@ -465,7 +466,7 @@ class PredictionHook(tf.train.SessionRunHook):
         for f in self.funcs:
             sc = f(y_test, preds)
             scores.append(round(sc, 4))
-            k = pred_id + "_" + f.__name__.split("_")[0]
+            k = pred_id + "_" + "_".join(f.__name__.split("_")[:-1])
             evals[k] = sc
 
         row = [name, balanced] + scores
@@ -518,7 +519,7 @@ class PredictionHook(tf.train.SessionRunHook):
 
 
 class PredictionRobustnessHook(tf.train.SessionRunHook):
-    def __init__(self, epoch, out_dir, model_save_path, streamer):
+    def __init__(self, epoch, out_dir, model_save_path, streamer, logger):
         """
         Analyze robustness of all predictions located
         in prediction folder. There may be multiple files
@@ -540,6 +541,7 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
             os.makedirs(self.out_dir)
 
         self.streamer = streamer
+        self.logger = logger
 
         # Read test pairs dumped by input streamer
         self.train_pairs = self.read_pairs(train=True)
@@ -581,6 +583,21 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
 
         with open(os.path.join(self.out_dir, file_name + ".json"), 'w') as f:
             json.dump(scores, f, indent=2)
+
+        eval_dic = {}
+        for k, v in scores.items():
+            if k == "n_pairs":
+                continue
+            eval_dic["prediction_robustness_" + file_name + "_" + k] = v
+
+        if "test" in file_name:
+            namespace = "test"
+        else:
+            namespace = "train"
+        self.logger.add_evaluations(
+            evaluation_dic=eval_dic,
+            namespace=namespace
+        )
 
     def analyze_file(self, file_path):
         image_label_to_pred = {}
