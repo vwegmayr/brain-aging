@@ -9,6 +9,7 @@ def wrap_nan(r, default=0):
     else:
         return r
 
+
 def MS_R(Y):
     n, k = Y.shape
     df = n - 1
@@ -130,6 +131,14 @@ def js_divergence(p, q, eps=0.000001):
     js = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
 
     return js
+
+
+def batch_divergence(batch_p, batch_q, div_fn):
+    divergences = []
+    for i in range(len(batch_p)):
+        d = div_fn(batch_p[i], batch_q[i])
+        divergences.append(d)
+    return divergences
 
 
 # Lin's Concordance Correlation Coefficient

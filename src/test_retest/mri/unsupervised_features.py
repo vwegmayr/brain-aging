@@ -255,6 +255,7 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         rec_0, rec_1 = decoder.get_nodes()
 
         predictions = {
+            "input": encoder.get_nodes()[0],
             "encoding": hidden_0,
             "decoding": rec_0
         }
