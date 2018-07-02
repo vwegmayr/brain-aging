@@ -414,6 +414,9 @@ class Conv3DEncoder(Body):
             **kwargs
         )
 
+    def get_encoding_dim(self):
+        return self.params["hidden_dim"]
+
     def construct_graph(self):
         features = self.features
         params = self.params
@@ -478,7 +481,7 @@ class Conv3DEncoder(Body):
         cur_dim = reduce(lambda x, y: x * y, dim_list)
 
         self.linear_trafo = False
-        if cur_dim > params["encoding_dim"]:
+        if cur_dim > self.get_encoding_dim():
             print("Non conv layer needed")
             self.linear_trafo = True
             self.dim_before_linear_trafo = cur_dim
@@ -486,12 +489,12 @@ class Conv3DEncoder(Body):
             current_input = tf.contrib.layers.flatten(current_input)
             W = tf.get_variable(
                 "non_conv_w",
-                shape=[cur_dim, params["encoding_dim"]],
+                shape=[cur_dim, self.get_encoding_dim()],
                 initializer=tf.contrib.layers.xavier_initializer(seed=40)
             )
             b = tf.get_variable(
                 "non_conv_b",
-                shape=[1, params["encoding_dim"]],
+                shape=[1, self.get_encoding_dim()],
                 initializer=tf.initializers.zeros
             )
             encoder.append(W)
@@ -540,7 +543,7 @@ class Conv3DDecoder(Head):
             if not params["tied_weights"]:
                 W = tf.get_variable(
                     "non_conv_w_dec",
-                    shape=[dim, params["encoding_dim"]],
+                    shape=[dim, params[self.encoder.get_encoding_dim()]],
                     initializer=tf.contrib.layers.xavier_initializer(seed=40)
                 )
             else:

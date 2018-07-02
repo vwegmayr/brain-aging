@@ -608,7 +608,7 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         flattened_z_0 = tf.contrib.layers.flatten(z_0)
         flattened_z_1 = tf.contrib.layers.flatten(z_1)
         dim = flattened_z_0.get_shape().as_list()[-1]
-        assert dim == params["encoding_dim"]
+        assert dim == encoder_0.get_encoding_dim()
 
         predictions = {
             "input": x_0,
@@ -633,7 +633,7 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         to_reg_1 = z_1
 
         diagnose_dim = params["diagnose_dim"]
-        hidden_dim = params["encoding_dim"]
+        hidden_dim = encoder_0.get_encoding_dim()
         if diagnose_dim > 0:
             patient_dim = hidden_dim - diagnose_dim
             patient_encs_0, diag_encs_0 = tf.split(
