@@ -257,7 +257,8 @@ class PCAAutoEncoderTuples(EvaluateEpochsBaseTF):
         predictions = {
             "input": encoder.get_nodes()[0],
             "encoding": hidden_0,
-            "decoding": rec_0
+            "decoding": rec_0,
+            "file_name": features["file_name_0"]
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
@@ -612,7 +613,8 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         predictions = {
             "input": x_0,
             "encoding": flattened_z_0,
-            "decoding": y_0
+            "decoding": y_0,
+            "file_name": features["file_name_0"]
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
