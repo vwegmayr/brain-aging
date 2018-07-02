@@ -119,7 +119,10 @@ class MRISingleStream(FileStream, MRIImageLoader):
         Normalization should be computed on the train set only.
         """
         # collect train file IDs
-        file_ids = list(self.get_set_file_ids(train=True))
+        test_ids = self.get_set_file_ids(train=False)
+        # some files may not be used by sampler, but all available
+        # images should be used to compute the normalization
+        file_ids = self.all_file_ids.difference(test_ids)
         n = len(file_ids)
         shape = self.get_sample_shape()
         voxel_mean = np.zeros(shape)

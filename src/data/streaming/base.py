@@ -81,6 +81,8 @@ class FileStream(abc.ABC):
                 else:
                     n_files_not_used += 1
 
+        self.all_file_ids = set(self.all_file_paths)
+
         if not self.silent:
             print("{} files found but not specified meta csv"
                   .format(n_files_not_used))

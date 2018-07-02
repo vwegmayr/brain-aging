@@ -148,6 +148,30 @@ class TestImageNormalization(unittest.TestCase):
         self.config["params"]["stream_config"]["train_ratio"] = 1
         create_object(self.config)
 
+    def test_different_streamers_same_normalization(self):
+        with open("tests/configs/test_normalization_similar_pairs.yaml") as f:
+            config_1 = yaml.load(f)
+
+        with open("tests/configs/test_normalization_same_age_pairs.yaml") as f:
+            config_2 = yaml.load(f)
+
+        streamer_1 = create_object(config_1)
+        streamer_2 = create_object(config_2)
+
+        self.assertTrue(
+            np.array_equal(
+                streamer_1.get_voxel_means(),
+                streamer_2.get_voxel_means()
+            )
+        )
+
+        self.assertTrue(
+            np.array_equal(
+                streamer_1.get_voxel_stds(),
+                streamer_2.get_voxel_stds()
+            )
+        )
+
 
 class TestBatchOrder(unittest.TestCase):
     def setUp(self):
