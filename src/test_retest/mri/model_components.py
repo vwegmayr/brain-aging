@@ -533,6 +533,8 @@ class Conv3DDecoder(Head):
         encoder_shapes = self.encoder.encoder_shapes
 
         current_input = z
+        # Check if the encoder performed a final non-convolutional
+        # transformation.
         if self.encoder.linear_trafo:
             dim = self.encoder.dim_before_linear_trafo
             if not params["tied_weights"]:

@@ -626,7 +626,41 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         rec_loss_0 = decoder_0.get_reconstruction_loss()
         rec_loss_1 = decoder_1.get_reconstruction_loss()
         rec_loss = rec_loss_0 / 2 + rec_loss_1 / 2
+
+        # Regularization
         reg_loss = tf.constant(0, dtype=rec_loss.dtype)
+        to_reg_0 = z_0
+        to_reg_1 = z_1
+
+        diagnose_dim = params["diagnose_dim"]
+        hidden_dim = params["encoding_dim"]
+        if diagnose_dim > 0:
+            patient_dim = hidden_dim - diagnose_dim
+            patient_encs_0, diag_encs_0 = tf.split(
+                z_0,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            patient_encs_1, diag_encs_1 = tf.split(
+                z_1,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            to_reg_0 = diag_encs_0
+            to_reg_1 = diag_encs_1
+
+        reg_lambda = params["hidden_lambda"]
+        if reg_lambda != 0:
+            reg_name = params["hidden_regularizer"]
+            reg_loss = name_to_hidden_regularization(
+                0,
+                reg_name,
+                to_reg_0,
+                to_reg_1
+            )
+            reg_loss *= reg_lambda
 
         loss = rec_loss + reg_loss
 
