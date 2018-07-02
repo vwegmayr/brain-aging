@@ -37,6 +37,8 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
             activations_retest
         )
         return tf.reduce_mean(similarities)
+    elif reg_name == regularizer.L1_MEAN:
+        return regularizer.l1_mean(activations_test - activations_retest)
     else:
         raise ValueError("regularization name '{}' is unknown".format(
                          reg_name))

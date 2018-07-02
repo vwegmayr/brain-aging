@@ -5,10 +5,16 @@ import tensorflow as tf
 JS_DIVERGENCE_LABEL = "js_divergence"
 L2_SQUARED_LABEL = "l2_sq"
 COSINE_SIMILARITY = "cosine_sim"
+L1_MEAN = "l1_mean"
+
 
 # Traditional norm regularizers
 def l1(weights, name):
     return tf.reduce_sum(tf.abs(weights), name=name)
+
+
+def l1_mean(x):
+    return tf.reduce_mean(tf.abs(x))
 
 
 def l2_squared(weights, name):
