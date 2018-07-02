@@ -598,11 +598,11 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
 
         z_0 = encoder_0.get_encoding()
         y_0 = decoder_0.get_reconstruction()
-        rec_0 = encoder_0.get_reconstruction_target()
+        x_0 = encoder_0.get_reconstruction_target()
 
         z_1 = encoder_1.get_encoding()
         y_1 = decoder_1.get_reconstruction()
-        rec_1 = encoder_1.get_reconstruction_target()
+        x_1 = encoder_1.get_reconstruction_target()
 
         flattened_z_0 = tf.contrib.layers.flatten(z_0)
         flattened_z_1 = tf.contrib.layers.flatten(z_1)
@@ -610,8 +610,9 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         assert dim == params["encoding_dim"]
 
         predictions = {
+            "input": x_0,
             "encoding": flattened_z_0,
-            "decoding": rec_0
+            "decoding": y_0
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
