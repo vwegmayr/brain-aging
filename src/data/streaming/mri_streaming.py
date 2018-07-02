@@ -352,7 +352,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
         self.groups = None
         # Make arbitrary test 
         groups = []
-        test_groups = self.produce_test_groups(test_files, 2)
+        test_groups = self.produce_groups(test_files, 2, train=False)
         groups += test_groups
 
         # Get train patient labels
@@ -881,7 +881,7 @@ class SimilarPairStream(MRISingleStream):
         self.groups = None
         # Make arbitrary test 
         groups = []
-        test_groups = self.produce_test_groups(test_files, 2)
+        test_groups = self.produce_groups(test_files, 2, train=False)
         groups += test_groups
 
         # Sample train pairs
@@ -919,6 +919,26 @@ class SimilarPairStream(MRISingleStream):
             groups += d_train
 
         return groups
+
+    def make_train_test_split(self):
+        pass
+
+
+class AnyPairStream(MRISingleStream):
+    def group_data(self):
+        self.groups = self.make_one_sample_groups()
+        self.make_balanced_train_test_split()
+
+        train_files = [g.file_ids[0] for g in self.groups
+                       if g.is_train == True]
+        test_files = [g.file_ids[0] for g in self.groups
+                      if g.is_train == False]
+        self.groups = None
+
+        train_groups = self.produce_groups(train_files, 2, train=True)
+        test_groups = self.produce_groups(test_files, 2, train=False)
+
+        return train_groups + test_groups
 
     def make_train_test_split(self):
         pass

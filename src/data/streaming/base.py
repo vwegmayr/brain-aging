@@ -420,7 +420,7 @@ class FileStream(abc.ABC):
         record = self.file_id_to_meta[file_id]
         return record[key]
 
-    def produce_test_groups(self, fids, group_size):
+    def produce_groups(self, fids, group_size, train):
         if len(fids) == 0:
             return []
 
@@ -439,7 +439,7 @@ class FileStream(abc.ABC):
 
         groups = [Group(group_ids) for group_ids in groups]
         for group in groups:
-            group.is_train = False
+            group.is_train = train
 
         return groups
 

@@ -3,7 +3,7 @@ import yaml
 import importlib
 from src.data.streaming.mri_streaming import \
     MRISingleStream, MRIDiagnosePairStream, MRISamePatientSameAgePairStream, \
-    SimilarPairStream
+    SimilarPairStream, AnyPairStream
 
 import subprocess
 import numpy as np
@@ -53,7 +53,7 @@ class TestReproducibility(unittest.TestCase):
         cmd = ["python", "-m", "tests.run_streamer", config_path]
         oi = subprocess.check_output(cmd)
 
-        for i in range(5):
+        for i in range(N_RUNS):
             o = subprocess.check_output(cmd)
             self.assertEqual(oi, o)
 
@@ -95,7 +95,12 @@ class TestReproducibility(unittest.TestCase):
     def test_similar_pair_stream(self):
         self.config["class"] = qualified_path(SimilarPairStream)
         self.reproducibility_within_run()
-        # self.reproducibility_accross_runs()
+        self.reproducibility_accross_runs()
+
+    def test_any_pair_stream(self):
+        self.config["class"] = qualified_path(AnyPairStream)
+        self.reproducibility_within_run()
+        self.reproducibility_accross_runs()
 
 
 class TestBalancedSplit(unittest.TestCase):
