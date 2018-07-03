@@ -11,6 +11,7 @@ import src.test_retest.regularizer as regularizer
 from src.data.mnist import read as mnist_read
 from src.train_hooks import ConfusionMatrixHook, ICCHook, BatchDumpHook, \
     RobustnessComputationHook, HookFactory, SumatraLoggingHook
+from src import compression_utils
 
 
 def test_retest_evaluation_spec(
@@ -354,7 +355,15 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.metric_logger.dump()
             sys.stdout.flush()
 
+        self.compress_data()
         self.streamer = None
+
+    def compress_data(self):
+        smt_label = os.path.split(self.save_path)[-1]
+        # Compress dumped embeddings
+        compression_utils.compress_embedding_folders(
+            os.path.join(self.data_params["dump_out_dir"], smt_label)
+        )
 
     def get_hooks(self, preds_test, preds_retest, features_test,
                   features_retest):
