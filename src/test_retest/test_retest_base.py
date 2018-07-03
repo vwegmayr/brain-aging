@@ -2,6 +2,7 @@ import tensorflow as tf
 import sys
 import os
 import numpy as np
+import re
 
 
 from modules.models.base import BaseTF
@@ -356,7 +357,36 @@ class EvaluateEpochsBaseTF(BaseTF):
             sys.stdout.flush()
 
         self.compress_data()
+        if "keep_checkpoint" in self.data_params:
+            if not self.data_params["keep_checkpoint"]:
+                self.remove_checkpoints()
+        else:
+            self.remove_checkpoints()
+        if "keep_tfevents" in self.data_params:
+            if not self.data_params["keep_tfevents"]:
+                self.remove_tfevents()
+        else:
+            self.remove_tfevents()
         self.streamer = None
+
+    def remove_files(self, reg, folder):
+        names = os.listdir(folder)
+        for name in names:
+            p = os.path.join(folder, name)
+            match = reg.match(name)
+            if match is not None:
+                print("removing {}".format(p))
+                os.remove(p)
+
+    def remove_checkpoints(self):
+        folder = self.save_path
+        reg = re.compile("model.*ckpt.*data.*")
+        self.remove_files(reg, folder)
+
+    def remove_tfevents(self):
+        folder = self.save_path
+        reg = re.compile(".*tfevents.*")
+        self.remove_files(reg, folder)
 
     def compress_data(self):
         smt_label = os.path.split(self.save_path)[-1]
