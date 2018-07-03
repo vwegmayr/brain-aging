@@ -453,6 +453,22 @@ class FileStream(abc.ABC):
 
         return groups
 
+    def make_patient_groups(self):
+        patient_to_group = OrderedDict()
+        for k in self.file_id_to_meta:
+            if "file_path" not in self.file_id_to_meta[k]:
+                continue
+            patient = self.get_patient_id(k)
+            if k not in patient_to_group:
+                patient_to_group[patient] = Group([])
+            patient_to_group[patient].add_file_id(k)
+
+        groups = []
+        for k in patient_to_group.keys():
+            groups.append(patient_to_group[k])
+
+        return groups
+
     def get_patient_to_file_ids_mapping(self):
         patient_to_file_ids = OrderedDict()
         not_found = 0
@@ -593,9 +609,42 @@ class Group(object):
     def __init__(self, file_ids, is_train=None):
         self.file_ids = file_ids
         self.is_train = is_train
+        self.label_stats = None
 
     def get_file_ids(self):
         return self.file_ids
+
+    def add_file_id(self, fid):
+        return self.file_ids.append(fid)
+
+    def get_label_stats(self, categorical, numerical):
+        if self.label_stats is not None:
+            return self.label_stats
+
+        stats = {
+            "n": len(self.file_ids)
+        }
+        all_keys = categorical + numerical
+        is_cat_bool = len(categorical) * [True] + len(numerical) * [False]
+
+        for k, is_cat in zip(all_keys, is_cat_bool):
+            stats[k] = {
+                "count": 0,
+                "vals": []
+            }
+            for fid in self.file_ids:
+                val = self.get_meta_info_by_key(fid, k)
+                if is_cat and val == 1:
+                    stats[k]["count"] += 1
+                if not is_cat:
+                    stats[k]["count"] += val
+                    stats[k]["vals"].append(val)
+            stats[k]["mean"] = stats[k]["count"] / stats["n"]
+            if not is_cat:
+                stats[k]["std"] = np.std(stats[k]["vals"])
+
+        self.label_stats = stats
+        return self.label_stats
 
     def __str__(self):
         return str([str(i) for i in self.file_ids])
