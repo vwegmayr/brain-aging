@@ -634,16 +634,19 @@ class DataSource(object):
 
         regexp = re.compile(self.id_from_filename["regexp"])
         group_id = self.id_from_filename["regex_id_group"]
+        discarded = 0
         for p in paths:
             match = regexp.match(p)
             if match is None:
-                warnings.warn("Could note extract id from path {}"
-                              .format(p))
+                discarded += 1
+                # warnings.warn("Could note extract id from path {}"
+                #             .format(p))
             else:
                 # extract image_label
                 image_label = match.group(group_id)
                 self.file_paths.append(p)
                 self.file_path_to_image_label[p] = image_label
+        warnings.warn("!!! {} IDs WERE NOT EXTRACTED !!!".format(discarded))
 
     def get_file_paths(self):
         return self.file_paths
