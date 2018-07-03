@@ -19,7 +19,7 @@ X_LABEL = config.X_LABEL
 Y_LABEL = config.Y_LABEL
 
 FILTERS = config.FILTERS
-
+LEGEND_LOC = config.LEGEND_LOC
 
 def filter_record_by_tag(rec, f):
     if "tags" not in f:
@@ -136,7 +136,7 @@ def plot_groups(groups):
     plt.xlabel(X_LABEL)
     plt.ylabel(Y_LABEL)
 
-    plt.legend(loc=4, ncol=1)
+    plt.legend(loc=LEGEND_LOC, ncol=1)
     plt.grid(True)
     plt.show()
 
