@@ -99,14 +99,18 @@ class MRISingleStream(FileStream, MRIImageLoader):
         assert n_groups == len(groups)
         return batches
 
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         # We just to stream the images one by one
         groups = []
-        for key in self.file_id_to_meta:
-            if "file_path" in self.file_id_to_meta[key]:
-                g = Group([key])
-                g.patient_label = self.get_patient_label(key)
-                groups.append(g)
+        for fid in train_ids:
+            g = Group([fid])
+            g.is_train = True
+            groups.append(g)
+
+        for fid in test_ids:
+            g = Group([fid])
+            g.is_train = False
+            groups.append(g)
 
         return groups
 
@@ -261,11 +265,11 @@ class MRISingleStream(FileStream, MRIImageLoader):
         }
 
         # Group by patient
-        self.groups = self.make_patient_groups()
+        all_groups = self.make_patient_groups()
 
         # Collect groups stats
         n_total_patients = 0
-        for group in self.groups:
+        for group in all_groups:
             stats = group.get_label_stats(categorical, numerical)
             for label in all_labels:
                 n_total_patients += stats["count"]
@@ -279,7 +283,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             all_label_std[label] = np.std(all_vals[label])
 
         folds = []  # list of group lists
-        n_groups = len(self.groups)
+        n_groups = len(all_groups)
         used = set([])
         unused = set(list(range(n_groups)))
         fold_target_size = int(n_total_patients / k)
@@ -299,8 +303,8 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # Get one unused group
             idx = unused.pop()  # deterministic for integer hashes
             used.add(idx)
-            fold.append(self.groups[idx])
-            fold_n += len(self.groups[idx].file_ids)
+            fold.append(all_groups[idx])
+            fold_n += len(all_groups[idx].file_ids)
 
             while fold_n < fold_target_size:
                 if len(unused) == 0:
@@ -309,6 +313,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 unused_idx = list(unused)
                 best_idx = -1
                 best_sc = -1
+                best_mean = best_std = None
                 for idx in unused_idx:
                     cur = self.groups[idx]
                     stats = self.group_stats(cur, categorical, numerical)
@@ -326,16 +331,34 @@ class MRISingleStream(FileStream, MRIImageLoader):
                     if (best_sc) == -1 or (best_sc != -1 and best_sc > sc):
                         best_sc = sc
                         best_idx = idx
+                        best_mean = copy.deepcopy(new_mean)
 
                 unused.remove(best_idx)
                 used.add(best_idx)
-                fold.append(self.groups[best_idx])
-                # TODO: update fold stats and fold_n
-                fold_n += len(self.groups[best_idx].file_ids)
+                fold.append(all_groups[best_idx])
+                # update fold stats and fold_n
+                fold_n += len(all_groups[best_idx].file_ids)
+                fold_mean = copy.deepcopy(best_mean)
 
             folds.append(fold)
 
-        # TODO: Add unused to last fold        
+        # Add unused to last fold
+        for idx in unused:
+            folds[-1].append(all_groups[idx])
+
+        # Set train and test groups
+        train_ids = []
+        test_ids = []
+        test_fold_idx = self.config["test_fold"]
+        for i in range(k):
+            if i == test_fold_idx:
+                for g in folds[i]:
+                    test_ids += g.file_ids
+            else:
+                for g in folds[i]:
+                    train_ids += g.file_ids
+
+        return train_ids, test_ids
 
     def make_balanced_train_test_split(self):
         print("Making balanced split")
@@ -345,11 +368,15 @@ class MRISingleStream(FileStream, MRIImageLoader):
         test_patients = set([])
         train_ratio = self.config["train_ratio"]
 
+        groups = self.make_one_sample_groups()
+        train_ids = []
+        test_ids = []
+
         toggle = True
         for label in balanced_labels:
             # get groups for which this label is set
             cur = []
-            for group in self.groups:
+            for group in groups:
                 fid = group.file_ids[0]
                 val = self.file_id_to_meta[fid][label]
                 if val == 1:
@@ -426,19 +453,31 @@ class MRISingleStream(FileStream, MRIImageLoader):
                     else:
                         g.is_train = i <= split
                     patient = self.get_patient_id(g.file_ids[0])
+
                     if g.is_train:
                         train_patients = train_patients.union(set([patient]))
+                        train_ids += g.file_ids
                     else:
                         test_patients = test_patients.union(set([patient]))
+                        test_ids += g.file_ids
 
             toggle = not toggle
 
+        return train_ids, test_ids
+
     def make_train_test_split(self):
-        return self.make_balanced_train_test_split()
+        if self.config["n_folds"] == 0:
+            print(">>>>>> Train-test split")
+            r = self.make_balanced_train_test_split()
+            print(r[0][:5])
+            return r
+        else:
+            print(">>>>>> k-fold split")
+            return self.make_balanced_k_fold_split()
 
 
 class MRISamePatientSameAgePairStream(MRISingleStream):
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         groups = []
         not_found = 0
         # Group by patient, same patient iff same patient_label
@@ -459,14 +498,9 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
         if not_found > 0:
             warnings.warn("{} files not found".format(not_found))
 
-        self.groups = self.make_one_sample_groups()
-        self.make_balanced_train_test_split()
-
         # Collect train and test patients
-        train_files = [g.file_ids[0] for g in self.groups
-                       if g.is_train == True]
-        test_files = [g.file_ids[0] for g in self.groups
-                      if g.is_train == False]
+        train_files = train_ids
+        test_files = test_ids
 
         self.groups = None
         # Make arbitrary test 
@@ -514,7 +548,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
 
 
 class MRISamePatientPairStream(MRISingleStream):
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         n_pairs = self.config["n_pairs"]
         groups = []
 
@@ -638,7 +672,7 @@ class MRISamePatientPairStream(MRISingleStream):
 
 
 class MRIDifferentPatientPairStream(MRISingleStream):
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         n_pairs = self.config["n_pairs"]
         groups = []
 
@@ -768,20 +802,14 @@ class MRIDiagnosePairStream(MRISingleStream):
     def get_diagnoses(self):
         return self.config["diagnoses"]
 
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         self.start_time = process_time()
         n_pairs = self.config["n_pairs"]
         n_train_pairs = int(self.config["train_ratio"] * n_pairs)
 
-        # Make balanced split
-        self.groups = self.make_one_sample_groups()
-        self.make_balanced_train_test_split()
-
         # Collect train and test patients
-        train_files = [g.file_ids[0] for g in self.groups
-                       if g.is_train == True]
-        test_files = [g.file_ids[0] for g in self.groups
-                      if g.is_train == False]
+        train_files = train_ids
+        test_files = test_ids
 
         train_labels = []
         for fid in train_files:
@@ -981,21 +1009,13 @@ class SimilarPairStream(MRISingleStream):
             idx = self.np_random.randint(0, len(others))
             yield fid, others[idx]
 
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         max_train_pairs = self.get_max_train_pairs()
         diagnoses = self.get_diagnoses()
 
-        # Use train-test split of MRISingleStream. Makes balanced split
-        # with respect to diagnoses. In addition, the train and test set
-        # of patients is distinct.
-        self.groups = self.make_one_sample_groups()
-        self.make_balanced_train_test_split()
-
         # Collect train and test patients
-        train_files = [g.file_ids[0] for g in self.groups
-                       if g.is_train == True]
-        test_files = [g.file_ids[0] for g in self.groups
-                      if g.is_train == False]
+        train_files = train_ids
+        test_files = test_ids
 
         self.groups = None
         # Make arbitrary test 
@@ -1044,15 +1064,9 @@ class SimilarPairStream(MRISingleStream):
 
 
 class AnyPairStream(MRISingleStream):
-    def group_data(self):
-        self.groups = self.make_one_sample_groups()
-        self.make_balanced_train_test_split()
-
-        train_files = [g.file_ids[0] for g in self.groups
-                       if g.is_train == True]
-        test_files = [g.file_ids[0] for g in self.groups
-                      if g.is_train == False]
-        self.groups = None
+    def group_data(self, train_ids, test_ids):
+        train_files = train_ids
+        test_files = test_ids
 
         train_groups = self.produce_groups(train_files, 2, train=True)
         test_groups = self.produce_groups(test_files, 2, train=False)

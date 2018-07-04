@@ -90,12 +90,12 @@ class FileStream(abc.ABC):
             n_missing = csv_len - len(self.all_file_paths)
             print("Number of files missing: {}".format(n_missing))
 
-        # Group files into tuples
-        self.groups = self.group_data()
+        # Make train-test split
+        train_ids, test_ids = self.make_train_test_split()
+        # Build train and test tuples
+        self.groups = self.group_data(train_ids, test_ids)
         self.sample_shape = None
 
-        # Make train-test split based on grouping
-        self.make_train_test_split()
         self.sanity_checks()
         if not self.silent:
             print(">>>>>>>>> Sanity checks OK")
@@ -135,11 +135,17 @@ class FileStream(abc.ABC):
         return batches
 
     @abc.abstractmethod
-    def group_data(self):
+    def group_data(self, train_ids, test_ids):
         """
         Group files together that should be streamed together.
         For example groups of two files (i.e. pairs) or groups
         of three files (i.e. triples) can be formed.
+
+        Args:
+            - train_ids: list of file IDs that can
+              be used for training
+            - test_ids: list of file IDs that can be
+              used for testing
         """
         pass
 
@@ -695,7 +701,10 @@ class DataSource(object):
                 image_label = match.group(group_id)
                 self.file_paths.append(p)
                 self.file_path_to_image_label[p] = image_label
-        warnings.warn("!!! {} IDs WERE NOT EXTRACTED !!!".format(discarded))
+
+        if discarded > 0:
+            warnings.warn("!!! {} IDs WERE NOT EXTRACTED !!!"
+                          .format(discarded))
 
     def get_file_paths(self):
         return self.file_paths
