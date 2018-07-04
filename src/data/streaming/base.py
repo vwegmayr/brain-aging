@@ -92,6 +92,10 @@ class FileStream(abc.ABC):
 
         # Make train-test split
         train_ids, test_ids = self.make_train_test_split()
+        all_train_test_ids = set(train_ids + test_ids)
+        assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
+        # all filest are used
+        assert len(self.all_file_ids.difference(all_train_test_ids)) == 0
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
         self.sample_shape = None
@@ -460,14 +464,18 @@ class FileStream(abc.ABC):
         return groups
 
     def make_patient_groups(self):
+        """
+        One group per patient containing all file
+        IDs.
+        """
         patient_to_group = OrderedDict()
-        for k in self.file_id_to_meta:
-            if "file_path" not in self.file_id_to_meta[k]:
+        for fid in self.file_id_to_meta:
+            if "file_path" not in self.file_id_to_meta[fid]:
                 continue
-            patient = self.get_patient_id(k)
-            if k not in patient_to_group:
+            patient = self.get_patient_id(fid)
+            if patient not in patient_to_group:
                 patient_to_group[patient] = Group([])
-            patient_to_group[patient].add_file_id(k)
+            patient_to_group[patient].add_file_id(fid)
 
         groups = []
         for k in patient_to_group.keys():
@@ -623,7 +631,7 @@ class Group(object):
     def add_file_id(self, fid):
         return self.file_ids.append(fid)
 
-    def get_label_stats(self, categorical, numerical):
+    def get_label_stats(self, streamer, categorical, numerical):
         if self.label_stats is not None:
             return self.label_stats
 
@@ -639,12 +647,12 @@ class Group(object):
                 "vals": []
             }
             for fid in self.file_ids:
-                val = self.get_meta_info_by_key(fid, k)
+                val = streamer.get_meta_info_by_key(fid, k)
+                stats[k]["vals"].append(val)
                 if is_cat and val == 1:
                     stats[k]["count"] += 1
                 if not is_cat:
                     stats[k]["count"] += val
-                    stats[k]["vals"].append(val)
             stats[k]["mean"] = stats[k]["count"] / stats["n"]
             if not is_cat:
                 stats[k]["std"] = np.std(stats[k]["vals"])

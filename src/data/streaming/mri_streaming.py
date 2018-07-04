@@ -254,10 +254,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
         is close to the one of the complete data set.
         """
         k = self.config["n_folds"]
-        categorical = ["healthy", "health_ad", "gender"]
-        numerical = ["age"]
+        categorical = self.config["categorical_split"]
+        numerical = self.config["numerical_split"]
         all_labels = categorical + numerical
-
         all_label_mean = {}
         all_label_std = {}
         all_vals = {
@@ -267,16 +266,17 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         # Group by patient
         all_groups = self.make_patient_groups()
+        self.np_random.shuffle(all_groups)
 
         # Collect groups stats
         n_total_patients = 0
         for group in all_groups:
-            stats = group.get_label_stats(categorical, numerical)
+            stats = group.get_label_stats(self, categorical, numerical)
+            n_total_patients += stats["n"]
             for label in all_labels:
-                n_total_patients += stats["count"]
-                all_vals[label].extend = stats[label]["vals"]
+                all_vals[label].extend(stats[label]["vals"])
 
-        assert n_total_patients == int(self.all_file_ids)
+        assert n_total_patients == len(self.all_file_ids)
         # Compute overall stats
         for label in all_labels:
             all_label_mean[label] = np.mean(all_vals[label])
@@ -288,7 +288,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         used = set([])
         unused = set(list(range(n_groups)))
         fold_target_size = int(n_total_patients / k)
-        for i in range(k):
+        for i in range(k - 1):
             fold = []
             fold_n = 0
             # Construct i-th fold
@@ -306,6 +306,13 @@ class MRISingleStream(FileStream, MRIImageLoader):
             used.add(idx)
             fold.append(all_groups[idx])
             fold_n += len(all_groups[idx].file_ids)
+            first_stats = all_groups[idx].get_label_stats(
+                self, categorical, numerical
+            )
+            for label in all_labels:
+                fold_mean[label] = first_stats[label]["mean"]
+                if label in numerical:
+                    fold_std[label] = first_stats[label]["std"]
 
             while fold_n < fold_target_size:
                 if len(unused) == 0:
@@ -316,18 +323,17 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 best_sc = -1
                 best_mean = best_std = None
                 for idx in unused_idx:
-                    cur = self.groups[idx]
-                    stats = self.group_stats(cur, categorical, numerical)
+                    cur = all_groups[idx]
+                    stats = cur.get_label_stats(self, categorical, numerical)
                     new_mean = copy.deepcopy(fold_mean)
                     new_std = copy.deepcopy(fold_std)
-                    stats = cur.get_label_stats()
                     # Update mean and std
                     sc = 0
                     new_n = fold_n + stats["n"]
                     for label in all_labels:
-                        new_mean[k] = stats[label]["mean"] * (stats["n"] / new_n) \
+                        new_mean[label] = stats[label]["mean"] * (stats["n"] / new_n) \
                                         + fold_mean[label] * (fold_n / new_n)
-                        sc += abs(new_mean[k] - all_label_mean[k])
+                        sc += abs(new_mean[label] - all_label_mean[label])
                     # Compute score
                     if (best_sc) == -1 or (best_sc != -1 and best_sc > sc):
                         best_sc = sc
@@ -344,6 +350,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             folds.append(fold)
 
         # Add unused to last fold
+        folds.append([])
         for idx in unused:
             folds[-1].append(all_groups[idx])
 
