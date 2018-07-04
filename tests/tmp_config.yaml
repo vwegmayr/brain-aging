@@ -1,0 +1,26 @@
+class: src.data.streaming.mri_streaming.SimilarPairStream
+params:
+  stream_config:
+    balanced_labels: [healthy, health_ad]
+    batch_size: -1
+    data_sources:
+    - glob_pattern: brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
+      id_from_filename: {regex_id_group: 1, regexp: '.*/([AI0-9]+)_{0,1}mni_aligned\.nii\.gz'}
+      name: ADNI_AIBL
+    diagnoses: [healthy, health_ad]
+    downsample:
+      enabled: false
+      shape: [5, 5, 5]
+    feature_collection: adni_aibl
+    max_train_pairs: 600
+    meta_csv: data/raw/csv/adni_aibl__ad_hc.csv
+    meta_id_column: image_label
+    n_folds: 0
+    n_pairs: 10
+    normalize_images: false
+    prefetch: 1
+    same_patient: false
+    seed: 47
+    shuffle: true
+    silent: true
+    train_ratio: 0.8

@@ -6,9 +6,10 @@ params:
     batch_size: -1
     prefetch: 1
     train_ratio: 1
+    n_folds: 0
     normalize_images: True
-    train_ratio: 0.6
-    max_train_pairs: 10
+    train_ratio: 0.8
+    max_train_pairs: 100
     balanced_labels:
       - healthy
       - health_ad

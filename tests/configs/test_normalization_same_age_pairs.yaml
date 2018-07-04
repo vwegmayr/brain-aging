@@ -7,6 +7,7 @@ params:
     prefetch: 1
     train_ratio: 1
     normalize_images: True
+    n_folds: 0
     train_ratio: 0.7
     max_train_pairs: 10
     balanced_labels:

@@ -130,9 +130,10 @@ class TestImageNormalization(unittest.TestCase):
     def test_normalization_on_few_images(self):
         streamer = create_object(self.config)
 
-        file_ids = list(streamer.get_set_file_ids(True))
+        test_ids = streamer.get_set_file_ids(train=False)
+        file_ids = streamer.all_file_ids.difference(test_ids)
         all_images = []
-
+        file_ids = sorted(list(file_ids))
         for fid in file_ids:
             p = streamer.get_file_path(fid)
             im = streamer.load_image(p)

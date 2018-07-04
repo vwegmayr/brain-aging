@@ -137,6 +137,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         cur_sums = np.zeros(shape)
         cur_sums_sq = np.zeros(shape)
         c = 0
+        file_ids = sorted(list(file_ids))
         for fid in file_ids:
             p = self.get_file_path(fid)
             im = self.load_image(p)
@@ -468,9 +469,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
     def make_train_test_split(self):
         if self.config["n_folds"] == 0:
             print(">>>>>> Train-test split")
-            r = self.make_balanced_train_test_split()
-            print(r[0][:5])
-            return r
+            return self.make_balanced_train_test_split()
         else:
             print(">>>>>> k-fold split")
             return self.make_balanced_k_fold_split()
@@ -541,11 +540,6 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
                     groups.append(g)
 
         return groups
-
-    def make_train_test_split(self):
-        # Train test split done above
-        pass
-
 
 class MRISamePatientPairStream(MRISingleStream):
     def group_data(self, train_ids, test_ids):
@@ -666,10 +660,6 @@ class MRISamePatientPairStream(MRISingleStream):
 
         return groups
 
-    def make_train_test_split(self):
-        # split is done during sampling
-        pass
-
 
 class MRIDifferentPatientPairStream(MRISingleStream):
     def group_data(self, train_ids, test_ids):
@@ -785,10 +775,6 @@ class MRIDifferentPatientPairStream(MRISingleStream):
                 assert self.get_diagnose(id1) != self.get_diagnose(id2)
 
         return groups
-
-    def make_train_test_split(self):
-        # split is done during sampling
-        pass
 
 
 class MRIDiagnosePairStream(MRISingleStream):
@@ -959,10 +945,6 @@ class MRIDiagnosePairStream(MRISingleStream):
 
         return groups
 
-    def make_train_test_split(self):
-        # split is done during sampling
-        pass
-
 
 class SimilarPairStream(MRISingleStream):
     """
@@ -1059,9 +1041,6 @@ class SimilarPairStream(MRISingleStream):
 
         return groups
 
-    def make_train_test_split(self):
-        pass
-
 
 class AnyPairStream(MRISingleStream):
     def group_data(self, train_ids, test_ids):
@@ -1072,6 +1051,3 @@ class AnyPairStream(MRISingleStream):
         test_groups = self.produce_groups(test_files, 2, train=False)
 
         return train_groups + test_groups
-
-    def make_train_test_split(self):
-        pass
