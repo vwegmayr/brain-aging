@@ -366,6 +366,20 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 for g in folds[i]:
                     train_ids += g.file_ids
 
+        # Check that folds are disjoint
+        for i in range(k):
+            i_ids = []
+            for g in folds[i]:
+                i_ids += g.file_ids
+            i_ids = set(i_ids)
+            for j in range(i + 1, k):
+                j_ids = []
+                for g in folds[j]:
+                    j_ids += g.file_ids
+                j_ids = set(j_ids)
+
+                assert len(i_ids.intersection(j_ids)) == 0
+
         return train_ids, test_ids
 
     def make_balanced_train_test_split(self):
