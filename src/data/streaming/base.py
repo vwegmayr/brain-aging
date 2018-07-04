@@ -290,11 +290,14 @@ class FileStream(abc.ABC):
                 of.write("Age diffences stats, mean={}, std={}\n"
                          .format(np.mean(age_diffs), np.std(age_diffs)))
 
+        total_diag_count = sum(dignosis_count.values())
         for diag, c in dignosis_count.items():
             if of is None:
-                print(">>>> {} count: {}".format(diag, c))
+                print(">>>> {} count: {} ({})"
+                      .format(diag, c, c / total_diag_count))
             else:
-                of.write("{} count: {}\n".format(diag, c))
+                of.write("{} count: {} ({})\n"
+                         .format(diag, c, c / total_diag_count))
 
         s = gender_0 * 1.0 + gender_1
         if s == 0:

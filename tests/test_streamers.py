@@ -132,7 +132,10 @@ class TestKFoldSplit(unittest.TestCase):
         self.assertIsNotNone(streamer)
 
     def test_single_stream(self):
-        self.run_streamer()
+        for i in range(self.config["params"]["stream_config"]["n_folds"]):
+            print(">>>>>>>>>>>>>>>>>>>>>>>>>> test fold {}".format(i))
+            self.config["params"]["stream_config"]["test_fold"] = i
+            self.run_streamer()
 
 
 class TestImageNormalization(unittest.TestCase):
