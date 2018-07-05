@@ -133,6 +133,14 @@ def js_divergence(p, q, eps=0.000001):
     return js
 
 
+def softmax(x):
+    ex = np.exp(x)
+    s = np.sum(ex)
+    if np.isinf(s):
+        return 0
+    return ex / s
+
+
 def batch_divergence(batch_p, batch_q, div_fn):
     divergences = []
     for i in range(len(batch_p)):
