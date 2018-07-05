@@ -16,7 +16,7 @@ from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.test_retest.test_retest_base import linear_trafo
 from src.test_retest.test_retest_base import regularizer
 from src.test_retest.test_retest_base import mnist_input_fn
-from src.test_retest.non_linear_estimator import name_to_hidden_regularization
+from src.test_retest.mri.model_components import name_to_hidden_regularization
 from src.train_hooks import BatchDumpHook, RobustnessComputationHook, \
     SumatraLoggingHook, PredictionHook, PredictionRobustnessHook
 from src.train_hooks import HookFactory
