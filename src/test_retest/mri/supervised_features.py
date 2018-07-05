@@ -134,8 +134,8 @@ class PairClassification(EvaluateEpochsBaseTF):
         train_hooks.append(log_hook_train)
 
         log_hook_test = SumatraLoggingHook(
-            ops=[loss, acc] + all_losses,
-            names=["loss", "acc"] + loss_names,
+            ops=[acc] + all_losses,
+            names=["acc"] + loss_names,
             logger=self.metric_logger,
             namespace="test"
         )
