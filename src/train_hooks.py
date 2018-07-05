@@ -514,7 +514,7 @@ class PredictionHook(tf.train.SessionRunHook):
             ]
         else:
             ests = [
-                Ridge(),
+                Ridge(random_state=44),
                 Lasso(random_state=44)
             ]
 
