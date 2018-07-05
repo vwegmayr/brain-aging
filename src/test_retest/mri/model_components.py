@@ -295,11 +295,14 @@ class PairClassificationHead(Head):
 
         self.construct_graph()
 
+    def get_encodings(self):
+        return self.encodings
+
     def construct_graph(self):
         params = self.params
         features = self.features
 
-        enc_0, enc_1 = self.encodings
+        enc_0, enc_1 = self.get_encodings()
         # Extract labels
         key = params["target_label_key"]
         labels_0 = features[key + "_0"]
@@ -377,7 +380,7 @@ class PairClassificationHead(Head):
         self.loss_o = lam * loss_o
 
     def hidden_regularization(self):
-        enc_0, enc_1 = self.encoder.get_encodings()
+        enc_0, enc_1 = self.get_encodings()
         params = self.params
         reg = name_to_hidden_regularization(
             "last",
