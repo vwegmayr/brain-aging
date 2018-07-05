@@ -414,9 +414,11 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 if patient in train_patients:
                     g.is_train = True
                     train += 1
+                    train_ids.append(g.file_ids[0])
                 elif patient in test_patients:
                     g.is_train = False
                     test += 1
+                    test_ids.append(g.file_ids[0])
                 else:
                     remaining.append(g)
 
