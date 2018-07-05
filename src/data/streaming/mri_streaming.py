@@ -491,10 +491,12 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
     def make_train_test_split(self):
         if self.config["n_folds"] == 0:
-            print(">>>>>> Train-test split")
+            if not self.silent:
+                print(">>>>>> Train-test split")
             return self.make_balanced_train_test_split()
         else:
-            print(">>>>>> k-fold split")
+            if not self.silent:
+                print(">>>>>> k-fold split")
             return self.make_balanced_k_fold_split()
 
 
@@ -1069,6 +1071,11 @@ class AnyPairStream(MRISingleStream):
     def group_data(self, train_ids, test_ids):
         train_files = train_ids
         test_files = test_ids
+
+        # Avoid that pairs are too similari due to ordering
+        # in csv file
+        self.np_random.shuffle(train_files)
+        self.np_random.shuffle(test_files)
 
         train_groups = self.produce_groups(train_files, 2, train=True)
         test_groups = self.produce_groups(test_files, 2, train=False)

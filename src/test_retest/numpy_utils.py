@@ -141,6 +141,14 @@ def softmax(x):
     return ex / s
 
 
+def l1_mean_reg(x):
+    return np.mean(np.abs(x))
+
+
+def l2_sq_mean_reg(x):
+    return np.mean(x ** 2)
+
+
 def batch_divergence(batch_p, batch_q, div_fn):
     divergences = []
     for i in range(len(batch_p)):

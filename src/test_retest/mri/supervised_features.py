@@ -4,7 +4,7 @@ import tensorflow as tf
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
     PairClassificationHead
-from src.train_hooks import SumatraLoggingHook
+from src.train_hooks import SumatraLoggingHook, HookFactory
 
 
 class PairClassification(EvaluateEpochsBaseTF):
@@ -49,15 +49,24 @@ class PairClassification(EvaluateEpochsBaseTF):
         eval_hooks = []
 
         train_hook_names = params["train_hooks"]
+        eval_hook_names = params["eval_hooks"]
+
+        hf = HookFactory(
+            streamer=self.streamer,
+            logger=self.metric_logger,
+            out_dir=self.data_params["dump_out_dir"],
+            model_save_path=self.save_path,
+            epoch=self.current_epoch
+        )
 
         if "embeddings" in train_hook_names:
             enc_0_hook_train, enc_0_hook_test = \
-                self.get_batch_dump_hook(enc_0, features["file_name_0"])
+                hf.get_batch_dump_hook(enc_0, features["file_name_0"])
             train_hooks.append(enc_0_hook_train)
             eval_hooks.append(enc_0_hook_test)
 
             enc_1_hook_train, enc_1_hook_test = \
-                self.get_batch_dump_hook(enc_1, features["file_name_1"])
+                hf.get_batch_dump_hook(enc_1, features["file_name_1"])
             train_hooks.append(enc_1_hook_train)
             eval_hooks.append(enc_1_hook_test)
 
@@ -75,6 +84,44 @@ class PairClassification(EvaluateEpochsBaseTF):
             )
             train_hooks.append(robustness_hook_train)
             eval_hooks.append(robustness_hook_test)
+
+            # Robustness of head predictions
+            hook = hf.get_tensor_prediction_robustness_hook(
+                [preds_0, preds_1],
+                [features["file_name_0"], features["file_name_1"]],
+                "head_prediction",
+                True
+            )
+            train_hooks.append(hook)
+
+            hook = hf.get_tensor_prediction_robustness_hook(
+                [preds_0, preds_1],
+                [features["file_name_0"], features["file_name_1"]],
+                "head_prediction",
+                False
+            )
+            eval_hooks.append(hook)
+
+        if "predictions" in eval_hook_names:
+            prediction_hook = hf.get_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                classify=True,
+                target_label="healthy",
+            )
+            eval_hooks.append(prediction_hook)
+
+            prediction_hook = hf.get_prediction_hook(
+                train_feature_folder=train_feature_folder,
+                test_feature_folder=test_feature_folder,
+                classify=False,
+                target_label="age",
+            )
+            eval_hooks.append(prediction_hook)
+
+            pred_robustness_hook = \
+                hf.get_prediction_robustness_hook()
+            eval_hooks.append(pred_robustness_hook)
 
         acc = clf.get_accuracy()
         all_losses, loss_names = clf.get_losses_with_names()
@@ -94,6 +141,12 @@ class PairClassification(EvaluateEpochsBaseTF):
             namespace="test"
         )
         eval_hooks.append(log_hook_test)
+
+        if self.current_epoch == self.n_epochs - 1:
+            eval_hooks.append(hf.get_file_summarizer_hook(
+                ["prediction_robustness", "predictions",
+                 "head_prediction"]
+            ))
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(

@@ -64,7 +64,7 @@ class TestRegularizers(unittest.TestCase):
         print("Record {}, epoch {}".format(record_label, epoch))
         # Load groups
         groups = []
-        with open("data/{}/test_groups.csv".format(record_label), 'r') as f:
+        with open("data/{}/train_groups.csv".format(record_label), 'r') as f:
             for line in f:
                 paths = line.strip().split("\t")
                 file_names = [os.path.split(p)[-1].split(".")[0] for p in paths]
@@ -72,16 +72,20 @@ class TestRegularizers(unittest.TestCase):
                 groups.append(file_names)
 
         # Unzip folder
-        folder_path = "produced_data/{}/test_{}.zip".format(
+        folder_path = "produced_data/{}/train_{}.zip".format(
             record_label, epoch
         )
-        dest_path = "produced_data/{}/test_{}".format(
+        dest_path = "produced_data/{}/train_{}".format(
             record_label, epoch
         )
 
         shutil.unpack_archive(folder_path, dest_path, 'zip')
 
-        ds = []
+        dic = {
+            "l1": [],
+            "l2": [],
+            "js": []
+        }
         norms = []
         for name_1, name_2 in groups:
             enc_1 = np.load(dest_path + "/{}.npy".format(name_1))[-diag_dim:]
@@ -90,16 +94,19 @@ class TestRegularizers(unittest.TestCase):
                 numpy_utils.softmax(enc_1),
                 numpy_utils.softmax(enc_2)
             )
-            ds.append(d)
+            dic["js"].append(d)
+            dic["l2"].append(numpy_utils.l2_sq_mean_reg(enc_1 - enc_2))
+            dic["l1"].append(numpy_utils.l1_mean_reg(enc_1 - enc_2))
             norms.append(np.linalg.norm(enc_1 - enc_2))
 
-        print(np.mean(ds))
+        for k, v in dic.items():
+            print("{}: {}".format(k, np.mean(v)))
         print(np.mean(norms))
 
         shutil.rmtree(dest_path)
 
-    def test_test_hidden_reg_loss(self):
-        with open("tests/configs/test_test_hidden_reg_loss.yaml", "r") as f:
+    def test_train_hidden_reg_loss(self):
+        with open("tests/configs/test_train_hidden_reg_loss.yaml", "r") as f:
             config = yaml.load(f)
 
         for label in config["record_labels"]:

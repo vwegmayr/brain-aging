@@ -98,6 +98,26 @@ class HookFactory(object):
         )
         return hook
 
+    def get_tensor_prediction_robustness_hook(
+            self,
+            tensors,
+            id_tensors,
+            name,
+            train):
+        hook = TensorPredictionRobustnessHook(
+            epoch=self.epoch,
+            out_dir=self.out_dir,
+            model_save_path=self.model_save_path,
+            streamer=self.streamer,
+            logger=self.logger,
+            tensors=tensors,
+            id_tensors=id_tensors,
+            name=name,
+            train=train
+        )
+
+        return hook
+
 
 class CollectValuesHook(tf.train.SessionRunHook):
     """
@@ -638,6 +658,106 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
 
         for p in self.input_paths:
             self.analyze_file(p)
+
+
+class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
+    def __init__(self, epoch, out_dir, model_save_path, streamer, logger,
+                 tensors, id_tensors, name, train):
+        """
+        Analyze the robustness of an evaluated tensor.
+        """
+        self.model_save_path = model_save_path
+        smt_label = os.path.split(model_save_path)[-1]
+
+        self.out_dir = os.path.join(
+            out_dir,
+            smt_label,
+            name + "_robustness_" + str(epoch)
+        )
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
+        self.train = train
+        self.streamer = streamer
+        self.logger = logger
+        self.values = []
+        self.image_names = []
+        self.tensors = tensors
+        self.id_tensors = id_tensors
+        self.name = name
+
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(
+            fetches=self.tensors + self.id_tensors
+        )
+
+    def after_run(self, run_context, run_values):
+        pred_0 = run_values.results[0]
+        pred_1 = run_values.results[1]
+        ids_0 = run_values.results[2]
+        ids_1 = run_values.results[3]
+
+        self.values.extend(pred_0)
+        self.values.extend(pred_1)
+        self.image_names.extend(ids_0)
+        self.image_names.extend(ids_1)
+
+    def end(self, session):
+        # Bytes to strings
+        self.image_names = [name[0].decode('utf-8')
+                            for name in self.image_names]
+
+        # Map file_names to predictions
+        image_labels = [name.split("_")[0] for name in self.image_names]
+        fname_to_pred = {}
+        for fname, pred in zip(image_labels, self.values):
+            fname_to_pred[fname] = pred
+
+        groups = self.streamer.get_test_retest_pairs(image_labels)
+
+        predictions = []
+        for g in groups:
+            id_1 = g.file_ids[0]
+            id_2 = g.file_ids[1]
+
+            predictions.append([
+                fname_to_pred[id_1],
+                fname_to_pred[id_2]
+            ])
+
+        self.analyze_robustness(np.array(predictions))
+
+    def analyze_robustness(self, predictions):
+        funcs = [
+            numpy_utils.ICC_C1,
+            numpy_utils.ICC_A1,
+            numpy_utils.not_equal_pairs,
+            numpy_utils.equal_pairs
+        ]
+
+        scores = {
+            "n_pairs": len(predictions)
+        }
+        for f in funcs:
+            scores[f.__name__] = f(predictions)
+
+        if not self.train:
+            namespace = "test"
+        else:
+            namespace = "train"
+        with open(os.path.join(self.out_dir, namespace + ".json"), 'w') as f:
+            json.dump(scores, f, indent=2)
+
+        eval_dic = {}
+        for k, v in scores.items():
+            if k == "n_pairs":
+                continue
+            eval_dic[self.name + "_robustness_" + k] = v
+
+        self.logger.add_evaluations(
+            evaluation_dic=eval_dic,
+            namespace=namespace
+        )
 
 
 class ICCHook(tf.train.SessionRunHook):
