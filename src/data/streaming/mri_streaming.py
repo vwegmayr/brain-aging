@@ -208,7 +208,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # im = im / np.max(im)
             shape = tuple(self.config["downsample"]["shape"])
             # im = resize(im, shape, anti_aliasing=False)
-            im = np.random.rand(*shape)
+            im = self.np_random.rand(*shape)
 
         return im
 

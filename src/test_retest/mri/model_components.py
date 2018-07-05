@@ -309,12 +309,36 @@ class PairClassificationHead(Head):
         labels_1 = features[key + "_1"]
 
         # Compute logits
+        """
         w, b, out = linear_trafo_multiple_input_tensors(
             Xs=[enc_0, enc_1],
             out_dim=params["n_classes"],
             weight_names=["logit_weight", "logit_bias"],
             output_names=["logits_0", "logits_1"]
         )
+        """
+        w = tf.get_variable(
+            shape=[enc_0.get_shape()[1], params["n_classes"]],
+            dtype=enc_0.dtype,
+            name="clf_weight",
+            initializer=tf.contrib.layers.xavier_initializer(seed=40)
+        )
+        b = tf.get_variable(
+            shape=[1, params["n_classes"]],
+            dtype=enc_0.dtype,
+            name="clf_bias",
+            initializer=tf.initializers.zeros
+        )
+        out = [
+            tf.add(
+                tf.matmul(enc_0, w),
+                b
+            ),
+            tf.add(
+                tf.matmul(enc_1, w),
+                b
+            )
+        ]
 
         self.logits_0, self.logits_1 = out
 
