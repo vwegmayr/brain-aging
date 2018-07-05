@@ -1,26 +1,25 @@
 import tensorflow as tf
+import abc
 
 
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
-    PairClassificationHead
+    PairClassificationHead, Conv3DEncoder
 from src.train_hooks import SumatraLoggingHook, HookFactory
 
 
 class PairClassification(EvaluateEpochsBaseTF):
-    def model_fn(self, features, labels, mode, params):
-        encoder = MultiLayerPairEncoder(
-            features=features,
-            params=params,
-            streamer=self.streamer
-        )
+    @abc.abstractmethod
+    def get_encodings(self, features, params):
+        pass
 
-        enc_0, enc_1 = encoder.get_encodings()
+    def model_fn(self, features, labels, mode, params):
+        enc_0, enc_1 = self.get_encodings(features, params)
 
         clf = PairClassificationHead(
             features=features,
             params=params,
-            encoder=encoder
+            encodings=[enc_0, enc_1]
         )
 
         preds_0, preds_1 = clf.get_predictions()
@@ -164,3 +163,39 @@ class PairClassification(EvaluateEpochsBaseTF):
 
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
         return self.streamer.get_input_fn(train)
+
+
+class LinearPairClassification(PairClassification):
+    def get_encodings(self, features, params):
+        encoder = MultiLayerPairEncoder(
+            features=features,
+            params=params,
+            streamer=self.streamer
+        )
+
+        enc_0, enc_1 = encoder.get_encodings()
+        return enc_0, enc_1
+
+
+class ConvPairClassification(PairClassification):
+    def get_encodings(self, features, params):
+        with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
+            encoder_0 = Conv3DEncoder(
+                input_key="X_0",
+                features=features,
+                params=params,
+                streamer=self.streamer
+            )
+
+        with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
+            encoder_1 = Conv3DEncoder(
+                input_key="X_1",
+                features=features,
+                params=params,
+                streamer=self.streamer
+            )
+
+        z_0 = encoder_0.get_encoding()
+        z_1 = encoder_1.get_encoding()
+
+        return z_0, z_1

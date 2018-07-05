@@ -288,10 +288,10 @@ class MultiLayerPairDecoder(Head):
 
 
 class PairClassificationHead(Head):
-    def __init__(self, features, params, encoder):
+    def __init__(self, features, params, encodings):
         self.features = features
         self.params = params
-        self.encoder = encoder
+        self.encodings = encodings
 
         self.construct_graph()
 
@@ -299,7 +299,7 @@ class PairClassificationHead(Head):
         params = self.params
         features = self.features
 
-        enc_0, enc_1 = self.encoder.get_encodings()
+        enc_0, enc_1 = self.encodings
         # Extract labels
         key = params["target_label_key"]
         labels_0 = features[key + "_0"]
