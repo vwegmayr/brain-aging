@@ -584,9 +584,6 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
                 params=params,
                 streamer=self.streamer
             )
-        with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
-            decoder_0 = Conv3DDecoder(features, params, encoder_0)
-
         with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
             encoder_1 = Conv3DEncoder(
                 input_key="X_1",
@@ -594,8 +591,18 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
                 params=params,
                 streamer=self.streamer
             )
+
+        target_0 = encoder_0.get_reconstruction_target()
+        target_1 = encoder_1.get_reconstruction_target()
+        if params["asymmetric"]:
+            target_0 = encoder_1.get_reconstruction_target()
+            target_1 = encoder_0.get_reconstruction_target()
+
         with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
-            decoder_1 = Conv3DDecoder(features, params, encoder_1)
+            decoder_0 = Conv3DDecoder(features, params, encoder_0, target_0)
+
+        with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
+            decoder_1 = Conv3DDecoder(features, params, encoder_1, target_1)
 
         z_0 = encoder_0.get_encoding()
         y_0 = decoder_0.get_reconstruction()
@@ -604,6 +611,11 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         z_1 = encoder_1.get_encoding()
         y_1 = decoder_1.get_reconstruction()
         x_1 = encoder_1.get_reconstruction_target()
+
+        if params["asymmetric"]:
+            tmp = y_0
+            y_0 = y_1
+            y_1 = tmp
 
         flattened_z_0 = tf.contrib.layers.flatten(z_0)
         flattened_z_1 = tf.contrib.layers.flatten(z_1)

@@ -206,8 +206,12 @@ class MultiLayerPairDecoder(Head):
         )
 
         # Reconstruction
-        loss_0 = tf.losses.mean_squared_error(x_0, self.rec_0)
-        loss_1 = tf.losses.mean_squared_error(x_1, self.rec_1)
+        if not params["asymmetric"]:
+            loss_0 = tf.losses.mean_squared_error(x_0, self.rec_0)
+            loss_1 = tf.losses.mean_squared_error(x_1, self.rec_1)
+        else:
+            loss_0 = tf.losses.mean_squared_error(x_0, self.rec_1)
+            loss_1 = tf.losses.mean_squared_error(x_1, self.rec_0)
         self.reconstruction_loss = loss_0 / 2 + loss_1 / 2
 
         # Regularization
@@ -547,17 +551,18 @@ class Conv3DEncoder(Body):
 
 
 class Conv3DDecoder(Head):
-    def __init__(self, features, params, encoder):
+    def __init__(self, features, params, encoder, target):
         self.features = features
         self.params = params
         self.encoder = encoder
+        self.target = target
 
         self.construct_graph()
 
     def construct_graph(self):
         params = self.params
 
-        x = self.encoder.get_reconstruction_target()
+        x = self.target
         z = self.encoder.get_encoding()
         encoder_weights = self.encoder.encoder_weights
         encoder_shapes = self.encoder.encoder_shapes
