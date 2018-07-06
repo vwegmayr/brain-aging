@@ -17,6 +17,7 @@ RECORD_LABEL = config.RECORD_LABEL
 AGG_METRICS = config.AGG_METRICS
 X_LABEL = config.X_LABEL
 Y_LABEL = config.Y_LABEL
+ID_TAGS = config.ID_TAGS
 
 FILTERS = config.FILTERS
 LEGEND_LOC = config.LEGEND_LOC
@@ -49,8 +50,14 @@ def filter_record_by_tag(rec, f):
 
 def fits_group(rec, group):
     g = group[0]
+    
+    for t in ID_TAGS:
+        if g.find_tag(t) != rec.find_tag(t):
+            return False
+        
+    return True
 
-    return (rec.version == g.version) and (rec.config == g.config)
+    # return (rec.version == g.version) and (rec.config == g.config)
 
 
 def group_records(records):
