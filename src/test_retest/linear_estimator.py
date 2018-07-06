@@ -8,6 +8,9 @@ import src.test_retest.regularizer as regularizer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.test_retest.test_retest_base import test_retest_evaluation_spec
 from src.test_retest.test_retest_base import mnist_test_retest_input_fn
+from src.test_retest.test_retest_base import \
+    mnist_test_retest_two_labels_input_fn, \
+    test_retest_two_labels_evaluation_spec
 
 
 class LogisticRegression(EvaluateEpochsBaseTF):
@@ -418,14 +421,16 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
                 predictions=predictions
             )
 
+        labels_test = labels[:, 0]
+        labels_retest = labels[:, 1]
         # compute cross-entropy loss for test and retest
         loss_test = tf.losses.sparse_softmax_cross_entropy(
-            labels,
+            labels_test,
             logits=logits_test
         )
 
         loss_retest = tf.losses.sparse_softmax_cross_entropy(
-            labels=labels,
+            labels=labels_retest,
             logits=logits_retest
         )
 
@@ -495,8 +500,9 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
             features_retest=hidden_features_retest
         )
 
-        return test_retest_evaluation_spec(
-            labels=labels,
+        return test_retest_two_labels_evaluation_spec(
+            test_labels=labels_test,
+            retest_labels=labels_retest,
             loss=loss,
             preds_test=preds_test,
             preds_retest=preds_retest,
@@ -554,7 +560,7 @@ class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
     images from .npy files.
     """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        return mnist_test_retest_input_fn(
+        return mnist_test_retest_two_labels_input_fn(
             X=X,
             y=y,
             data_params=self.data_params,
@@ -571,7 +577,7 @@ class MnistTestRetestTwoLevelLogisticRegression(
     images from .npy files.
     """
     def gen_input_fn(self, X, y=None, train=True, input_fn_config={}):
-        return mnist_test_retest_input_fn(
+        return mnist_test_retest_two_labels_input_fn(
             X=X,
             y=y,
             data_params=self.data_params,
