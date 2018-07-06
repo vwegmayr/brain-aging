@@ -342,3 +342,66 @@ class MnistSampler(TransformerMixin):
         sampled = _sample_test_retest(n, X)
 
         return sampled
+
+
+def find_nearest_neighbour(image_id, images, labels):
+    ref_im = images[image_id]
+    n = len(images)
+    closest = -1
+    closest_id = -1
+    for i in range(n):
+        if i == image_id:
+            continue
+        if labels[image_id] != labels[i]:
+            continue
+        diff = np.linalg.norm(ref_im - images[i])
+        if (closest == -1) or (closest != -1 and diff < closest):
+            closest = diff
+            closest_id = i
+
+    return closest_id
+
+
+class MnistNNTestRetestSampler(TransformerMixin):
+    """
+    A test-retest pair consists of an MNIST image
+    and its nearest neighbourg in the images set
+    with the same label. 
+    """
+    def __init__(self, data_path, n, train_data=True):
+        """
+        Args:
+            - np_random_seed: numpy random seed
+            - data_path: path to MNIST data folder
+            - train_data: True if training data should be
+              sampled, False if test data should be sampled
+        """
+        self.data_path = data_path
+        self.train_data = train_data
+        self.n = n
+
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X, y=None):
+        """
+        Input is ignored an MNIST data is load from path
+        given to the constructor.
+
+        Return:
+            - sampled: tuple containing test and retest images
+              as numpy arrays in its first and second component
+              respectively
+        """
+        if self.train_data:
+            X, labels = load_mnist_training(self.data_path)
+        else:
+            X, labels = load_mnist_test(self.data_path)
+
+        n = min(self.n, len(labels))
+        test_ids = list(range(n))
+        retest_ids = [find_nearest_neighbour(i, X, labels) for i in test_ids]
+
+        retest_images = X[retest_ids, :, :]
+
+        return X, retest_images
