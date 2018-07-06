@@ -238,6 +238,7 @@ class MnistDeepTestRetestClassifier(DeepTestRetestClassifier):
             X=X,
             y=y,
             data_params=self.data_params,
+            np_random=self.np_random,
             train=train,
             input_fn_config=input_fn_config
         )

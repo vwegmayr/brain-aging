@@ -404,4 +404,4 @@ class MnistNNTestRetestSampler(TransformerMixin):
 
         retest_images = X[retest_ids, :, :]
 
-        return X, retest_images
+        return X[test_ids, :, :], retest_images

@@ -442,9 +442,14 @@ class TestRetestTwoLevelLogisticRegression(LogisticRegression):
                 name="l2_hidden_features"
             )
         elif params[param_name] == "l2_sq":
-            reg_f = regularizer.l2_squared(
-                f1 - f2,
-                name="l2_sq_hidden_features"
+            reg_f = tf.losses.mean_squared_error(
+                f1,
+                f2
+            )
+        elif params[param_name] == regularizer.L1_MEAN:
+            reg_f = regularizer.l1_mean(
+                f1,
+                f2
             )
         else:
             raise ValueError("Regularizer not found")
@@ -553,6 +558,7 @@ class MnistTestRetestLogisticRegression(TestRetestLogisticRegression):
             X=X,
             y=y,
             data_params=self.data_params,
+            np_random=self.np_random,
             train=train,
             input_fn_config=input_fn_config
         )
@@ -569,6 +575,7 @@ class MnistTestRetestTwoLevelLogisticRegression(
             X=X,
             y=y,
             data_params=self.data_params,
+            np_random=self.np_random,
             train=train,
             input_fn_config=input_fn_config
         )

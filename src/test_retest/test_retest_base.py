@@ -3,6 +3,7 @@ import sys
 import os
 import numpy as np
 import re
+import copy
 
 
 from modules.models.base import BaseTF
@@ -96,7 +97,7 @@ def test_retest_two_labels_evaluation_spec(
     )
 
 
-def mnist_input_fn(X, data_params, y=None, train=True,
+def mnist_input_fn(X, data_params, np_random, y=None, train=True,
                    input_fn_config={}):
     """
     MNIST logistic regression for test-retest data. Loads presampled
@@ -118,17 +119,28 @@ def mnist_input_fn(X, data_params, y=None, train=True,
         images = images[:data_params["test_size"]]
         labels = images[:data_params["test_size"]]
 
+    if input_fn_config["shuffle"]:
+        # shuffle data
+        n = len(labels)
+        idx = list(range(n))
+        np_random.shuffle(idx)
+        images = images[idx]
+        labels = labels[idx]
+
+    cp_config = copy.deepcopy(input_fn_config)
+    cp_config["shuffle"] = False
+
     return tf.estimator.inputs.numpy_input_fn(
         x={
             "X_0": images,
             "file_name_0": np.array([[str(i)] for i in range(len(images))])
         },
         y=labels,
-        **input_fn_config,
+        **cp_config,
     )
 
 
-def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
+def mnist_test_retest_input_fn(X, data_params, np_random, y=None, train=True,
                                input_fn_config={}):
     """
     MNIST logistic regression for test-retest data. Loads presampled
@@ -152,17 +164,29 @@ def mnist_test_retest_input_fn(X, data_params, y=None, train=True,
             False
         )
 
+    if input_fn_config["shuffle"]:
+        # shuffle data
+        n = len(labels)
+        idx = list(range(n))
+        np_random.shuffle(idx)
+        test = test[idx]
+        retest = retest[idx]
+        labels = labels[idx]
+
+    cp_config = copy.deepcopy(input_fn_config)
+    cp_config["shuffle"] = False
+
     return tf.estimator.inputs.numpy_input_fn(
         x={
             "X_test": test,
             "X_retest": retest
         },
         y=labels,
-        **input_fn_config
+        **cp_config
     )
 
 
-def mnist_test_retest_two_labels_input_fn(X, data_params, y=None, train=True,
+def mnist_test_retest_two_labels_input_fn(X, data_params, np_random, y=None, train=True,
                                           input_fn_config={}):
     """
     MNIST logistic regression for test-retest data. Loads presampled
@@ -190,6 +214,19 @@ def mnist_test_retest_two_labels_input_fn(X, data_params, y=None, train=True,
                 data_params["mix_pairs"]
             )
 
+    if input_fn_config["shuffle"]:
+        # shuffle data
+        n = len(test_labels)
+        idx = list(range(n))
+        np_random.shuffle(idx)
+        test = test[idx]
+        retest = retest[idx]
+        test_labels = test_labels[idx]
+        retest_labels = retest_labels[idx]
+
+    cp_config = copy.deepcopy(input_fn_config)
+    cp_config["shuffle"] = False
+
     labels = np.hstack((np.reshape(test_labels, (-1, 1)),
                         np.reshape(retest_labels, (-1, 1))))
     return tf.estimator.inputs.numpy_input_fn(
@@ -198,7 +235,7 @@ def mnist_test_retest_two_labels_input_fn(X, data_params, y=None, train=True,
             "X_retest": retest
         },
         y=labels,
-        **input_fn_config
+        **cp_config
     )
 
 
@@ -301,6 +338,9 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.data_params = data_params
         self.sumatra_params = sumatra_params
         self.hooks = hooks
+        self.np_random = np.random.RandomState(
+            seed=config["tf_random_seed"]
+        )
 
         # Initialize streamer
         # Create a session to lock GPU during initialization
