@@ -256,6 +256,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         k = self.config["n_folds"]
         categorical = self.config["categorical_split"]
         numerical = self.config["numerical_split"]
+        further_stats = ["distinct_patients"]
         all_labels = categorical + numerical
         all_label_mean = {}
         all_label_std = {}
@@ -271,7 +272,12 @@ class MRISingleStream(FileStream, MRIImageLoader):
         # Collect groups stats
         n_total_patients = 0
         for group in all_groups:
-            stats = group.get_label_stats(self, categorical, numerical)
+            stats = group.get_label_stats(
+                streamer=self,
+                categorical=categorical,
+                numerical=numerical,
+                further_stats=further_stats
+            )
             n_total_patients += stats["n"]
             for label in all_labels:
                 all_vals[label].extend(stats[label]["vals"])
@@ -283,76 +289,82 @@ class MRISingleStream(FileStream, MRIImageLoader):
         for label in numerical:
             all_label_std[label] = np.std(all_vals[label])
 
-        folds = []  # list of group lists
+        folds = [[] for i in range(k)]  # list of group lists
+        fold_means = [{} for i in range(k)]
+        fold_it = itertools.cycle(list(range(k)))
         n_groups = len(all_groups)
         used = set([])
         unused = set(list(range(n_groups)))
         fold_target_size = int(n_total_patients / k)
-        for i in range(k - 1):
-            fold = []
-            fold_n = 0
-            # Construct i-th fold
-            fold_mean = {
-                label: 0
-                for label in all_labels
-            }
-            fold_std = {
-                label: 0
-                for label in numerical
-            }
+        # Fill folds in round robin fashion
+        full_folds = []
+        while len(full_folds) < k:
+            fold_i = next(fold_it)
+            while (fold_i in full_folds):
+                fold_i = next(fold_it)
 
-            # Get one unused group
-            idx = unused.pop()  # deterministic for integer hashes
-            used.add(idx)
-            fold.append(all_groups[idx])
-            fold_n += len(all_groups[idx].file_ids)
-            first_stats = all_groups[idx].get_label_stats(
-                self, categorical, numerical
-            )
-            for label in all_labels:
-                fold_mean[label] = first_stats[label]["mean"]
-                if label in numerical:
-                    fold_std[label] = first_stats[label]["std"]
+            fold = folds[fold_i]
+            fold_mean = fold_means[fold_i]
 
-            while fold_n < fold_target_size:
-                if len(unused) == 0:
-                    break
-                # Find best group
-                unused_idx = list(unused)
-                best_idx = -1
-                best_sc = -1
-                best_mean = best_std = None
-                for idx in unused_idx:
-                    cur = all_groups[idx]
-                    stats = cur.get_label_stats(self, categorical, numerical)
-                    new_mean = copy.deepcopy(fold_mean)
-                    new_std = copy.deepcopy(fold_std)
-                    # Update mean and std
-                    sc = 0
-                    new_n = fold_n + stats["n"]
-                    for label in all_labels:
-                        new_mean[label] = stats[label]["mean"] * (stats["n"] / new_n) \
-                                        + fold_mean[label] * (fold_n / new_n)
-                        sc += abs(new_mean[label] - all_label_mean[label])
-                    # Compute score
-                    if (best_sc) == -1 or (best_sc != -1 and best_sc > sc):
-                        best_sc = sc
-                        best_idx = idx
-                        best_mean = copy.deepcopy(new_mean)
+            if len(fold) == 0:
+                # Get one unused group
+                idx = unused.pop()  # deterministic for integer hashes
+                used.add(idx)
+                fold.append(all_groups[idx])
+                fold_n = len(all_groups[idx].file_ids)
+                first_stats = all_groups[idx].get_label_stats(
+                    self, categorical, numerical, further_stats
+                )
+                for label in all_labels:
+                    fold_mean[label] = first_stats[label]["mean"]
 
-                unused.remove(best_idx)
-                used.add(best_idx)
-                fold.append(all_groups[best_idx])
-                # update fold stats and fold_n
-                fold_n += len(all_groups[best_idx].file_ids)
-                fold_mean = copy.deepcopy(best_mean)
+                fold_mean["n"] = fold_n
 
-            folds.append(fold)
+                continue
+
+            fold_n = fold_mean["n"]
+
+            if len(unused) == 0:
+                break
+            # Find best group
+            unused_idx = list(unused)
+            best_idx = -1
+            best_sc = -1
+            best_mean = None
+            for idx in unused_idx:
+                cur = all_groups[idx]
+                stats = cur.get_label_stats(
+                    self, categorical, numerical, further_stats
+                )
+                new_mean = copy.deepcopy(fold_mean)
+                # Update mean and std
+                sc = 0
+                new_n = fold_n + stats["n"]
+                for label in all_labels:
+                    new_mean[label] = \
+                        stats[label]["mean"] * (stats["n"] / new_n) \
+                        + fold_mean[label] * (fold_n / new_n)
+                    sc += abs(new_mean[label] - all_label_mean[label])
+                # Compute score
+                if (best_sc) == -1 or (best_sc != -1 and best_sc > sc):
+                    best_sc = sc
+                    best_idx = idx
+                    best_mean = copy.deepcopy(new_mean)
+
+            unused.remove(best_idx)
+            used.add(best_idx)
+            fold.append(all_groups[best_idx])
+            # update fold stats and fold_n
+            fold_n += len(all_groups[best_idx].file_ids)
+            fold_mean = copy.deepcopy(best_mean)
+            fold_mean["n"] = fold_n
+
+            if fold_n >= fold_target_size:
+                full_folds.append(fold_i)
 
         # Add unused to last fold
-        folds.append([])
         for idx in unused:
-            folds[-1].append(all_groups[idx])
+            folds[next(fold_it)].append(all_groups[idx])
 
         # Set train and test groups
         train_ids = []
@@ -571,6 +583,7 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
                     groups.append(g)
 
         return groups
+
 
 class MRISamePatientPairStream(MRISingleStream):
     def group_data(self, train_ids, test_ids):

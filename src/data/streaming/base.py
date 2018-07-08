@@ -644,7 +644,8 @@ class Group(object):
     def add_file_id(self, fid):
         return self.file_ids.append(fid)
 
-    def get_label_stats(self, streamer, categorical, numerical):
+    def get_label_stats(self, streamer, categorical, numerical,
+                        further_stats):
         if self.label_stats is not None:
             return self.label_stats
 
