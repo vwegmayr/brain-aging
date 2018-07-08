@@ -342,7 +342,10 @@ class MRISingleStream(FileStream, MRIImageLoader):
                     new_mean[label] = \
                         stats[label]["mean"] * (stats["n"] / new_n) \
                         + fold_mean[label] * (fold_n / new_n)
-                    sc += abs(new_mean[label] - all_label_mean[label])
+                    s = abs(new_mean[label] - all_label_mean[label])
+                    if label in numerical:
+                        s /= all_label_std[label]
+                    sc += s
                 # Compute score
                 if (best_sc) == -1 or (best_sc != -1 and best_sc > sc):
                     best_sc = sc
