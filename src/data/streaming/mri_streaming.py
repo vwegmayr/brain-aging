@@ -307,7 +307,6 @@ class MRISingleStream(FileStream, MRIImageLoader):
             fold_mean = fold_means[fold_i]
 
             if len(fold) == 0:
-                print("fold {} is empty".format(fold_i))
                 # Get one unused group
                 idx = unused.pop()  # deterministic for integer hashes
                 used.add(idx)
@@ -322,10 +321,6 @@ class MRISingleStream(FileStream, MRIImageLoader):
                 fold_mean["n"] = fold_n
 
                 continue
-
-            fold_n = fold_mean["n"]
-            if fold_i == 0:
-                print(fold_mean)
 
             if len(unused) == 0:
                 break
