@@ -236,13 +236,12 @@ class FileStream(abc.ABC):
         assert len(train_patients.intersection(test_patients)) == 0
 
     def print_stats(self, groups, outfile=None):
-        group_size = len(self.groups[0].file_ids)
-
         dignosis_count = OrderedDict()
         ages = []
         age_diffs = []
         gender_0 = 0
         gender_1 = 0
+        patient_set = set([])
         for group in groups:
             for fid in group.file_ids:
                 ages.append(self.get_age(fid))
@@ -257,7 +256,10 @@ class FileStream(abc.ABC):
                 elif g == 1:
                     gender_1 += 1
 
-            if group_size == 1:
+                patient = self.get_patient_id(fid)
+                patient_set.add(patient)
+
+            if len(group.file_ids) == 1:
                 continue
 
             for i, fid in enumerate(group.file_ids[1:]):
@@ -274,6 +276,14 @@ class FileStream(abc.ABC):
             of = open(outfile, 'w')
         else:
             print(">>>>>>>>>>>>>>>>")
+
+        if of is None:
+            print(">>>> Distinct patients: {}"
+                  .format(len(patient_set)))
+        else:
+            of.write(">>>> Distinct patients: {}\n"
+                     .format(len(patient_set)))
+
         if len(ages) > 0:
             if of is None:
                 print(">>>> Age stats, mean={}, std={}"
