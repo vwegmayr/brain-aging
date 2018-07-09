@@ -589,6 +589,16 @@ class EvaluateEpochsBaseTF(BaseTF):
                 ["prediction_robustness", "predictions"]
             ))
 
+            if "robustness" in eval_hook_names:
+                enc_dim = params["hidden_dim"]
+                diag_dim = params["diagnose_dim"]
+                not_reg = set([str(i) for i in range(0, enc_dim - diag_dim)])
+                reg = set([str(i) for i in range(enc_dim - diag_dim, enc_dim)])
+                eval_hooks.append(hook_factory.get_compare_regularized_unregularized_features(
+                    reg=reg,
+                    not_reg=not_reg
+                ))
+
         return train_hooks, eval_hooks
 
     def score(self, X, y):

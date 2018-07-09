@@ -8,6 +8,10 @@ from sklearn.metrics import accuracy_score, f1_score, recall_score, \
         mean_squared_error
 import pandas as pd
 import csv
+import matplotlib
+matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
+import matplotlib.pyplot as plt
+import re
 
 
 from src.test_retest import numpy_utils
@@ -114,6 +118,16 @@ class HookFactory(object):
             id_tensors=id_tensors,
             name=name,
             train=train
+        )
+
+        return hook
+
+    def get_compare_regularized_unregularized_features(self, reg, not_reg):
+        hook = CompareRegularizedUnregularizedFeatures(
+            model_save_path=self.model_save_path,
+            out_dir=self.out_dir,
+            reg=reg,
+            not_reg=not_reg
         )
 
         return hook
@@ -361,6 +375,64 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
         )
         self.analyzer.set_save_path(self.model_save_path)
         self.analyzer.transform(None, None)
+
+
+class CompareRegularizedUnregularizedFeatures(tf.train.SessionRunHook):
+    def __init__(self, model_save_path, out_dir, reg, not_reg):
+        """
+        Args:
+            - reg: names of features that are regularized
+            - not_reg: names of features that are not regularized
+        """
+        self.model_save_path = model_save_path
+        smt_label = os.path.split(model_save_path)[-1]
+        self.base_dir = os.path.join(out_dir, smt_label)
+        self.reg = reg
+        self.not_reg = not_reg
+
+    def feature_agreement(self, in_folder, feature_set, prefix, file_name,
+                          measure_name="ICC_A1"):
+        # Retrieve computation dic
+        plt.figure()
+        comps = []
+        comp_names = []
+        for name in os.listdir(in_folder):
+            if name.startswith(prefix) and name.endswith(".json"):
+                dic = json.load(open(os.path.join(in_folder, name), 'r'))
+                comps.append(dic)
+                comp_names.append("_".join(name.split("_")[:-1]))
+
+        all_values = []
+        for comp, name in zip(comps, comp_names):
+            values = []
+            for f in feature_set:
+                values.append(comp[f][measure_name])
+            all_values.append(values)
+        plt.xlabel(measure_name)
+        plt.ylabel("Number of features")
+        plt.title("Feature reproducibility on test-retest pairs")
+        plt.hist(all_values, edgecolor="black", label=comp_names)
+        plt.legend(loc=0, ncol=1)
+        plt.tight_layout()
+        oname = "{}_{}_{}.pdf".format(file_name, prefix, measure_name)
+        plt.savefig(os.path.join(in_folder, oname))
+        plt.close()
+
+    def compare_agreement(self):
+        pattern = "robustness_(train|test)_[0-9]+"
+        regexp = re.compile(pattern)
+        for name in os.listdir(self.base_dir):
+            print(name)
+            match = regexp.match(name)
+            if match is not None:
+                p = os.path.join(self.base_dir, name, "robustness_measures")
+                self.feature_agreement(p, self.not_reg, "same_patient", "not_reg")
+                self.feature_agreement(p, self.reg, "same_patient", "reg")
+                self.feature_agreement(p, self.not_reg, "different_patient", "not_reg")
+                self.feature_agreement(p, self.reg, "different_patient", "reg")
+
+    def end(self, session):
+        self.compare_agreement()
 
 
 class PredictionHook(tf.train.SessionRunHook):
