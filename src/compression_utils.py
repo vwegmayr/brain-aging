@@ -4,6 +4,8 @@ import re
 
 
 def zip_folders(record_folder, reg):
+    if not os.path.exists(record_folder):
+        return
     names = os.listdir(record_folder)
     for name in names:
         p = os.path.join(record_folder, name)

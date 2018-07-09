@@ -205,14 +205,30 @@ def mnist_test_retest_two_labels_input_fn(X, data_params, np_random, y=None, tra
 
     else:
         # load test/retest data
-        test, retest, test_labels, retest_labels = \
-            mnist_read.load_test_retest_two_labels(
-                data_params["data_path"],  # path to MNIST root folder
-                data_params["test_test_retest"],
-                data_params["test_size"],
-                False,
-                data_params["mix_pairs"]
+        if "true_test_data" not in data_params:
+            # Load sampled data
+            test, retest, test_labels, retest_labels = \
+                mnist_read.load_test_retest_two_labels(
+                    data_params["data_path"],  # path to MNIST root folder
+                    data_params["test_test_retest"],
+                    data_params["test_size"],
+                    False,
+                    data_params["mix_pairs"]
+                )
+        else:
+            # Load unmodified original test data
+            print(">>>>>>>> Loading true test data")
+            images, labels = mnist_read.load_mnist_test(
+                data_params["true_test_data"]
             )
+            images = images[:data_params["test_size"]]
+            labels = labels[:data_params["test_size"]]
+            # Make pairs
+            half = int(len(images) / 2)
+            test = images[:half]
+            retest = images[half:2*half]
+            test_labels = labels[:half]
+            retest_labels = labels[half:2*half]
 
     if input_fn_config["shuffle"]:
         # shuffle data
