@@ -487,7 +487,6 @@ class CompareRegularizedUnregularizedFeatures(tf.train.SessionRunHook):
         pattern = "robustness_(train|test)_[0-9]+"
         regexp = re.compile(pattern)
         for name in os.listdir(self.base_dir):
-            print(name)
             match = regexp.match(name)
             if match is not None:
                 p = os.path.join(self.base_dir, name, "robustness_measures")
