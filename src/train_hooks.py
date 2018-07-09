@@ -20,12 +20,29 @@ from src.test_retest.mri.feature_analysis import RobustnessMeasureComputation
 
 
 class HookFactory(object):
+    """
+    Factory to create different hooks. Objects
+    that are used by many different hooks are
+    passed to the constructor.
+    """
     def __init__(self,
                  streamer,
                  logger,
                  out_dir,
                  model_save_path,
                  epoch):
+        """
+        Args:
+            - streamer: streamer used to stream input data
+              for training and evaluation
+            - logger: logging object used to log metrics
+              displayed by sumatra
+            - out_dir: output data folder that is not tracked
+              by sumatra (e.g. 'produced_data')
+            - model_save_path: output data folder that is tracked
+              by sumatra (e.g. 'data/20181212-102120')
+            - epoch: i-th epoch of training
+        """
         self.streamer = streamer
         self.logger = logger
         self.out_dir = out_dir
@@ -161,6 +178,13 @@ class CollectValuesHook(tf.train.SessionRunHook):
 
 class ConfusionMatrixHook(tf.train.SessionRunHook):
     def __init__(self, pred_1, pred_2, n_classes, out_dir):
+        """
+        Args:
+            - pred_1: tensor containing predictions for test
+              samples
+            - pred_2: tensor containing predictions for retest
+              samples
+        """
         self.pred_1 = pred_1
         self.pred_2 = pred_2
         self.n_classes = n_classes
@@ -200,8 +224,21 @@ class ConfusionMatrixHook(tf.train.SessionRunHook):
 
 
 class FileSummarizer(tf.train.SessionRunHook):
+    """
+    Collect files with the same name which are stored
+    in different epoch output folders and summarize
+    them into a single file which is dumped to a summary
+    folder.
+    """
     def __init__(self, model_save_path, out_dir,
                  folder_prefixes, size_lim=1000):
+        """
+        Args:
+            - folder_prefixes: prefixes of folders
+              that should be considered
+            - size_lim: only files with a size less
+              than this limit (in bytes) are considered
+        """
         self.model_save_path = model_save_path
         self.smt_label = os.path.split(model_save_path)[-1]     
         self.size_lim = size_lim
@@ -287,10 +324,16 @@ class FileSummarizer(tf.train.SessionRunHook):
 
 class BatchDumpHook(tf.train.SessionRunHook):
     """
-    Dump tensor to file.
+    Dump tensor as numpy array to a file.
     """
     def __init__(self, tensor_batch, batch_names, model_save_path,
                  out_dir, epoch, train=True):
+        """
+        Args:
+            - tensor_batch: tensor containing values that are dumped
+            - batch_names: contains the names that are used as output
+              file names
+        """
         self.tensor_batch = tensor_batch
         self.batch_names = batch_names
         self.epoch = epoch
@@ -329,8 +372,24 @@ class BatchDumpHook(tf.train.SessionRunHook):
 
 
 class RobustnessComputationHook(tf.train.SessionRunHook):
+    """
+    Compute robustness measures using the streamer collection
+    defined in the config file. The files are dumped in the
+    output data folder that is not tracked by sumatra. A
+    subfolder with name robustness_(train|test)_epoch is
+    created.
+    """
     def __init__(self, model_save_path, out_dir, epoch, train,
                  feature_folder, robustness_streamer_config):
+        """
+        Args:
+            - train: true iff it should be used as hook
+              during training
+            - feature_folder: folder containing the feature
+              vectors (they should be stored as numpy arrays)
+            - robustness_streamer_config: config for streamer
+              collection used for the robustness computation
+        """
         self.model_save_path = model_save_path
         self.out_dir = out_dir
         self.epoch = epoch
@@ -378,6 +437,10 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
 
 
 class CompareRegularizedUnregularizedFeatures(tf.train.SessionRunHook):
+    """
+    Load robustness stats and do some further analysis by comparing
+    regularized and unregularized features.
+    """
     def __init__(self, model_save_path, out_dir, reg, not_reg):
         """
         Args:
@@ -396,6 +459,7 @@ class CompareRegularizedUnregularizedFeatures(tf.train.SessionRunHook):
         plt.figure()
         comps = []
         comp_names = []
+        # Load computation dictionaries
         for name in os.listdir(in_folder):
             if name.startswith(prefix) and name.endswith(".json"):
                 dic = json.load(open(os.path.join(in_folder, name), 'r'))
@@ -408,6 +472,7 @@ class CompareRegularizedUnregularizedFeatures(tf.train.SessionRunHook):
             for f in feature_set:
                 values.append(comp[f][measure_name])
             all_values.append(values)
+        # Plot histogram
         plt.xlabel(measure_name)
         plt.ylabel("Number of features")
         plt.title("Feature reproducibility on test-retest pairs")
@@ -736,7 +801,8 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
     def __init__(self, epoch, out_dir, model_save_path, streamer, logger,
                  tensors, id_tensors, name, train):
         """
-        Analyze the robustness of an evaluated tensor.
+        Analyze the robustness of an evaluated tensor which contains
+        predictions.
         """
         self.model_save_path = model_save_path
         smt_label = os.path.split(model_save_path)[-1]
