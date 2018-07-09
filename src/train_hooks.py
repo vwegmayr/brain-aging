@@ -220,7 +220,7 @@ class FileSummarizer(tf.train.SessionRunHook):
                     self.out_dir,
                     folder_prefix + "_" + fname + ".json"
                 ), 'w') as f:
-            json.dump(dic, f, indent=2)
+            json.dump(dic, f, indent=2, ensure_ascii=False)
 
     def process_csv_files(self, folder_prefix, fname, file_paths):
         combined_csv = pd.concat([pd.read_csv(f) for f in file_paths])
@@ -602,7 +602,7 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
             scores[f.__name__] = f(predictions)
 
         with open(os.path.join(self.out_dir, file_name + ".json"), 'w') as f:
-            json.dump(scores, f, indent=2)
+            json.dump(scores, f, indent=2, ensure_ascii=False)
 
         eval_dic = {}
         for k, v in scores.items():
@@ -746,7 +746,7 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
         else:
             namespace = "train"
         with open(os.path.join(self.out_dir, namespace + ".json"), 'w') as f:
-            json.dump(scores, f, indent=2)
+            json.dump(scores, f, indent=2, ensure_ascii=False)
 
         eval_dic = {}
         for k, v in scores.items():

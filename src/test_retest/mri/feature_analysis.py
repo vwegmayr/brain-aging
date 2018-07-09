@@ -292,7 +292,7 @@ class RobustnessMeasureComputation(DataTransformer):
             # Dump dictionary
             file_name = os.path.join(out_path, r_name + "_all.json")
             with open(file_name, 'w') as f:
-                json.dump(r_dic, f, indent=2)
+                json.dump(r_dic, f, indent=2, ensure_ascii=False)
 
             # List best features
             items = list(r_dic.items())
@@ -346,7 +346,7 @@ class RobustnessMeasureComputation(DataTransformer):
             file_name = streamer.name + "_" + "computations.json"
             # Dump computations
             with open(os.path.join(out_path, file_name), 'w') as f:
-                json.dump(computation_dic, f, indent=2)
+                json.dump(computation_dic, f, indent=2, ensure_ascii=False)
 
             histo_path = os.path.join(out_path, streamer.name + "_histo.pdf")
             # Generate histogram

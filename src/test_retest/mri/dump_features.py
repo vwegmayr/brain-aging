@@ -54,7 +54,7 @@ class MriFeatureDumper(DataTransformer):
                 file_name = self.get_output_file_name(fid)
                 with open(os.path.join(out_path, file_name + ".json"), "w") \
                         as f:
-                    json.dump(dic, f, indent=2)
+                    json.dump(dic, f, indent=2, ensure_ascii=False)
 
         self.streamer = None
 

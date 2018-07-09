@@ -60,7 +60,7 @@ class PyRadiomicsFeatures(DataTransformer):
                         os.path.join(out_path, str(file_id) + ".json"),
                         "w"
                     ) as f:
-                        json.dump(features, f, indent=2)
+                        json.dump(features, f, indent=2, ensure_ascii=False)
 
 
 class PyRadiomicsFeaturesSpawn(DataTransformer):
@@ -134,7 +134,7 @@ class PyRadiomicsSingleFileTransformer(DataTransformer):
             os.path.join(self.out_path),
             "w"
         ) as f:
-            json.dump(features, f, indent=2)
+            json.dump(features, f, indent=2, ensure_ascii=False)
 
 
 class MriIncrementalPCA(DataTransformer):
