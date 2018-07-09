@@ -345,7 +345,7 @@ class RobustnessMeasureComputation(DataTransformer):
             computation_dic = self.process_stream(streamer)
             file_name = streamer.name + "_" + "computations.json"
             # Dump computations
-            with open(os.path.join(out_path, file_name), 'w') as f:
+            with open(os.path.join(out_path, file_name), 'w', encoding="utf-8") as f:
                 json.dump(computation_dic, f, indent=2, ensure_ascii=False)
 
             histo_path = os.path.join(out_path, streamer.name + "_histo.pdf")
