@@ -365,11 +365,11 @@ class PairClassificationHead(Head):
         self.loss_clf = self.loss_0 / 2 + self.loss_1 / 2
 
         self.acc_0 = tf.reduce_mean(
-            tf.cast(tf.equal(self.preds_0, labels_0), tf.int32)
+            tf.cast(tf.equal(self.preds_0, labels_0), tf.float32)
         )
 
         self.acc_1 = tf.reduce_mean(
-            tf.cast(tf.equal(self.preds_1, labels_1), tf.int32)
+            tf.cast(tf.equal(self.preds_1, labels_1), tf.float32)
         )
 
         # Set some regularizers
@@ -424,6 +424,9 @@ class PairClassificationHead(Head):
         names = ["output_loss", "hidden_loss", "cross_entropy"]
         return ops, names
 
+    def get_acc_test(self):
+        return self.acc_0
+
     def get_accuracy(self):
         return self.acc_0 / 2 + self.acc_1 / 2
 
@@ -447,6 +450,12 @@ class Conv3DEncoder(Body):
 
     def get_encoding_dim(self):
         return self.params["hidden_dim"]
+
+    def get_pooling_size(self, i):
+        return self.params["pooling_sizes"][i]
+
+    def use_pooling(self):
+        return "pooling_sizes" in self.params
 
     def construct_graph(self):
         features = self.features
@@ -506,13 +515,26 @@ class Conv3DEncoder(Body):
             )
             current_input = output
 
+            # Pooling
+            if self.use_pooling():
+                s = self.get_pooling_size(layer_i)
+                current_input = tf.layers.max_pooling3d(
+                    inputs=current_input,
+                    pool_size=s,
+                    strides=s
+                )
+            dim_list = current_input.get_shape().as_list()[1:]
+            cur_dim = reduce(lambda x, y: x * y, dim_list)
+            print(">>>>> input dim is {}".format(cur_dim))
+
         self.z = current_input
 
         dim_list = current_input.get_shape().as_list()[1:]
         cur_dim = reduce(lambda x, y: x * y, dim_list)
+        print(">>>>> input dim after conv layers: {}".format(cur_dim))
 
         self.linear_trafo = False
-        if cur_dim > self.get_encoding_dim():
+        if cur_dim > self.get_encoding_dim() and not self.use_pooling():
             print("Non conv layer needed")
             self.linear_trafo = True
             self.dim_before_linear_trafo = cur_dim
@@ -536,6 +558,8 @@ class Conv3DEncoder(Body):
             )
 
             self.z = current_input
+        else:
+            self.z = tf.contrib.layers.flatten(current_input)
 
         self.encoder_weights = encoder
         self.encoder_shapes = shapes

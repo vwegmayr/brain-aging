@@ -1,7 +1,6 @@
 import tensorflow as tf
 import abc
 
-
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
     PairClassificationHead, Conv3DEncoder

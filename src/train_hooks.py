@@ -149,6 +149,35 @@ class HookFactory(object):
 
         return hook
 
+    def get_print_run_mean_hook(self, tensors, names):
+        hook = PrintRunMeanHook(
+            tensors=tensors,
+            names=names
+        )
+
+        return hook
+
+
+class PrintRunMeanHook(tf.train.SessionRunHook):
+    def __init__(self, tensors, names):
+        self.tensors = tensors
+        self.names = names
+        self.all_values = [[] for i in range(len(names))]
+
+    def before_run(self, run_context):
+        # All tensors in tensor_dic will be evaluated
+        return tf.train.SessionRunArgs(fetches=[self.tensors])
+
+    def after_run(self, run_context, run_values):
+        for i, values in enumerate(run_values.results):
+            self.all_values[i].extend(values)
+
+    def end(self, session):
+        # Compute and print means
+        for i, name in enumerate(self.names):
+            v = np.mean(self.all_values[i])
+            print("{}: {}".format(v, name))
+
 
 class CollectValuesHook(tf.train.SessionRunHook):
     """
