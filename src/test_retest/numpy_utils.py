@@ -133,6 +133,10 @@ def js_divergence(p, q, eps=0.000001):
     return js
 
 
+def js_metric(x, y):
+    return js_divergence(softmax(x), softmax(y))
+
+
 def softmax(x):
     ex = np.exp(x)
     s = np.sum(ex)

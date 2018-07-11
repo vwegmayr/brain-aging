@@ -146,6 +146,16 @@ class PairClassification(EvaluateEpochsBaseTF):
                  "head_prediction"]
             ))
 
+            if "robustness" in eval_hook_names:
+                enc_dim = params["hidden_dim"]
+                diag_dim = params["diagnose_dim"]
+                not_reg = set([str(i) for i in range(0, enc_dim - diag_dim)])
+                reg = set([str(i) for i in range(enc_dim - diag_dim, enc_dim)])
+                eval_hooks.append(hf.get_compare_regularized_unregularized_features(
+                    reg=reg,
+                    not_reg=not_reg
+                ))
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,

@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.python.summary import summary as core_summary
 import numpy as np
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, f1_score, recall_score, \
         mean_squared_error
 import pandas as pd
@@ -12,7 +13,7 @@ import matplotlib
 matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
 import re
-
+import types
 
 from src.test_retest import numpy_utils
 from src.test_retest.metrics import specificity_score
@@ -616,12 +617,21 @@ class PredictionHook(tf.train.SessionRunHook):
         name = est.__class__.__name__
         est.fit(X_train, y_train)
 
-        if self.classify:
+        if isinstance(est, LogisticRegression):
             balanced = est.get_params()["class_weight"]
             if balanced is None:
                 balanced = "_not_balanced"
             else:
                 balanced = "_balanced"
+        elif isinstance(est, KNeighborsClassifier):
+            params = est.get_params()
+            metric = params["metric"]
+            if isinstance(metric, types.FunctionType):
+                metric = metric.__name__
+            balanced = "_k_{}_metric_{}".format(
+                params["n_neighbors"],
+                metric
+            )
         else:
             balanced = ""
 
@@ -675,7 +685,31 @@ class PredictionHook(tf.train.SessionRunHook):
         if self.classify:
             ests = [
                 LogisticRegression(class_weight='balanced'),
-                LogisticRegression()
+                LogisticRegression(),
+                KNeighborsClassifier(
+                    n_neighbors=1,
+                    metric="euclidean"
+                ),
+                KNeighborsClassifier(
+                    n_neighbors=5,
+                    metric="euclidean"
+                ),
+                KNeighborsClassifier(
+                    n_neighbors=1,
+                    metric="manhattan"
+                ),
+                KNeighborsClassifier(
+                    n_neighbors=5,
+                    metric="manhattan"
+                ),
+                KNeighborsClassifier(
+                    n_neighbors=1,
+                    metric=numpy_utils.js_metric
+                ),
+                KNeighborsClassifier(
+                    n_neighbors=5,
+                    metric=numpy_utils.js_metric
+                )
             ]
         else:
             ests = [
