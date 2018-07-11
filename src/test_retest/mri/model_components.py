@@ -313,14 +313,6 @@ class PairClassificationHead(Head):
         self.labels_1 = tf.reshape(features[key + "_1"], [-1])
 
         # Compute logits
-        """
-        w, b, out = linear_trafo_multiple_input_tensors(
-            Xs=[enc_0, enc_1],
-            out_dim=params["n_classes"],
-            weight_names=["logit_weight", "logit_bias"],
-            output_names=["logits_0", "logits_1"]
-        )
-        """
         w = tf.get_variable(
             shape=[enc_0.get_shape()[1], params["n_classes"]],
             dtype=enc_0.dtype,
@@ -410,11 +402,33 @@ class PairClassificationHead(Head):
     def hidden_regularization(self):
         enc_0, enc_1 = self.get_encodings()
         params = self.params
+        diagnose_dim = params["diagnose_dim"]
+        enc_dim = enc_0.get_shape().as_list()[-1]
+        to_reg_0 = enc_0
+        to_reg_1 = enc_1
+
+        if diagnose_dim > 0:
+            patient_dim = enc_dim - diagnose_dim
+            patient_encs_0, diag_encs_0 = tf.split(
+                enc_0,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            patient_encs_1, diag_encs_1 = tf.split(
+                enc_1,
+                [patient_dim, diagnose_dim],
+                axis=1
+            )
+
+            to_reg_0 = diag_encs_0
+            to_reg_1 = diag_encs_1
+
         reg = name_to_hidden_regularization(
-            "last",
+            "hidden_reg",
             params["hidden_regularizer"],
-            enc_0,
-            enc_1
+            to_reg_0,
+            to_reg_1
         )
 
         self.loss_h = params["hidden_lambda"] * reg
