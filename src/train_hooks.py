@@ -166,7 +166,7 @@ class PrintRunMeanHook(tf.train.SessionRunHook):
 
     def before_run(self, run_context):
         # All tensors in tensor_dic will be evaluated
-        return tf.train.SessionRunArgs(fetches=[self.tensors])
+        return tf.train.SessionRunArgs(fetches=self.tensors)
 
     def after_run(self, run_context, run_values):
         for i, values in enumerate(run_values.results):
@@ -176,7 +176,7 @@ class PrintRunMeanHook(tf.train.SessionRunHook):
         # Compute and print means
         for i, name in enumerate(self.names):
             v = np.mean(self.all_values[i])
-            print("{}: {}".format(v, name))
+            print("{}: {}".format(name, v))
 
 
 class CollectValuesHook(tf.train.SessionRunHook):
@@ -685,7 +685,13 @@ class PredictionHook(tf.train.SessionRunHook):
 
         self.rows = []
         for est in ests:
-            self.evaluate(est, X_train, y_train, X_test, y_test)
+            self.evaluate(
+                est=est,
+                X_train=X_train,
+                y_train=y_train,
+                X_test=X_test,
+                y_test=y_test
+            )
 
         func_names = ["_".join(f.__name__.split("_")[:-1]) for f in self.funcs]
         self.df = pd.DataFrame(
@@ -972,7 +978,6 @@ class SumatraLoggingHook(tf.train.SessionRunHook):
 
     def after_run(self, run_context, run_values):
         values = run_values.results
-
         for val, name in zip(values, self.names):
             self.name_to_values[name].append(val)
 

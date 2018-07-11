@@ -309,8 +309,8 @@ class PairClassificationHead(Head):
         enc_0, enc_1 = self.get_encodings()
         # Extract labels
         key = params["target_label_key"]
-        labels_0 = features[key + "_0"]
-        labels_1 = features[key + "_1"]
+        self.labels_0 = tf.reshape(features[key + "_0"], [-1])
+        self.labels_1 = tf.reshape(features[key + "_1"], [-1])
 
         # Compute logits
         """
@@ -353,23 +353,23 @@ class PairClassificationHead(Head):
         self.preds_1 = tf.argmax(input=self.logits_1, axis=1)
 
         self.loss_0 = tf.losses.sparse_softmax_cross_entropy(
-            labels=labels_0,
+            labels=self.labels_0,
             logits=self.logits_0
         )
 
         self.loss_1 = tf.losses.sparse_softmax_cross_entropy(
-            labels=labels_1,
+            labels=self.labels_1,
             logits=self.logits_1
         )
 
         self.loss_clf = self.loss_0 / 2 + self.loss_1 / 2
 
         self.acc_0 = tf.reduce_mean(
-            tf.cast(tf.equal(self.preds_0, labels_0), tf.float32)
+            tf.cast(tf.equal(self.preds_0, self.labels_0), tf.float32)
         )
 
         self.acc_1 = tf.reduce_mean(
-            tf.cast(tf.equal(self.preds_1, labels_1), tf.float32)
+            tf.cast(tf.equal(self.preds_1, self.labels_1), tf.float32)
         )
 
         # Set some regularizers
