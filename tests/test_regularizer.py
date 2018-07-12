@@ -8,7 +8,7 @@ import shutil
 
 
 from src.test_retest.regularizer import \
-    js_divergence, batch_divergence
+    js_divergence, batch_divergence, l1_mean
 
 from src.test_retest import numpy_utils
 
@@ -114,6 +114,55 @@ class TestRegularizers(unittest.TestCase):
             diag_dim = config["record_labels"][label]["diag_dim"]
             for e in epochs:
                 self.compute_js_divergence(label, e, diag_dim)
+
+    def test_weighted_loss(self):
+        x = tf.placeholder(shape=[4, 2], dtype=tf.float32)
+        y = tf.placeholder(shape=[4, 2], dtype=tf.float32)
+
+        loss = l1_mean(x - y)
+
+        np_x = np.array([
+            [1, 1],
+            [2, 2],
+            [3, 2],
+            [9, 0]
+        ])
+
+        np_y = np.array([
+            [1, 1],
+            [0, 0],
+            [0, 0],
+            [0, 0]
+        ])
+
+        np_loss = np.mean(np.abs(np_x - np_y))
+
+        tf_loss = self.sess.run(loss, {
+            x: np_x,
+            y: np_y
+        })
+
+        self.assertTrue(np.allclose(np_loss, tf_loss))
+
+        np_weights = np.array([
+            [0],
+            [0],
+            [0],
+            [1]
+        ])
+
+        weights = tf.placeholder(shape=[4, 1], dtype=tf.float32)
+        mse = tf.losses.mean_squared_error(x, y, weights)
+        loss = l1_mean(x - y, weights)
+        #loss = tf.losses.compute_weighted_loss(np.abs(x - y), weights)
+        tf_loss, tf_mse = self.sess.run([loss, mse], {
+            x: np_x,
+            y: np_y,
+            weights: np_weights
+        })
+        print(tf_loss)
+        self.assertTrue(np.isclose(tf_loss, 9/2))
+        print(tf_mse)
 
 
 if __name__ == "__main__":

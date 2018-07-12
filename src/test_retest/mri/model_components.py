@@ -8,7 +8,10 @@ from src.test_retest.test_retest_base import \
 
 
 def name_to_hidden_regularization(layer_id, reg_name, activations_test,
-                                  activations_retest):
+                                  activations_retest, weights=None):
+    batch_size = tf.shape(activations_test)[0]
+    if weights is None:
+        weights = tf.ones(shape=[batch_size, 1])
     if reg_name == regularizer.JS_DIVERGENCE_LABEL:
         s_test = tf.nn.softmax(
             activations_test,
@@ -25,20 +28,24 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
             n,
             regularizer.js_divergence
         )
-        return tf.reduce_mean(batch_div)
+        return tf.losses.compute_weighted_loss(batch_div, weights)
 
     elif reg_name == regularizer.L2_SQUARED_LABEL:
         return tf.losses.mean_squared_error(
-                    activations_test, activations_retest
+                    activations_test, activations_retest,
+                    weights=weights
                )
     elif reg_name == regularizer.COSINE_SIMILARITY:
         similarities = regularizer.cosine_similarities(
             activations_test,
             activations_retest
         )
-        return tf.reduce_mean(similarities)
+        return tf.losses.compute_weighted_loss(similarities, weights)
     elif reg_name == regularizer.L1_MEAN:
-        return regularizer.l1_mean(activations_test - activations_retest)
+        return regularizer.l1_mean(
+            activations_test - activations_retest,
+            weights=weights
+        )
     else:
         raise ValueError("regularization name '{}' is unknown".format(
                          reg_name))
@@ -302,6 +309,17 @@ class PairClassificationHead(Head):
     def get_encodings(self):
         return self.encodings
 
+    def get_similarity_weight(self):
+        return self.params["similarity_w"]
+
+    def get_dissimilarity_weight(self):
+        return self.params["dissimilarity_w"]
+
+    def compute_pair_weighing(self, sim_w, dissim_w, labels_0, labels_1):
+        eq = tf.cast(tf.equal(labels_0, labels_1), tf.float32)
+        weights = (sim_w + dissim_w) * eq - dissim_w
+        return tf.reshape(weights, [-1, 1])
+
     def construct_graph(self):
         params = self.params
         features = self.features
@@ -378,6 +396,10 @@ class PairClassificationHead(Head):
         lam = params["lambda_o"]
         key = "output_regularizer"
 
+        label_equality = tf.cast(
+            tf.equal(self.labels_0, self.labels_1),
+            tf.float32
+        )
         if params[key] == "kl_divergence":
             loss_o = regularizer.batch_divergence(
                 self.probs_0,
@@ -385,7 +407,6 @@ class PairClassificationHead(Head):
                 params["n_classes"],
                 regularizer.kl_divergence
             )
-            loss_o = tf.reduce_mean(loss_o)
         elif params[key] == "js_divergence":
             loss_o = regularizer.batch_divergence(
                 self.probs_0,
@@ -393,10 +414,11 @@ class PairClassificationHead(Head):
                 params["n_classes"],
                 regularizer.js_divergence
             )
-            loss_o = tf.reduce_mean(loss_o)
         else:
             raise ValueError("Regularizer not found")
 
+        weights = tf.reshape(label_equality, [-1, 1])
+        loss_o = tf.losses.compute_weighted_loss(loss_o, weights)
         self.loss_o = lam * loss_o
 
     def hidden_regularization(self):
@@ -424,11 +446,19 @@ class PairClassificationHead(Head):
             to_reg_0 = diag_encs_0
             to_reg_1 = diag_encs_1
 
+        weights = self.compute_pair_weighing(
+            sim_w=self.get_similarity_weight(),
+            dissim_w=self.get_dissimilarity_weight(),
+            labels_0=self.labels_0,
+            labels_1=self.labels_1
+        )
+
         reg = name_to_hidden_regularization(
             "hidden_reg",
             params["hidden_regularizer"],
             to_reg_0,
-            to_reg_1
+            to_reg_1,
+            weights
         )
 
         self.loss_h = params["hidden_lambda"] * reg

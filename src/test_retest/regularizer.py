@@ -13,8 +13,11 @@ def l1(weights, name):
     return tf.reduce_sum(tf.abs(weights), name=name)
 
 
-def l1_mean(x):
-    return tf.reduce_mean(tf.abs(x))
+def l1_mean(x, weights=None):
+    n = tf.shape(x)[0]
+    if weights is None:
+        weights = tf.ones(shape=[n, 1])
+    return tf.losses.compute_weighted_loss(tf.abs(x), weights)
 
 
 def l2_squared(weights, name):
@@ -93,7 +96,7 @@ def batch_divergence(batch_p, batch_q, n, div_fn):
     fn = (lambda x: div_fn(x[:n], x[n:]))
     divergences = tf.map_fn(fn, all_probs)
 
-    return divergences
+    return tf.reshape(divergences, [-1, 1])
 
 
 def cosine_similarities(A, B):
