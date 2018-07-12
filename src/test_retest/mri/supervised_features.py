@@ -147,7 +147,7 @@ class PairClassification(EvaluateEpochsBaseTF):
             ))
 
             if "robustness" in eval_hook_names:
-                enc_dim = params["hidden_dim"]
+                enc_dim = enc_0.get_shape().as_list()[-1]
                 diag_dim = params["diagnose_dim"]
                 not_reg = set([str(i) for i in range(0, enc_dim - diag_dim)])
                 reg = set([str(i) for i in range(enc_dim - diag_dim, enc_dim)])
