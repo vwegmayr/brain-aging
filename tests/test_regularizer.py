@@ -145,24 +145,25 @@ class TestRegularizers(unittest.TestCase):
         self.assertTrue(np.allclose(np_loss, tf_loss))
 
         np_weights = np.array([
-            [0],
+            [1],
             [0],
             [0],
             [1]
         ])
 
         weights = tf.placeholder(shape=[4, 1], dtype=tf.float32)
-        mse = tf.losses.mean_squared_error(x, y, weights)
+
         loss = l1_mean(x - y, weights)
-        #loss = tf.losses.compute_weighted_loss(np.abs(x - y), weights)
-        tf_loss, tf_mse = self.sess.run([loss, mse], {
+        loss_5 = l1_mean(x - y, 5 * weights)
+        loss_0 = l1_mean(x - y, 0 * weights)
+        tf_loss, tf_loss_5, tf_loss_0 = self.sess.run([loss, loss_5, loss_0], {
             x: np_x,
             y: np_y,
             weights: np_weights
         })
-        print(tf_loss)
-        self.assertTrue(np.isclose(tf_loss, 9/2))
-        print(tf_mse)
+
+        self.assertTrue(np.isclose(tf_loss * 5, tf_loss_5))
+        self.assertTrue(np.isclose(tf_loss * 0, tf_loss_0))
 
 
 if __name__ == "__main__":
