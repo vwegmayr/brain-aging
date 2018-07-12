@@ -686,32 +686,6 @@ class PredictionHook(tf.train.SessionRunHook):
             ests = [
                 LogisticRegression(class_weight='balanced'),
                 LogisticRegression(),
-                """
-		KNeighborsClassifier(
-                    n_neighbors=1,
-                    metric="euclidean"
-                ),
-                KNeighborsClassifier(
-                    n_neighbors=5,
-                    metric="euclidean"
-                ),
-                KNeighborsClassifier(
-                    n_neighbors=1,
-                    metric="manhattan"
-                ),
-                KNeighborsClassifier(
-                    n_neighbors=5,
-                    metric="manhattan"
-                ),
-                KNeighborsClassifier(
-                    n_neighbors=1,
-                    metric=numpy_utils.js_metric
-                ),
-                KNeighborsClassifier(
-                    n_neighbors=5,
-                    metric=numpy_utils.js_metric
-                )
-		"""
             ]
         else:
             ests = [
