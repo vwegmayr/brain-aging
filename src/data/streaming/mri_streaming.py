@@ -1116,6 +1116,8 @@ class Patient(object):
         """
         candidates = self.diag_to_patients[self.diagnosis]
         for cand in candidates:
+            if cand.patient_id == self.patient_id:
+                continue
             # allow some size tolerance
             if len(cand.similar) <= len(self.similar) + 1 and \
                     cand.patient_id not in self.similar:
@@ -1124,6 +1126,8 @@ class Patient(object):
                 cand.similar.add(self.patient_id)
                 return True
 
+        for c in candidates:
+            print("{}: {}".format(c.patient_id, c.similar))
         return False
 
     def find_dissimilar(self):
@@ -1137,6 +1141,8 @@ class Patient(object):
             candidates = self.diag_to_patients[diagnoses[0]]
 
         for cand in candidates:
+            if cand.patient_id == self.patient_id:
+                continue
             # allow some tolerance
             if len(cand.dissimilar) <= len(self.dissimilar) + 1 and \
                     cand.patient_id not in self.dissimilar:
@@ -1145,6 +1151,8 @@ class Patient(object):
                 cand.dissimilar.add(self.patient_id)
                 return True
 
+        for c in candidates:
+            print("{}: {}".format(c.patient_id, c.similar))
         return False
 
 
