@@ -972,7 +972,7 @@ class MRIDiagnosePairStream(MRISingleStream):
             sampled.add(pair)
 
         if len(sampled) < n_pairs:
-            warnings.warn("Sampled only {} pairs!!!".format(len(sampled)))
+            warnings.warn("{} sampled only {} pairs!!!".format(self.__class__.__name__, len(sampled)))
 
         sampled = sorted(list(sampled))
         for i, s in enumerate(sampled):
