@@ -1115,16 +1115,22 @@ class Patient(object):
         Returns true iff a matching patient was found.
         """
         candidates = self.diag_to_patients[self.diagnosis]
+        best_cand = None
+        best_size = -1
         for cand in candidates:
             if cand.patient_id == self.patient_id:
                 continue
             # allow some size tolerance
-            if len(cand.similar) <= len(self.similar) + 1 and \
-                    cand.patient_id not in self.similar:
-                # Found match
-                self.similar.add(cand.patient_id)
-                cand.similar.add(self.patient_id)
-                return True
+            if cand.patient_id not in self.similar:
+                if (best_cand is None) or (len(cand.similar) < best_size):
+                    best_size = len(cand.similar)
+                    best_cand = cand
+
+        # Found match
+        if best_cand is not None:
+            self.similar.add(best_cand.patient_id)
+            best_cand.similar.add(self.patient_id)
+            return True
 
         for c in candidates:
             print("{}: {}".format(c.patient_id, c.similar))
@@ -1140,16 +1146,22 @@ class Patient(object):
         else:
             candidates = self.diag_to_patients[diagnoses[0]]
 
+        best_cand = None
+        best_size = -1
         for cand in candidates:
             if cand.patient_id == self.patient_id:
                 continue
-            # allow some tolerance
-            if len(cand.dissimilar) <= len(self.dissimilar) + 1 and \
-                    cand.patient_id not in self.dissimilar:
-                # Found match
-                self.dissimilar.add(cand.patient_id)
-                cand.dissimilar.add(self.patient_id)
-                return True
+            # allow some size tolerance
+            if cand.patient_id not in self.dissimilar:
+                if (best_cand is None) or (len(cand.dissimilar) < best_size):
+                    best_size = len(cand.dissimilar)
+                    best_cand = cand
+
+        # Found match
+        if best_cand is not None:
+            self.dissimilar.add(best_cand.patient_id)
+            best_cand.dissimilar.add(self.patient_id)
+            return True
 
         for c in candidates:
             print("{}: {}".format(c.patient_id, c.similar))
@@ -1176,7 +1188,7 @@ class MixedPairStream(MRISingleStream):
 
         # Build patients
         all_patients = []
-        diag_to_patients = OrderedDict() 
+        diag_to_patients = OrderedDict()
         for d in diagnoses:
             diag_to_patients[d] = []
 
@@ -1185,7 +1197,7 @@ class MixedPairStream(MRISingleStream):
         for g in patient_groups:
             pat = Patient(
                 file_ids=g.file_ids,
-                patient_id=len(all_patients)
+                patient_id=self.get_patient_id(g.file_ids[0])
             )
             patient_id_to_obj[pat.patient_id] = pat
             diags = [self.get_diagnose(fid) for fid in g.file_ids]
@@ -1229,10 +1241,34 @@ class MixedPairStream(MRISingleStream):
         for pat in all_patients:
             # allow some tolerance in case patients cannot match up
             # perfectly (dependent on the desired number of pairs)
-            assert len(pat.similar) <= n_pairs_per_patient + 1
-            assert len(pat.dissimilar) <= n_pairs_per_patient + 1
             assert len(pat.similar) >= n_pairs_per_patient
             assert len(pat.dissimilar) >= n_pairs_per_patient
+
+        if not self.silent:
+            # Print some stats
+            similar_pairs_hist = OrderedDict()
+            dissimilar_pairs_hist = OrderedDict()
+
+            for pat in all_patients:
+                c = len(pat.similar)
+                if c not in similar_pairs_hist:
+                    similar_pairs_hist[c] = 1
+                else:
+                    similar_pairs_hist[c] += 1
+
+                c = len(pat.dissimilar)
+                if c not in dissimilar_pairs_hist:
+                    dissimilar_pairs_hist[c] = 1
+                else:
+                    dissimilar_pairs_hist[c] += 1
+
+            print("Similar pair stats")
+            for k, v in similar_pairs_hist.items():
+                print(">>> Number patients with {} pairs: {}".format(k, v))
+
+            print("Dissimilar pair stats")
+            for k, v in dissimilar_pairs_hist.items():
+                print(">>> Number patients with {} pairs: {}".format(k, v))
 
         train_pairs = set()
         # Avoid duplicate pairs
@@ -1253,6 +1289,16 @@ class MixedPairStream(MRISingleStream):
             g = Group([pat1.get_next_image(), pat2.get_next_image()], True)
             train_groups.append(g)
         test_groups = self.produce_groups(test_ids, 2, train=False)
+
+        # Make sure all patients are used
+        used_patients = set([])
+        for g in train_groups:
+            for fid in g.file_ids:
+                pat_id = self.get_patient_id(fid)
+                used_patients.add(pat_id)
+
+        init_patients = set([pat.patient_id for pat in all_patients])
+        assert used_patients == init_patients
 
         return train_groups + test_groups
 
