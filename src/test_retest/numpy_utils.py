@@ -205,3 +205,11 @@ def equal_pairs(Y):
 def not_equal_pairs(Y):
     n = len(Y)
     return np.sum(Y[:, 0] != Y[:, 1]) / n
+
+
+def equal_and_correct_pairs(Y, true_labels):
+    eq = Y[:, 0] == Y[:, 1]
+    corr_0 = Y[:, 0] == true_labels
+    corr_1 = Y[:, 1] == true_labels
+    corr = corr_0.astype(float) * corr_1.astype(float)
+    return np.mean(eq * corr)

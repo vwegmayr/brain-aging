@@ -88,6 +88,7 @@ class PairClassification(EvaluateEpochsBaseTF):
                 [preds_0, preds_1],
                 [features["file_name_0"], features["file_name_1"]],
                 "head_prediction",
+                params["target_label_key"],
                 True
             )
             train_hooks.append(hook)
@@ -96,6 +97,7 @@ class PairClassification(EvaluateEpochsBaseTF):
                 [preds_0, preds_1],
                 [features["file_name_0"], features["file_name_1"]],
                 "head_prediction",
+                params["target_label_key"],
                 False
             )
             eval_hooks.append(hook)

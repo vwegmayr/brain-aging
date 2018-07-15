@@ -125,6 +125,7 @@ class HookFactory(object):
             tensors,
             id_tensors,
             name,
+            target_key,
             train):
         hook = TensorPredictionRobustnessHook(
             epoch=self.epoch,
@@ -135,7 +136,8 @@ class HookFactory(object):
             tensors=tensors,
             id_tensors=id_tensors,
             name=name,
-            train=train
+            train=train,
+            target_key=target_key
         )
 
         return hook
@@ -768,12 +770,18 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
 
         return [g.file_ids for g in groups]
 
-    def analyze_robustness(self, file_name, predictions):
+    def analyze_robustness(self, file_name, predictions, true_labels):
+        def equal_and_correct(x):
+            return numpy_utils.equal_and_correct_pairs(
+                Y=x,
+                true_labels=true_labels
+            )
         funcs = [
             numpy_utils.ICC_C1,
             numpy_utils.ICC_A1,
             numpy_utils.not_equal_pairs,
-            numpy_utils.equal_pairs
+            numpy_utils.equal_pairs,
+            equal_and_correct,
         ]
 
         scores = {
@@ -802,6 +810,7 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
 
     def analyze_file(self, file_path):
         image_label_to_pred = {}
+        target_label = os.path.split(file_path)[-1].split("_")[0]
         with open(file_path) as csvfile:
             fname = os.path.split(file_path)[-1].split(".")[0]
             reader = csv.DictReader(csvfile)
@@ -820,14 +829,20 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
                 pairs = self.test_pairs
 
             predictions = []
+            true_labels = []
             for pa in pairs:
                 cur = []
                 for el in pa:
                     image_label = self.streamer.get_image_label(el)
                     cur.append(image_label_to_pred[image_label])
                 predictions.append(cur)
+                true_labels.append(
+                    self.streamer.get_meta_info_by_key(pa[0], target_label)
+                )
 
-            self.analyze_robustness(fname, np.array(predictions))
+            self.analyze_robustness(
+                fname, np.array(predictions), np.array(true_labels)
+            )
 
     def end(self, session):
         self.input_paths = []
@@ -843,7 +858,7 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
 
 class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
     def __init__(self, epoch, out_dir, model_save_path, streamer, logger,
-                 tensors, id_tensors, name, train):
+                 tensors, id_tensors, name, train, target_key):
         """
         Analyze the robustness of an evaluated tensor which contains
         predictions.
@@ -867,6 +882,7 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
         self.tensors = tensors
         self.id_tensors = id_tensors
         self.name = name
+        self.target_key = target_key
 
     def before_run(self, run_context):
         return tf.train.SessionRunArgs(
@@ -897,6 +913,7 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
 
         groups = self.streamer.get_test_retest_pairs(image_labels)
 
+        true_labels = []
         predictions = []
         for g in groups:
             id_1 = g.file_ids[0]
@@ -906,15 +923,24 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
                 fname_to_pred[id_1],
                 fname_to_pred[id_2]
             ])
+            true_labels.append(self.streamer.get_meta_info_by_key(
+                id_1, self.target_key
+            ))
 
-        self.analyze_robustness(np.array(predictions))
+        self.analyze_robustness(np.array(predictions), np.array(true_labels))
 
-    def analyze_robustness(self, predictions):
+    def analyze_robustness(self, predictions, true_labels):
+        def equal_and_correct(x):
+            return numpy_utils.equal_and_correct_pairs(
+                Y=x,
+                true_labels=true_labels
+            )
         funcs = [
             numpy_utils.ICC_C1,
             numpy_utils.ICC_A1,
             numpy_utils.not_equal_pairs,
-            numpy_utils.equal_pairs
+            numpy_utils.equal_pairs,
+            equal_and_correct
         ]
 
         scores = {
