@@ -242,7 +242,9 @@ class FileStream(abc.ABC):
         gender_0 = 0
         gender_1 = 0
         patient_set = set([])
+        image_set = set([])
         for group in groups:
+            image_set = image_set.union(group.file_ids)
             for fid in group.file_ids:
                 ages.append(self.get_age(fid))
                 diag = self.get_diagnose(fid)
@@ -283,6 +285,13 @@ class FileStream(abc.ABC):
         else:
             of.write(">>>> Distinct patients: {}\n"
                      .format(len(patient_set)))
+
+        if of is None:
+            print(">>>> Distinct images: {}"
+                  .format(len(image_set)))
+        else:
+            of.write(">>>> Distinct patients: {}\n"
+                     .format(len(image_set)))
 
         if len(ages) > 0:
             if of is None:
@@ -476,13 +485,15 @@ class FileStream(abc.ABC):
 
         return groups
 
-    def make_patient_groups(self):
+    def make_patient_groups(self, fids=None):
         """
         One group per patient containing all file
         IDs.
         """
         patient_to_group = OrderedDict()
-        for fid in self.file_id_to_meta:
+        if fids is None:
+            fids = list(self.file_id_to_meta.keys)
+        for fid in fids:
             if "file_path" not in self.file_id_to_meta[fid]:
                 continue
             patient = self.get_patient_id(fid)

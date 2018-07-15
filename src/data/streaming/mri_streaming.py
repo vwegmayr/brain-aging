@@ -1041,7 +1041,6 @@ class SimilarPairStream(MRISingleStream):
         max_train_pairs = self.get_max_train_pairs()
         diagnoses = self.get_diagnoses()
 
-        # Collect train and test patients
         train_files = train_ids
         test_files = test_ids
 
@@ -1086,6 +1085,146 @@ class SimilarPairStream(MRISingleStream):
             groups += d_train
 
         return groups
+
+
+class Patient(object):
+    def __init__(self, file_ids, patient_id):
+        self.file_ids = file_ids
+        self.patient_id = patient_id
+        self.similar = set([])
+        self.dissimilar = set([])
+
+    def set_diagnosis(self, diag):
+        self.diagnosis = diag
+
+    def get_diagnosis(self):
+        return self.diagnosis
+
+    def set_diag_to_patients(self, diag_to_patients):
+        self.diag_to_patients = diag_to_patients
+
+    def find_similar(self):
+        """
+        Returns true iff a matching patient was found.
+        """
+        candidates = self.diag_to_patients[self.diagnosis]
+        for cand in candidates:
+            if len(cand.similar) == len(self.similar) and \
+                    cand.patient_id not in self.similar:
+                # Found match
+                self.similar.add(cand.patient_id)
+                cand.similar.add(self.patient_id)
+                return True
+
+        return False
+
+    def find_dissimilar(self):
+        """
+        Returns true iff a matching patient was found.
+        """
+        diagnoses = list(self.diag_to_patients.keys())
+        if self.diagnosis == diagnoses[0]:
+            candidates = self.diag_to_patients[diagnoses[1]]
+        else:
+            candidates = self.diag_to_patients[diagnoses[0]]
+
+        for cand in candidates:
+            if len(cand.dissimilar) == len(self.dissimilar) and \
+                    cand.patient_id not in self.dissimilar:
+                # Found match
+                self.dissimilar.add(cand.patient_id)
+                cand.dissimilar.add(self.patient_id)
+                return True
+
+        return False
+
+
+class MixedPairStream(MRISingleStream):
+    """
+    Remove patients from training that have multiple
+    diagnoses.
+    """
+    def get_diagnoses(self):
+        return self.config["diagnoses"]
+
+    def get_number_pairs_per_patient(self):
+        # The number of pairs per patient
+        return self.config["n_patient_pairs"]
+
+    def group_data(self, train_ids, test_ids):
+        n_pairs_per_patient = self.get_number_pairs_per_patient()
+        diagnoses = self.get_diagnoses()
+
+        patient_groups = self.make_patient_groups(train_ids)
+
+        # Build patients
+        all_patients = []
+        diag_to_patients = OrderedDict() 
+        for d in diagnoses:
+            diag_to_patients[d] = []
+
+        for g in patient_groups:
+            pat = Patient(
+                file_ids=g.file_ids,
+                patient_id=len(all_patients)
+            )
+            diags = [self.get_diagnose(fid) for fid in g.file_ids]
+            # Remove patients with multiple diagnoses
+            if len(set(diags)) > 1:
+                continue  # more than one diagnosis
+
+            pat.set_diagnosis(diags[0])
+            pat.set_diag_to_patients(diag_to_patients)
+            all_patients.append(pat)
+            # Map diagnoses to patients
+            diag_to_patients[diags[0]].append(pat)
+
+        # Build pairs, shuffle list of patients for each iteration
+        # Pair patients that have the same number of pairs
+
+        # Similar pairs
+        for diag in diagnoses:
+            patients = diag_to_patients[diag]
+            for i in range(n_pairs_per_patient):
+                self.np_random.shuffle(patients)
+                for pat in patients:
+                    if len(pat.similar) == i:
+                        assert pat.find_similar()
+
+        # Dissimilar pairs
+        assert len(diagnoses) == 2
+        for i in range(n_pairs_per_patient):
+            self.np_random.shuffle(diag_to_patients[diagnoses[0]])
+            self.np_random.shuffle(diag_to_patients[diagnoses[1]])
+            self.np_random.shuffle(all_patients)
+
+            for pat in all_patients:
+                if len(pat.dissimilar) == i:
+                    assert pat.find_dissimilar()
+
+        # Check that every patient has enough pairs
+        for pat in all_patients:
+            assert len(pat.similar) == n_pairs_per_patient
+            assert len(pat.dissimilar) == n_pairs_per_patient
+
+        train_pairs = set()
+        # Avoid duplicate pairs
+        for pat in all_patients:
+            for other in pat.similar + pat.dissimilar:
+                tup = tuple([pat.patient_id, other.patient_id])
+                if tup[0] > tup[1]:
+                    tup = tuple([tup[1], tup[0]])
+                train_pairs.add(tup)
+
+        train_groups = []
+        train_pairs = sorted(list(train_pairs))
+        self.np_random.shuffle(train_pairs)
+        for tup in train_pairs:
+            g = Group(list(tup), True)
+            train_groups.append(g)
+        test_groups = self.produce_groups(test_ids, 2, train=False)
+
+        return train_groups + test_groups
 
 
 class AnyPairStream(MRISingleStream):

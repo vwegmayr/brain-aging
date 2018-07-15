@@ -1,0 +1,10 @@
+record_labels:
+  20180702-160459: 
+    epochs: [0, 1]
+    diag_dim: 48
+  20180705-102120:
+    epochs: [0, 1]
+    diag_dim: 32
+  20180705-102428:
+    epochs: [0, 1]
+    diag_dim: 32

@@ -3,7 +3,7 @@ import yaml
 import importlib
 from src.data.streaming.mri_streaming import \
     MRISingleStream, MRIDiagnosePairStream, MRISamePatientSameAgePairStream, \
-    SimilarPairStream, AnyPairStream
+    SimilarPairStream, AnyPairStream, MixedPairStream
 
 import subprocess
 import numpy as np
@@ -99,6 +99,11 @@ class TestReproducibility(unittest.TestCase):
 
     def test_any_pair_stream(self):
         self.config["class"] = qualified_path(AnyPairStream)
+        self.reproducibility_within_run()
+        self.reproducibility_accross_runs()
+
+    def test_mixed_pair_stream(self):
+        self.config["class"] = qualified_path(MixedPairStream)
         self.reproducibility_within_run()
         self.reproducibility_accross_runs()
 

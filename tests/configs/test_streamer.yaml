@@ -19,6 +19,7 @@ params:
     diagnoses:
       - "healthy"
       - "health_ad"
+    n_patient_pairs: 1
     same_patient: False
     seed: 47
     shuffle: True
