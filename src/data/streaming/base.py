@@ -492,7 +492,7 @@ class FileStream(abc.ABC):
         """
         patient_to_group = OrderedDict()
         if fids is None:
-            fids = list(self.file_id_to_meta.keys)
+            fids = list(self.file_id_to_meta.keys())
         for fid in fids:
             if "file_path" not in self.file_id_to_meta[fid]:
                 continue

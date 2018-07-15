@@ -1094,6 +1094,10 @@ class Patient(object):
         self.similar = set([])
         self.dissimilar = set([])
 
+        r = np.random.RandomState(11)
+        r.shuffle(self.file_ids)
+        self.fid_cycle = itertools.cycle(self.file_ids)
+
     def set_diagnosis(self, diag):
         self.diagnosis = diag
 
@@ -1103,13 +1107,17 @@ class Patient(object):
     def set_diag_to_patients(self, diag_to_patients):
         self.diag_to_patients = diag_to_patients
 
+    def get_next_image(self):
+        return next(self.fid_cycle)
+
     def find_similar(self):
         """
         Returns true iff a matching patient was found.
         """
         candidates = self.diag_to_patients[self.diagnosis]
         for cand in candidates:
-            if len(cand.similar) == len(self.similar) and \
+            # allow some size tolerance
+            if len(cand.similar) <= len(self.similar) + 1 and \
                     cand.patient_id not in self.similar:
                 # Found match
                 self.similar.add(cand.patient_id)
@@ -1129,7 +1137,8 @@ class Patient(object):
             candidates = self.diag_to_patients[diagnoses[0]]
 
         for cand in candidates:
-            if len(cand.dissimilar) == len(self.dissimilar) and \
+            # allow some tolerance
+            if len(cand.dissimilar) <= len(self.dissimilar) + 1 and \
                     cand.patient_id not in self.dissimilar:
                 # Found match
                 self.dissimilar.add(cand.patient_id)
@@ -1164,11 +1173,13 @@ class MixedPairStream(MRISingleStream):
             diag_to_patients[d] = []
 
         multiple_diags = 0
+        patient_id_to_obj = {}
         for g in patient_groups:
             pat = Patient(
                 file_ids=g.file_ids,
                 patient_id=len(all_patients)
             )
+            patient_id_to_obj[pat.patient_id] = pat
             diags = [self.get_diagnose(fid) for fid in g.file_ids]
             # Remove patients with multiple diagnoses
             if len(set(diags)) > 1:
@@ -1208,14 +1219,18 @@ class MixedPairStream(MRISingleStream):
 
         # Check that every patient has enough pairs
         for pat in all_patients:
-            assert len(pat.similar) == n_pairs_per_patient
-            assert len(pat.dissimilar) == n_pairs_per_patient
+            # allow some tolerance in case patients cannot match up
+            # perfectly (dependent on the desired number of pairs)
+            assert len(pat.similar) <= n_pairs_per_patient + 1
+            assert len(pat.dissimilar) <= n_pairs_per_patient + 1
+            assert len(pat.similar) >= n_pairs_per_patient
+            assert len(pat.dissimilar) >= n_pairs_per_patient
 
         train_pairs = set()
         # Avoid duplicate pairs
         for pat in all_patients:
-            for other in pat.similar + pat.dissimilar:
-                tup = tuple([pat.patient_id, other.patient_id])
+            for other in pat.similar.union(pat.dissimilar):
+                tup = tuple([pat.patient_id, other])
                 if tup[0] > tup[1]:
                     tup = tuple([tup[1], tup[0]])
                 train_pairs.add(tup)
@@ -1224,7 +1239,10 @@ class MixedPairStream(MRISingleStream):
         train_pairs = sorted(list(train_pairs))
         self.np_random.shuffle(train_pairs)
         for tup in train_pairs:
-            g = Group(list(tup), True)
+            # Given pair of patient ids, we need to sample images
+            pat1 = patient_id_to_obj[tup[0]]
+            pat2 = patient_id_to_obj[tup[1]]
+            g = Group([pat1.get_next_image(), pat2.get_next_image()], True)
             train_groups.append(g)
         test_groups = self.produce_groups(test_ids, 2, train=False)
 

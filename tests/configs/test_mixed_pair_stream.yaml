@@ -6,7 +6,14 @@ params:
     batch_size: -1
     prefetch: 1
     train_ratio: 1
-    n_folds: 0
+    n_folds: 2
+    test_fold: 1
+    categorical_split:
+      - healthy
+      - health_ad
+      - sex
+    numerical_split:
+      - age
     n_pairs: 10
     max_train_pairs: 600
     normalize_images: False
@@ -19,7 +26,7 @@ params:
     diagnoses:
       - "healthy"
       - "health_ad"
-    n_patient_pairs: 1
+    n_patient_pairs: 2
     same_patient: False
     seed: 47
     shuffle: True
