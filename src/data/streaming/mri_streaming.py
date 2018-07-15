@@ -1163,6 +1163,7 @@ class MixedPairStream(MRISingleStream):
         for d in diagnoses:
             diag_to_patients[d] = []
 
+        multiple_diags = 0
         for g in patient_groups:
             pat = Patient(
                 file_ids=g.file_ids,
@@ -1171,6 +1172,7 @@ class MixedPairStream(MRISingleStream):
             diags = [self.get_diagnose(fid) for fid in g.file_ids]
             # Remove patients with multiple diagnoses
             if len(set(diags)) > 1:
+                multiple_diags += 1
                 continue  # more than one diagnosis
 
             pat.set_diagnosis(diags[0])
@@ -1179,6 +1181,8 @@ class MixedPairStream(MRISingleStream):
             # Map diagnoses to patients
             diag_to_patients[diags[0]].append(pat)
 
+        if not self.silent:
+            print("{} patients with multiple diagnoses".format(multiple_diags))
         # Build pairs, shuffle list of patients for each iteration
         # Pair patients that have the same number of pairs
 

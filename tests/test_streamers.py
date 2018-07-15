@@ -143,6 +143,21 @@ class TestKFoldSplit(unittest.TestCase):
             self.run_streamer()
 
 
+class TestMixedPairStream(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_mixed_pair_stream.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def run_streamer(self):
+        streamer = create_object(self.config)
+        self.assertIsNotNone(streamer)
+
+    def test_grouping(self):
+        self.run_streamer()
+
+
 class TestImageNormalization(unittest.TestCase):
     def setUp(self):
         with open("tests/configs/test_image_normalization.yaml") as f:
