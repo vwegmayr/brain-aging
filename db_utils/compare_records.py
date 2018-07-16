@@ -10,7 +10,7 @@ import db_utils.compare_config as config
 TABLE_NAME = config.TABLE_NAME
 DB_PATH = config.DB_PATH
 COLUMNS = config.COLUMNS
-METRICS = config.METRICS
+#METRICS = config.METRICS
 DATA_PATH = config.DATA_PATH
 PLOT_TAG_LABEL = config.PLOT_TAG_LABEL
 RECORD_LABEL = config.RECORD_LABEL
@@ -21,6 +21,7 @@ ID_TAGS = config.ID_TAGS
 
 FILTERS = config.FILTERS
 LEGEND_LOC = config.LEGEND_LOC
+REASON = config.REASON
 
 def filter_record_by_tag(rec, f):
     if "tags" not in f:
@@ -130,6 +131,10 @@ def plot_groups(groups):
             ys.append(r.metrics["agg_metric"]["y"])
 
         ys = np.array(ys)
+        cp = np.copy(ys)
+        cp = np.max(cp, axis=1)  # max for each run
+        cp = np.reshape(cp, (-1, 1))
+        print("mean = {}, std = {}".format(np.mean(cp), np.std(cp)))
         std = np.std(ys, axis=0)
         mean = np.mean(ys, axis=0)
 
@@ -151,10 +156,12 @@ def plot_groups(groups):
 def main():
     # TODO: data base filter query
     db = SumatraDB(db=DB_PATH)
-    if RECORD_LABEL is None:
-        records = db.get_all_records(COLUMNS)
-    else:
+    if REASON is not None:
+        records = db.get_filtered_by_reason(COLUMNS, REASON)
+    elif RECORD_LABEL is not None:
         records = db.get_filtered_by_label(COLUMNS, RECORD_LABEL)
+    else:
+        records = db.get_all_records(COLUMNS)
     # print([str(r) for r in records])
 
     # Load config files

@@ -107,3 +107,26 @@ class SumatraDB(object):
         res = c.fetchall()
 
         return list(map(lambda x: Record(x), res))
+    
+    def get_filtered_by_reason(self, columns, reason):
+        """
+        Queries all the records whose label starts with
+        'records_label'.
+
+        Arg:
+            - columns: list of column names that are selected
+
+        Return:
+            - list of Record objects
+        """
+        c = self.get_cursor()
+        col_s = ",".join(columns)
+
+        q = "select {} from {} where reason like '{}%'".format(
+            col_s, self.record_table, reason
+        )
+        c.execute(q)
+
+        res = c.fetchall()
+
+        return list(map(lambda x: Record(x), res))
