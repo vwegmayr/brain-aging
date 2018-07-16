@@ -57,7 +57,7 @@ class Record(object):
 
         """
         for t in self.tags:
-            if partial_tag in t:
+            if t.startswith(partial_tag):
                 return t
 
         return "NA"
