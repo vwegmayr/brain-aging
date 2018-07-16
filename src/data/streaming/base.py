@@ -94,11 +94,15 @@ class FileStream(abc.ABC):
         train_ids, test_ids = self.make_train_test_split()
         all_train_test_ids = set(train_ids + test_ids)
         assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
-        # all filest are used
+        # all files are used
         assert len(self.all_file_ids.difference(all_train_test_ids)) == 0
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
         self.sample_shape = None
+
+        # Exchange train and test set
+        if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
+            self.exchange_train_test()
 
         self.sanity_checks()
         if not self.silent:
@@ -197,6 +201,10 @@ class FileStream(abc.ABC):
 
     def dump_normalization(self, outfolder):
         pass
+
+    def exchange_train_test(self):
+        for group in self.groups:
+            group.is_train = not group.is_train
 
     def get_data_source_by_name(self, name):
         return self.name_to_data_source[name]
