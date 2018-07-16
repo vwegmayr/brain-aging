@@ -298,7 +298,7 @@ class FileStream(abc.ABC):
             print(">>>> Distinct images: {}"
                   .format(len(image_set)))
         else:
-            of.write(">>>> Distinct patients: {}\n"
+            of.write(">>>> Distinct images: {}\n"
                      .format(len(image_set)))
 
         if len(ages) > 0:
