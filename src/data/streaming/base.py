@@ -96,13 +96,14 @@ class FileStream(abc.ABC):
         assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
         # all files are used
         assert len(self.all_file_ids.difference(all_train_test_ids)) == 0
+        # Exchange train and test set
+        if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
+            tmp = train_ids
+            train_ids = test_ids
+            test_ids = tmp
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
         self.sample_shape = None
-
-        # Exchange train and test set
-        if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
-            self.exchange_train_test()
 
         self.sanity_checks()
         if not self.silent:
