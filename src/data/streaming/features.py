@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 
 class FeatureCollection:
@@ -44,13 +45,28 @@ for disease in [
 ]:
     adni_aibl.add('health_%s' % disease, disease, default=0)
 
-AGE = adni_aibl.add("age", default=-1)
+AGE = adni_aibl.add("age", default=-1, py_type=np.float32, t=tf.float32)
 HEALTHY = adni_aibl.add('healthy', 'hc', default=0)
 MRI = adni_aibl.add('mri', t=tf.float32, py_type=float)
 SEX = adni_aibl.add('sex', doc='male = 0; female = 1', default=-1)
 STUDY_ID = adni_aibl.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = adni_aibl.add('study_image_id', 'image', default=-1)
 STUDY_PATIENT_ID = adni_aibl.add('study_patient_id', 'patient', default=-1)
+
+MRI_MANUFACTURER = adni_aibl.add(
+    'mri_manufacturer', t=tf.string, default='', py_type=str,
+    doc='Manufacturer name e.g. SIEMENS',
+)
+MRI_FIELD_STRENGTH = adni_aibl.add(
+    'mri_field_strength', t=tf.string, default='', py_type=str,
+    doc='Field strength in Tesla - if available',
+)
+
+WEIGHTING = adni_aibl.add(
+    'weighting', t=tf.string, default='', py_type=str,
+    doc='e.g., T1, T2',
+)
+
 
 collections = {
     "adni_aibl": adni_aibl
