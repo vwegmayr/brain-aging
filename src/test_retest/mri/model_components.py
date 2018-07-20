@@ -125,6 +125,18 @@ class Head(abc.ABC):
 
 
 class MultiLayerPairEncoder(Body):
+    def with_bias(self):
+        if "bias" in self.params and self.params["bias"]:
+            return True
+        else:
+            return False
+
+    def non_linear(self):
+        if "non_linear" in self.params and self.params["non_linear"]:
+            return True
+        else:
+            return False
+
     def construct_graph(self):
         features = self.features
         params = self.params
@@ -165,8 +177,25 @@ class MultiLayerPairEncoder(Body):
 
         self.x_0 = x_0
         self.x_1 = x_1
-        self.enc_0 = tf.matmul(x_0, w, name="hidden_rep_0")
-        self.enc_1 = tf.matmul(x_1, w, name="hidden_rep_1")
+        enc_0 = tf.matmul(x_0, w, name="hidden_rep_0")
+        enc_1 = tf.matmul(x_1, w, name="hidden_rep_1")
+
+        if self.with_bias():
+            bias = tf.get_variable(
+                name="bias",
+                shape=[1, hidden_dim],
+                dtype=enc_0.dtype,
+                initializer=tf.initializers.zeros
+            )
+            enc_0 = tf.add(enc_0, bias)
+            enc_1 = tf.add(enc_1, bias)
+
+        if self.non_linear():
+            enc_0 = tf.nn.relu(enc_0)
+            enc_1 = tf.nn.relu(enc_1)
+
+        self.enc_0 = enc_0
+        self.enc_1 = enc_1
         self.w = w
 
     def get_encoding_weights(self):
