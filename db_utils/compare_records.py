@@ -134,9 +134,11 @@ def plot_groups(groups):
         cp = np.copy(ys)
         cp = np.max(cp, axis=1)  # max for each run
         cp = np.reshape(cp, (-1, 1))
-        print("mean = {}, std = {}".format(np.mean(cp), np.std(cp)))
+        print("max comparison, mean = {}, std = {}".format(np.mean(cp), np.std(cp)))
         std = np.std(ys, axis=0)
         mean = np.mean(ys, axis=0)
+        print(mean)
+        print(std)
 
         c = next(color)
         line = plt.plot(x, mean, c=c, marker='o', linewidth=2,
