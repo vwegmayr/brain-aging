@@ -1,0 +1,1 @@
+from src.baum_vagan import data
