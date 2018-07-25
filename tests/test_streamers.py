@@ -158,6 +158,30 @@ class TestMixedPairStream(unittest.TestCase):
         self.run_streamer()
 
 
+class TestAnySingleStream(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_any_single_stream.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def test_batches(self):
+        streamer = create_object(self.config)
+        for i in range(50):
+            x, y = streamer.trainAD.next_batch(6)
+            batch = streamer.trainCN.next_batch(4)
+
+        """
+        for i in range(50):
+            batch = streamer.validationAD.next_batch(4)
+            batch = streamer.validationCN.next_batch(4)
+
+        for i in range(50):
+            batch = streamer.testAD.next_batch(4)
+            batch = streamer.testCN.next_batch(4)
+        """
+
+
 class TestImageNormalization(unittest.TestCase):
     def setUp(self):
         with open("tests/configs/test_image_normalization.yaml") as f:

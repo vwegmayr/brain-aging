@@ -1,4 +1,4 @@
-class: src.data.streaming.mri_streaming.MRIDiagnosePairStream
+class: src.data.streaming.mri_streaming.AnySingleStream
 params:
   stream_config:
     meta_csv: data/raw/csv/adni_aibl__ad_hc.csv
@@ -19,6 +19,8 @@ params:
     normalize_images: False
     train_ratio: 0.8
     silent: True
+    AD_key: healthy
+    CN_key: health_ad
     balanced_labels:
       - healthy
       - health_ad
@@ -31,8 +33,8 @@ params:
     seed: 47
     shuffle: True
     downsample:
-      enabled: False
-      shape: [5, 5, 5]
+      enabled: True
+      shape: [4, 4]
     data_sources:
       - name: ADNI_AIBL
         glob_pattern: brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz

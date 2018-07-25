@@ -123,11 +123,14 @@ class MRISingleStream(FileStream, MRIImageLoader):
         Normalization should be computed on the train set only.
         """
         # collect train file IDs
-        test_ids = self.get_set_file_ids(train=False)
+        test_ids = set(self.get_test_ids())
+        validation_ids = set(self.get_validation_ids())
         # some files may not be used by sampler, but all available
         # images should be used to compute the normalization
         file_ids = self.all_file_ids.difference(test_ids)
+        file_ids = file_ids.difference(validation_ids)
         n = len(file_ids)
+
         shape = self.get_sample_shape()
         voxel_mean = np.zeros(shape)
         voxel_mean_sq = np.zeros(shape)
@@ -223,6 +226,10 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return im
 
+    def load_normalized_sample(self, file_path):
+        im = self.load_image(file_path)
+        return self.normalize_image(im)
+
     def group_stats(self, group, categorical, numerical):
         stats = {
             "n": len(group.file_ids)
@@ -267,6 +274,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         # Group by patient
         all_groups = patient_groups
+        all_file_ids = [fid for g in all_groups for fid in g.file_ids]
         self.np_random.shuffle(all_groups)
 
         # Collect groups stats
@@ -282,7 +290,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             for label in all_labels:
                 all_vals[label].extend(stats[label]["vals"])
 
-        assert n_total_patients == len(self.all_file_ids)
+        assert n_total_patients == len(all_file_ids)
         # Compute overall stats
         for label in all_labels:
             all_label_mean[label] = np.mean(all_vals[label])
@@ -1322,16 +1330,18 @@ class AnyPairStream(MRISingleStream):
 class BatchProvider(object):
     def __init__(self, streamer, file_ids, label_key, prefetch=1000):
         self.file_ids = file_ids
+        assert len(file_ids) > 0
         self.streamer = streamer
         self.label_key = label_key
         self.prefetch = prefetch
         self.loaded = []
         self.np_random = np.random.RandomState(seed=11)
+        self.fid_gen = self.next_fid()
+        self.img_gen = self.next_image()
 
     def next_fid(self):
         self.np_random.shuffle(self.file_ids)
         p = 0
-
         while (1):
             if p < len(self.file_ids):
                 yield self.file_ids[p]
@@ -1346,24 +1356,27 @@ class BatchProvider(object):
         while (1):
             if len(loaded) == 0:
                 # prefetch
-                for i in range(prefetch):
-                    fid = next(self.next_fid())
+                for i in range(self.prefetch):
+                    fid = next(self.fid_gen)
                     p = self.streamer.get_file_path(fid)
                     im = self.streamer.load_sample(p)
+                    if self.streamer.normalize_images:
+                        im = self.streamer.normalize_image(im)
                     label = self.streamer.get_meta_info_by_key(
                         fid, self.label_key
                     )
-                    loaded.append((im, label))
+                    loaded.append([im, label])
             else:
                 el = loaded[0]
                 loaded.pop(0)
                 yield el
 
     def next_batch(self, batch_size):
-        X_batch = y_batch = []
+        X_batch = []
+        y_batch = []
         for i in range(batch_size):
-            x, y = next(self.next_image())
-            X_batch.append(X)
+            x, y = next(self.img_gen)
+            X_batch.append(x)
             y_batch.append(y)
 
         return np.array(X_batch), np.array(y_batch)
@@ -1402,12 +1415,14 @@ class AnySingleStream(MRISingleStream):
         self.trainAD = BatchProvider(
             streamer=self,
             file_ids=train_AD_ids,
-            label_key=self.AD_key
+            label_key=self.AD_key,
+            prefetch=self.config["prefetch"]
         )
         self.trainCN = BatchProvider(
             streamer=self,
             file_ids=train_CN_ids,
-            label_key=self.CN_key
+            label_key=self.CN_key,
+            prefetch=self.config["prefetch"]
         )
 
         # Validation batches
@@ -1416,24 +1431,28 @@ class AnySingleStream(MRISingleStream):
         self.validationAD = BatchProvider(
             streamer=self,
             file_ids=valid_AD_ids,
-            label_key=self.AD_key
+            label_key=self.AD_key,
+            prefetch=self.config["prefetch"]
         )
         self.validationCN = BatchProvider(
             streamer=self,
             file_ids=valid_CN_ids,
-            label_key=self.CN_key
+            label_key=self.CN_key,
+            prefetch=self.config["prefetch"]
         )
 
-        # Train batches
+        # Test batches
         test_ids = self.get_test_ids()
         test_AD_ids, test_CN_ids = self.get_ad_cn_ids(test_ids)
         self.testAD = BatchProvider(
             streamer=self,
             file_ids=test_AD_ids,
-            label_key=self.AD_key
+            label_key=self.AD_key,
+            prefetch=self.config["prefetch"]
         )
         self.testCN = BatchProvider(
             streamer=self,
             file_ids=test_CN_ids,
-            label_key=self.CN_key
-        )       
+            label_key=self.CN_key,
+            prefetch=self.config["prefetch"]
+        )

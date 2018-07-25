@@ -12,6 +12,13 @@ from src.baum_vagan.tfwrapper import utils as tf_utils
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
+def normalize_to_range(a, b, x):
+    maxi = tf.reduce_max(x)
+    mini = tf.reduce_min(x)
+
+    return a + (x - mini) / (maxi - mini) * (b - a)
+
+
 class vagan:
 
     """
@@ -62,6 +69,17 @@ class vagan:
         self.x_c1 = tf.placeholder(
             tf.float32, self.img_tensor_shape, name='c1_img'
         )
+
+        if exp_config.rescale_to_one:
+            self.x_c0 = tf.map_fn(
+                lambda x: normalize_to_range(-1, 1, x),
+                self.x_c0
+            )
+
+            self.x_c1 = tf.map_fn(
+                lambda x: normalize_to_range(-1, 1, x),
+                self.x_c1
+            )
 
         # network outputs
         self.M = self.generator_net(self.x_c1, self.training_pl_gen)

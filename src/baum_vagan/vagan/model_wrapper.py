@@ -48,7 +48,11 @@ class VAGanWrapper(object):
 
         # Should be done in the end, import data loader and create
         data_loader = import_string(exp_config.data_loader)
-        data = data_loader(exp_config)
+
+        if "stream_config" in kwargs:
+            data = data_loader(exp_config.stream_config)
+        else:
+            data = data_loader(exp_config)
 
         self.config = exp_config
         self.data = data
