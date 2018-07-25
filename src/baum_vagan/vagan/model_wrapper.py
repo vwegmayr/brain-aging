@@ -1,5 +1,7 @@
 import importlib
 import pydoc
+import numpy as np
+import matplotlib.pyplot as plt
 
 from src.baum_vagan.vagan.model_vagan import vagan
 
@@ -48,6 +50,8 @@ class VAGanWrapper(object):
         data_loader = import_string(exp_config.data_loader)
         data = data_loader(exp_config)
 
+        self.config = exp_config
+        self.data = data
         self.vagan = vagan(exp_config=exp_config, data=data)
 
     def fit(self, X, y=None):
@@ -55,3 +59,28 @@ class VAGanWrapper(object):
 
     def set_save_path(self, save_path):
         self.vagan.set_save_path(save_path)
+
+    def show_morphed_images(self):
+        # Run predictions in an endless loop
+        exp_config = self.config
+        sampler_AD = lambda bs: self.data.testAD.next_batch(bs)[0]
+        while True:
+
+            ad_in = sampler_AD(1)
+            mask = self.vagan.predict_mask(ad_in)
+            # print(logits)
+
+            morphed = ad_in + mask
+            if exp_config.use_tanh:
+                morphed = np.tanh(morphed)
+
+            plt.imshow(np.squeeze(morphed[0]), cmap='gray')
+            plt.show()
+
+    def transform(self, X=None, y=None):
+        # Load model
+        path = self.config.trained_model_dir
+        self.vagan.load_weights(log_dir=path)
+
+        self.show_morphed_images()
+        
