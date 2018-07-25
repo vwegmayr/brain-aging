@@ -1365,6 +1365,7 @@ class BatchProvider(object):
                     label = self.streamer.get_meta_info_by_key(
                         fid, self.label_key
                     )
+                    im = np.reshape(im, tuple(list(im.shape) + [1]))
                     loaded.append([im, label])
             else:
                 el = loaded[0]

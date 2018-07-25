@@ -33,11 +33,15 @@ def unet_16_bn(x, training, scope_name='generator'):
         upconv2 = layers.deconv3D_layer_bn(conv5_2, name='upconv2', num_filters=n_ch_0, training=training)
         concat2 = layers.crop_and_concat_layer([upconv2, conv2_2], axis=-1)
 
+        print(concat2)
         conv6_1 = layers.conv3D_layer_bn(concat2, 'conv6_1', num_filters=n_ch_0*2, training=training)
         conv6_2 = layers.conv3D_layer_bn(conv6_1, 'conv6_2', num_filters=n_ch_0*2, training=training)
 
+        print(conv6_2)
         upconv1 = layers.deconv3D_layer_bn(conv6_2, name='upconv1', num_filters=n_ch_0, training=training)
-        concat1 = layers.crop_and_concat_layer([upconv1, conv1_2], axis=-1)
+        print(upconv1)
+        print(conv1_2)
+        concat1 = layers.crop_and_concat_layer([conv1_2, upconv1], axis=-1)
 
         conv8_1 = layers.conv3D_layer_bn(concat1, 'conv8_1', num_filters=n_ch_0, training=training)
         conv8_2 = layers.conv3D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)

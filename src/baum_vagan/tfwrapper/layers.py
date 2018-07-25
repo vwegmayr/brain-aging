@@ -85,7 +85,9 @@ def crop_and_concat_layer(inputs, axis=-1):
 
         # Don't subtract over batch_size because it may be None
         start_crop = np.subtract(larger_size, output_size) // 2
-
+        
+        for i in range(len(start_crop)):
+            start_crop[i] = max(start_crop[i], 0)
         if len(output_size) == 4:  # nets3D images
         # if output_size.shape[0] == 5:  # nets3D images
             cropped_tensor = tf.slice(inputs[ii],
