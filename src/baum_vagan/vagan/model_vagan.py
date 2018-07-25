@@ -354,7 +354,7 @@ class vagan:
         self.summary_writer = tf.summary.FileWriter(self.log_dir, self.sess.graph)
 
         # Copy experiment config file to log_dir for future reference
-        shutil.copy(self.exp_config.__file__, self.log_dir)
+        # shutil.copy(self.exp_config.__file__, self.log_dir) # no need to copy when using smt
 
 
     def _get_optimizer(self, lr_pl):
