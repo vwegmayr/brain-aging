@@ -3,6 +3,7 @@
 
 import numpy as np
 
+
 class BatchProvider():
     """
     This is a helper class to conveniently access mini batches of training, testing and validation data
