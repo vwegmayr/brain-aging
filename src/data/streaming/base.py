@@ -91,7 +91,8 @@ class FileStream(abc.ABC):
             print("Number of files missing: {}".format(n_missing))
 
         # Make train-test split
-        train_ids, test_ids = self.make_train_test_split()
+        all_patient_groups = self.make_patient_groups()
+        train_ids, test_ids = self.make_train_test_split(all_patient_groups)
         all_train_test_ids = set(train_ids + test_ids)
         assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
         # all files are used
@@ -101,22 +102,39 @@ class FileStream(abc.ABC):
             tmp = train_ids
             train_ids = test_ids
             test_ids = tmp
+
+        # build validation set
+        train_groups = self.make_patient_groups(fids=train_ids)
+        train_ids, validation_ids = self.make_train_test_split(train_groups)
+        assert len(train_ids) + len(validation_ids) + len(test_ids) == \
+            len(self.all_file_ids)
+
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
+        self.train_valid = self.group_data(train_ids, validation_ids)
+
+        self.validation_groups = [g for g in self.train_valid if g.is_train == False]
+        for g in self.validation_groups:
+            g.validation = True
+
+        self.train_groups = [g for g in self.groups if g.is_train == True]
+        self.test_groups = [g for g in self.groups if g.is_train == False]
+
         self.sample_shape = None
 
         self.sanity_checks()
+        self.train_validation_test_checks()
         if not self.silent:
             print(">>>>>>>>> Sanity checks OK")
 
         # Print stats
         if not self.silent:
-            train_groups = [group for group in self.groups if group.is_train]
-            test_groups = [group for group in self.groups if not group.is_train]
             print(">>>>>>>> Train stats")
-            self.print_stats(train_groups)
+            self.print_stats(self.train_groups)
+            print(">>>>>>>> Validation stats")
+            self.print_stats(self.validation_groups)
             print(">>>>>>>> Test stats")
-            self.print_stats(test_groups)
+            self.print_stats(self.test_groups)
 
     def get_batches(self, train=True):
         groups = [group for group in self.groups
@@ -159,7 +177,7 @@ class FileStream(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def make_train_test_split(self):
+    def make_train_test_split(self, patient_groups):
         """
         Split the previously formed groups in a training set and
         a test set.
@@ -218,6 +236,18 @@ class FileStream(abc.ABC):
         fids = [fid for group in groups for fid in group.file_ids]
         return set(fids)
 
+    def get_validation_ids(self):
+        fids = [fid for g in self.validation_groups for fid in g.file_ids]
+        return set(fids)
+
+    def get_train_ids(self):
+        fids = [fid for g in self.train_groups for fid in g.file_ids]
+        return set(fids)
+
+    def get_test_ids(self):
+        fids = [fid for g in self.test_groups for fid in g.file_ids]
+        return set(fids)
+
     def sanity_checks(self):
         """
         Check sound train-test split. The train set and test set
@@ -243,6 +273,15 @@ class FileStream(abc.ABC):
         test_patients = set([self.get_patient_id(fid) for fid in test_ids])
 
         assert len(train_patients.intersection(test_patients)) == 0
+
+    def train_validation_test_checks(self):
+        train_ids = self.get_train_ids()
+        test_ids = self.get_test_ids()
+        validation_ids = self.get_validation_ids()
+
+        assert len(train_ids.intersection(test_ids)) == 0
+        assert len(train_ids.intersection(validation_ids)) == 0
+        assert len(validation_ids.intersection(test_ids)) == 0
 
     def print_stats(self, groups, outfile=None):
         dignosis_count = OrderedDict()
@@ -653,10 +692,11 @@ class Group(object):
     """
     Represents files that should be considered as a group.
     """
-    def __init__(self, file_ids, is_train=None):
+    def __init__(self, file_ids, is_train=None, validation=False):
         self.file_ids = file_ids
         self.is_train = is_train
         self.label_stats = None
+        self.validation = validation
 
     def get_file_ids(self):
         return self.file_ids

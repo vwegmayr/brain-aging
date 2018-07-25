@@ -248,7 +248,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return stats
 
-    def make_balanced_k_fold_split(self):
+    def make_balanced_k_fold_split(self, patient_groups):
         """
         Make k folds for which the label distribution of the labels
         is close to the one of the complete data set.
@@ -266,7 +266,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         }
 
         # Group by patient
-        all_groups = self.make_patient_groups()
+        all_groups = patient_groups
         self.np_random.shuffle(all_groups)
 
         # Collect groups stats
@@ -402,7 +402,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return train_ids, test_ids
 
-    def make_balanced_train_test_split(self):
+    def make_balanced_train_test_split(self, patient_groups):
         print("Making balanced split")
         # these should be mutually exclusive
         balanced_labels = self.config["balanced_labels"]
@@ -509,15 +509,15 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return train_ids, test_ids
 
-    def make_train_test_split(self):
+    def make_train_test_split(self, patient_groups):
         if self.config["n_folds"] == 0:
             if not self.silent:
                 print(">>>>>> Train-test split")
-            return self.make_balanced_train_test_split()
+            return self.make_balanced_train_test_split(patient_groups)
         else:
             if not self.silent:
                 print(">>>>>> k-fold split")
-            return self.make_balanced_k_fold_split()
+            return self.make_balanced_k_fold_split(patient_groups)
 
 
 class MRISamePatientSameAgePairStream(MRISingleStream):
@@ -1317,3 +1317,123 @@ class AnyPairStream(MRISingleStream):
         test_groups = self.produce_groups(test_files, 2, train=False)
 
         return train_groups + test_groups
+
+
+class BatchProvider(object):
+    def __init__(self, streamer, file_ids, label_key, prefetch=1000):
+        self.file_ids = file_ids
+        self.streamer = streamer
+        self.label_key = label_key
+        self.prefetch = prefetch
+        self.loaded = []
+        self.np_random = np.random.RandomState(seed=11)
+
+    def next_fid(self):
+        self.np_random.shuffle(self.file_ids)
+        p = 0
+
+        while (1):
+            if p < len(self.file_ids):
+                yield self.file_ids[p]
+                p += 1
+            else:
+                p = 0
+                self.np_random.shuffle(self.file_ids)
+
+    def next_image(self):
+        loaded = []
+
+        while (1):
+            if len(loaded) == 0:
+                # prefetch
+                for i in range(prefetch):
+                    fid = next(self.next_fid())
+                    p = self.streamer.get_file_path(fid)
+                    im = self.streamer.load_sample(p)
+                    label = self.streamer.get_meta_info_by_key(
+                        fid, self.label_key
+                    )
+                    loaded.append((im, label))
+            else:
+                el = loaded[0]
+                loaded.pop(0)
+                yield el
+
+    def next_batch(self, batch_size):
+        X_batch = y_batch = []
+        for i in range(batch_size):
+            x, y = next(self.next_image())
+            X_batch.append(X)
+            y_batch.append(y)
+
+        return np.array(X_batch), np.array(y_batch)
+
+
+class AnySingleStream(MRISingleStream):
+    """
+    Compatibility with Baumgartner VAGAN implementation.
+    """
+    def __init__(self, *args, **kwargs):
+        super(AnySingleStream, self).__init__(
+            *args,
+            **kwargs
+        )
+        self.AD_key = self.config["AD_key"]  
+        self.CN_key = self.config["CN_key"]  # Control group
+        self.set_up_batches()
+
+    def get_ad_cn_ids(self, file_ids):
+        ad_ids = []
+        cn_ids = []
+
+        for fid in file_ids:
+            v = self.get_meta_info_by_key(fid, self.AD_key)
+            if v == 1:
+                ad_ids.append(fid)
+            else:
+                cn_ids.append(fid)
+
+        return ad_ids, cn_ids
+
+    def set_up_batches(self):
+        # Train batches
+        train_ids = self.get_train_ids()
+        train_AD_ids, train_CN_ids = self.get_ad_cn_ids(train_ids)
+        self.trainAD = BatchProvider(
+            streamer=self,
+            file_ids=train_AD_ids,
+            label_key=self.AD_key
+        )
+        self.trainCN = BatchProvider(
+            streamer=self,
+            file_ids=train_CN_ids,
+            label_key=self.CN_key
+        )
+
+        # Validation batches
+        validation_ids = self.get_validation_ids()
+        valid_AD_ids, valid_CN_ids = self.get_ad_cn_ids(validation_ids)
+        self.validationAD = BatchProvider(
+            streamer=self,
+            file_ids=valid_AD_ids,
+            label_key=self.AD_key
+        )
+        self.validationCN = BatchProvider(
+            streamer=self,
+            file_ids=valid_CN_ids,
+            label_key=self.CN_key
+        )
+
+        # Train batches
+        test_ids = self.get_test_ids()
+        test_AD_ids, test_CN_ids = self.get_ad_cn_ids(test_ids)
+        self.testAD = BatchProvider(
+            streamer=self,
+            file_ids=test_AD_ids,
+            label_key=self.AD_key
+        )
+        self.testCN = BatchProvider(
+            streamer=self,
+            file_ids=test_CN_ids,
+            label_key=self.CN_key
+        )       
