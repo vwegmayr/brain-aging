@@ -7,14 +7,10 @@ import numpy as np
 import os.path
 import tensorflow as tf
 
-import src.baum_vagan.config.system as sys_config
 from src.baum_vagan.grad_accum_optimizers import grad_accum_optimizer_gan
 from src.baum_vagan.tfwrapper import utils as tf_utils
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-
-# Set SGE_GPU environment variable if we are not on the local host
-# sys_config.setup_GPU_environment()
 
 
 class vagan:
@@ -321,6 +317,8 @@ class vagan:
 
 
     ### HELPER FUNCTIONS ############################################################################################
+    def set_save_path(self, save_path):
+        self.save_path = save_path
 
     def _setup_log_dir_and_continue_mode(self):
 
@@ -330,7 +328,7 @@ class vagan:
         """
 
         # Default values
-        self.log_dir = os.path.join(sys_config.log_root, 'gan', self.exp_config.experiment_name)
+        self.log_dir = os.path.join(self.save_path, 'logdir')
         self.init_checkpoint_path = None
         self.continue_run = False
         self.init_step = 0

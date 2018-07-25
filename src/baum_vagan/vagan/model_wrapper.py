@@ -22,7 +22,16 @@ class Dict2Obj(object):
 
 
 class VAGanWrapper(object):
+    """
+    Wraps Baumgartner implementaion of vagan model. In particular,
+    it transforms the configuration into a python object where parameters
+    are accessible through fields ('.' access).
+    """
     def __init__(self, **kwargs):
+        """
+        Arg:
+            - kwargs: params dictionary as specified in yaml config 
+        """
         # Transform to object
         exp_config = Dict2Obj(kwargs)
 
@@ -43,3 +52,6 @@ class VAGanWrapper(object):
 
     def fit(self, X, y=None):
         self.vagan.train()
+
+    def set_save_path(self, save_path):
+        self.vagan.set_save_path(save_path)
