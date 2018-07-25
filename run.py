@@ -179,7 +179,12 @@ class ConfigAction(Action):
     def _save(self):
         class_name = self.config["class"].__name__
         model_path = normpath(os.path.join(self.save_path, class_name+".pkl"))
-        joblib.dump(self.model, model_path)
+
+        try:
+            joblib.dump(self.model, model_path)
+        except:
+            print(">>>> Could not pickle model")
+            return
 
         if self.X_new is not None:
             X_path = normpath(os.path.join(
