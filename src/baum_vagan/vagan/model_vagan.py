@@ -30,12 +30,12 @@ class vagan:
 
         """
         Initialise the VA-GAN model with the two required networks,
-        loss functions, etc... 
+        loss functions, etc...
         Args:
             - exp_config: An experiment config file
             - data: A handle to the data object that should be used
-            - fixed_batch_size: Optionally, a fixed batch size can be 
-              selected. If None, the batch_size will stay flexible. 
+            - fixed_batch_size: Optionally, a fixed batch size can be
+              selected. If None, the batch_size will stay flexible.
         """
 
         self.exp_config = exp_config

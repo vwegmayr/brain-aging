@@ -78,7 +78,7 @@ def crop_and_concat_layer(inputs, axis=-1):
     # output_size = tf.shape(inputs[0])[1:]
     concat_inputs = [inputs[0]]
 
-    for ii in range(1,len(inputs)):
+    for ii in range(1, len(inputs)):
 
         larger_size = inputs[ii].get_shape().as_list()[1:]
         # larger_size = tf.shape(inputs[ii])
@@ -88,6 +88,7 @@ def crop_and_concat_layer(inputs, axis=-1):
         
         for i in range(len(start_crop)):
             start_crop[i] = max(start_crop[i], 0)
+        print(start_crop)
         if len(output_size) == 4:  # nets3D images
         # if output_size.shape[0] == 5:  # nets3D images
             cropped_tensor = tf.slice(inputs[ii],
@@ -98,6 +99,57 @@ def crop_and_concat_layer(inputs, axis=-1):
             cropped_tensor = tf.slice(inputs[ii],
                                      (0, start_crop[0], start_crop[1], 0),
                                      (-1, output_size[0], output_size[1], -1))
+        else:
+            raise ValueError('Unexpected number of dimensions on tensor: %d' % len(output_size))
+
+        concat_inputs.append(cropped_tensor)
+
+    return tf.concat(concat_inputs, axis=axis)
+
+
+def crop_and_concat_layer_fixed(inputs, axis=-1):
+
+    '''
+    Layer for cropping and stacking feature maps of different size along a different axis. 
+    Currently, the first feature map in the inputs list defines the output size. 
+    The feature maps can have different numbers of channels. 
+    :param inputs: A list of input tensors of the same dimensionality but can have different sizes
+    :param axis: Axis along which to concatentate the inputs
+    :return: The concatentated feature map tensor
+    '''
+
+    n_dims = len(inputs[0].get_shape().as_list())
+    output_size = (n_dims - 2) * [np.inf]
+    for inp in inputs:
+        shape = inp.get_shape().as_list()[1:-1]
+        for i, s in enumerate(shape):
+            output_size[i] = min(output_size[i], s)
+
+    # Determine output size
+    # output_size = tf.shape(inputs[0])[1:]
+    concat_inputs = []
+
+    for ii in range(0, len(inputs)):
+
+        larger_size = inputs[ii].get_shape().as_list()[1:-1]
+        # larger_size = tf.shape(inputs[ii])
+
+        # Don't subtract over batch_size because it may be None
+        start_crop = np.subtract(larger_size, output_size) // 2
+        
+        # for i in range(len(start_crop)):
+            #  start_crop[i] = max(start_crop[i], 0)
+
+        if len(output_size) == 3:  # nets3D images
+        # if output_size.shape[0] == 5:  # nets3D images
+            cropped_tensor = tf.slice(inputs[ii],
+                                    (0, start_crop[0], start_crop[1], start_crop[2], 0),
+                                    (-1, output_size[0], output_size[1], output_size[2], -1))
+        elif len(output_size) == 2:  # nets2D images
+        # elif output_size.shape[0] == 4:
+            cropped_tensor = tf.slice(inputs[ii],
+                                    (0, start_crop[0], start_crop[1], 0),
+                                    (-1, output_size[0], output_size[1], -1))
         else:
             raise ValueError('Unexpected number of dimensions on tensor: %d' % len(output_size))
 
