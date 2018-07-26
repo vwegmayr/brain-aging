@@ -70,7 +70,7 @@ class vagan:
             tf.float32, self.img_tensor_shape, name='c1_img'
         )
 
-        if exp_config.rescale_to_one:
+        if exp_config.tf_rescale_to_one:
             self.x_c0 = tf.map_fn(
                 lambda x: normalize_to_range(-1, 1, x),
                 self.x_c0
