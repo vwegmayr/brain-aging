@@ -97,7 +97,10 @@ class vagan:
                 self.gen_x = self.gen_x[:, :, :, :, 0:-1]
 
         self.M = self.generator_net(self.gen_x, self.training_pl_gen)
-        self.y_c0_ = tf.concat([self.gen_x, self.M], axis=-1)
+        if exp_config.conditioned_gan:
+            self.y_c0_ = tf.concat([self.gen_x, self.M], axis=-1)
+        else:
+            self.y_c0_ = self.gen_x + self.M
 
         if exp_config.use_tanh:
             self.y_c0_ = tf.tanh(self.y_c0_)
@@ -480,13 +483,13 @@ class vagan:
                 raise ValueError('Invalid image dimensions')
 
             if data_dimension == 3:
-                y_c0_disp = y_c0_[:, :, :, self.exp_config.image_z_slice, :]
-                x_c1_disp = x_c1[:, :, :, self.exp_config.image_z_slice, :]
-                x_c0_disp = x_c0[:, :, :, self.exp_config.image_z_slice, :]
+                y_c0_disp = y_c0_[:, :, :, self.exp_config.image_z_slice, 0:1]
+                x_c1_disp = x_c1[:, :, :, self.exp_config.image_z_slice, 0:1]
+                x_c0_disp = x_c0[:, :, :, self.exp_config.image_z_slice, 0:1]
             else:
-                y_c0_disp = y_c0_
-                x_c1_disp = x_c1
-                x_c0_disp = x_c0
+                y_c0_disp = y_c0_[:, :, :, 0:1]
+                x_c1_disp = x_c1[:, :, :, 0:1]
+                x_c0_disp = x_c0[:, :, :, 0:1]
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,

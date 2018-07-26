@@ -9,6 +9,7 @@ class BatchProvider(object):
         self.images = images
         self.labels = labels
         self.ids = ids
+        assert len(ids) > 0
         self.image_shape = image_shape
         self.np_random = np.random.RandomState(seed=11)
         self.fid_gen = self.next_fid()
@@ -41,7 +42,10 @@ class BatchProvider(object):
             X_batch.append(x)
             y_batch.append(y)
 
-        return np.array(X_batch), np.array(y_batch)
+        X_batch = np.array(X_batch)
+        y_batch = np.array(y_batch)
+
+        return X_batch, y_batch
 
 
 class CN_AD_Loader(object):

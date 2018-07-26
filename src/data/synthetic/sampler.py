@@ -154,10 +154,10 @@ class TZeroNotFixedSampler(object):
             images.append(np.stack((gt_t1 + noise, delta_im), axis=-1))
 
         for i in range(n_ad):
-            labels.append(0)
+            labels.append(1)
             gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(**self.sample_params)
             delta_im = gt_t1 - gt_t0
-            gts.append(gt_t1)
+            gts.append(gt_t0)
             images.append(np.stack((gt_t0 + noise, delta_im), axis=-1))
 
         images = np.array(images)
