@@ -49,8 +49,13 @@ class vagan:
         self.sampler_c1 = lambda bs: data.trainAD.next_batch(bs)[0]
         self.sampler_c0 = lambda bs: data.trainCN.next_batch(bs)[0]
 
-        self.img_tensor_shape = [fixed_batch_size] + \
-            list(exp_config.image_size) + [1]
+        if not exp_config.conditioned_gan:
+            self.img_tensor_shape = [fixed_batch_size] + \
+                list(exp_config.image_size) + [1]
+        else:
+            self.img_tensor_shape = [fixed_batch_size] + \
+                list(exp_config.image_size) + [exp_config.n_channels]
+
         self.batch_size = exp_config.batch_size
 
         # Generate placeholders for the images and labels.
@@ -82,8 +87,17 @@ class vagan:
             )
 
         # network outputs
-        self.M = self.generator_net(self.x_c1, self.training_pl_gen)
-        self.y_c0_ = self.x_c1 + self.M
+        self.gen_x = self.x_c1
+        if exp_config.conditioned_gan:
+            # drop last channel which should be only used by
+            # the discriminator
+            if len(exp_config.image_size) == 2:
+                self.gen_x = self.gen_x[:, :, :, 0:-1]
+            else:
+                self.gen_x = self.gen_x[:, :, :, :, 0:-1]
+
+        self.M = self.generator_net(self.gen_x, self.training_pl_gen)
+        self.y_c0_ = tf.concat([self.gen_x, self.M], axis=-1)
 
         if exp_config.use_tanh:
             self.y_c0_ = tf.tanh(self.y_c0_)

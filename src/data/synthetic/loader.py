@@ -5,10 +5,11 @@ from src.baum_vagan.utils import map_image_to_intensity_range
 
 
 class BatchProvider(object):
-    def __init__(self, images, ids, labels):
+    def __init__(self, images, ids, labels, image_shape):
         self.images = images
         self.labels = labels
         self.ids = ids
+        self.image_shape = image_shape
         self.np_random = np.random.RandomState(seed=11)
         self.fid_gen = self.next_fid()
         self.img_gen = self.next_image()
@@ -28,7 +29,8 @@ class BatchProvider(object):
         while (1):
             iid = next(self.fid_gen)
             img = self.images[iid]
-            img = np.reshape(img, list(img.shape) + [1])
+            if list(img.shape) != list(self.image_shape):
+                img = np.reshape(img, self.image_shape)
             yield img, self.labels[iid]
 
     def next_batch(self, batch_size):
@@ -46,6 +48,8 @@ class CN_AD_Loader(object):
     def __init__(self, stream_config):
         self.f = h5py.File(stream_config["data_path"])
         self.rescale_to_one = stream_config["rescale_to_one"]
+        self.image_shape = stream_config["image_shape"]
+        self.config = stream_config
 
         self.set_up_batches()
 
@@ -95,35 +99,41 @@ class CN_AD_Loader(object):
         self.trainAD = BatchProvider(
             images=images_train,
             ids=train_AD_ids,
-            labels=labels_train
+            labels=labels_train,
+            image_shape=self.image_shape
         )
 
         self.trainCN = BatchProvider(
             images=images_train,
             ids=train_CN_ids,
-            labels=labels_train
+            labels=labels_train,
+            image_shape=self.image_shape
         )
 
         self.validationAD = BatchProvider(
             images=images_val,
             ids=val_AD_ids,
-            labels=labels_val
+            labels=labels_val,
+            image_shape=self.image_shape
         )
 
         self.validationCN = BatchProvider(
             images=images_val,
             ids=val_CN_ids,
-            labels=labels_val
+            labels=labels_val,
+            image_shape=self.image_shape
         )
 
         self.testAD = BatchProvider(
             images=images_test,
             ids=test_AD_ids,
-            labels=labels_test
+            labels=labels_test,
+            image_shape=self.image_shape
         )
 
         self.testCN = BatchProvider(
             images=images_test,
             ids=test_CN_ids,
-            labels=labels_test
+            labels=labels_test,
+            image_shape=self.image_shape
         )
