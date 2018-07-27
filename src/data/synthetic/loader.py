@@ -50,7 +50,7 @@ class BatchProvider(object):
 
 class CN_AD_Loader(object):
     def __init__(self, stream_config):
-        self.f = h5py.File(stream_config["data_path"])
+        self.f = h5py.File(stream_config["data_path"], 'r')
         self.rescale_to_one = stream_config["rescale_to_one"]
         self.image_shape = stream_config["image_shape"]
         self.config = stream_config
