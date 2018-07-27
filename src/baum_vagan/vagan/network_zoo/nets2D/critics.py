@@ -86,12 +86,61 @@ def C3D_fcn_16_2D_conditioned(x, training, scope_name='critic', scope_reuse=Fals
         condition_logits = C3D_fcn_16_2D(
             condition, training, scope_name="critic_condition", scope_reuse=scope_reuse
         )
-        print(logits)
-        print(condition_logits)
+
         all_logits = tf.concat([logits, condition_logits], axis=-1)
         decision = tf.layers.dense(all_logits, 1, reuse=scope_reuse)
-        print(all_logits)
-        print(decision)
+
+    return decision
+
+
+def C3D_fcn_16_2D_conditioned_with_delta(x, training, scope_name='critic', scope_reuse=False):
+
+    with tf.variable_scope(scope_name) as scope:
+        if scope_reuse:
+            scope.reuse_variables()
+
+        # discrimnator is conditioned on the difference map
+        condition = x[:, :, :, 2:3]
+        delta_img = x[:, :, : 1:2]
+        delta = delta_img[:, 0, 0, :]
+        x = x[:, :, :, 0:1]
+
+        conv1_1 = layers.conv2D_layer(x, 'conv1_1', num_filters=16)
+
+        pool1 = layers.maxpool2D_layer(conv1_1)
+
+        conv2_1 = layers.conv2D_layer(pool1, 'conv2_1', num_filters=32)
+
+        pool2 = layers.maxpool2D_layer(conv2_1)
+
+        conv3_1 = layers.conv2D_layer(pool2, 'conv3_1', num_filters=64)
+        conv3_2 = layers.conv2D_layer(conv3_1, 'conv3_2', num_filters=64)
+
+        pool3 = layers.maxpool2D_layer(conv3_2)
+
+        conv4_1 = layers.conv2D_layer(pool3, 'conv4_1', num_filters=128)
+        conv4_2 = layers.conv2D_layer(conv4_1, 'conv4_2', num_filters=128)
+
+        pool4 = layers.maxpool2D_layer(conv4_2)
+
+        conv5_1 = layers.conv2D_layer(pool4, 'conv5_1', num_filters=256)
+        conv5_2 = layers.conv2D_layer(conv5_1, 'conv5_2', num_filters=256)
+
+        convD_1 = layers.conv2D_layer(conv5_2, 'convD_1', num_filters=256)
+        convD_2 = layers.conv2D_layer(convD_1,
+                                         'convD_2',
+                                         num_filters=1,
+                                         kernel_size=(1,1,1),
+                                         activation=tf.identity)
+
+        logits = layers.averagepool2D_layer(convD_2, name='diagnosis_avg')
+
+        condition_logits = C3D_fcn_16_2D(
+            condition, training, scope_name="critic_condition", scope_reuse=scope_reuse
+        )
+
+        all_logits = tf.concat([logits, condition_logits, delta], axis=-1)
+        decision = tf.layers.dense(all_logits, 1, reuse=scope_reuse)
 
     return decision
 

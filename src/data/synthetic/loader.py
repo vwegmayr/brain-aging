@@ -66,8 +66,10 @@ class CN_AD_Loader(object):
                 # only map the first channel
                 sample = images[i]
                 if len(sample.shape) > 2:
-                    img = map_image_to_intensity_range(sample[:, :, 0:1], -1, 1)
-                    images[i] = np.concatenate((img, sample[:, :, 1:sample.shape[2] + 1]), axis=-1)
+                    for c in self.config["rescale_channels"]:
+                        if np.std(sample[:, :, c]) != 0:
+                            sample[:, :, c] = map_image_to_intensity_range(sample[:, :, c], -1, 1)
+                    images[i] = sample
                 else:
                     images[i] = map_image_to_intensity_range(images[i], -1, 1)
 
