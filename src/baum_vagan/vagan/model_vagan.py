@@ -98,12 +98,15 @@ class vagan:
 
         self.M = self.generator_net(self.gen_x, self.training_pl_gen)
         if exp_config.conditioned_gan:
-            self.y_c0_ = tf.concat([self.gen_x, self.M], axis=-1)
+            if exp_config.use_tanh:
+                delta_x = tf.tanh(self.M)
+            else:
+                delta_x = self.M
+            self.y_c0_ = tf.concat([self.gen_x, delta_x], axis=-1)
         else:
             self.y_c0_ = self.gen_x + self.M
-
-        if exp_config.use_tanh:
-            self.y_c0_ = tf.tanh(self.y_c0_)
+            if exp_config.use_tanh:
+                self.y_c0_ = tf.tanh(self.y_c0_)
 
         self.D = self.critic_net(
             self.x_c0, self.training_pl_cri, scope_reuse=False
@@ -490,6 +493,10 @@ class vagan:
                 y_c0_disp = y_c0_[:, :, :, 0:1]
                 x_c1_disp = x_c1[:, :, :, 0:1]
                 x_c0_disp = x_c0[:, :, :, 0:1]
+                delta_x0 = None
+                if self.exp_config.conditioned_gan:
+                    delta_x0 = x_c0[:, :, :, 1:2]
+                    delta_x1 = x_c1[:, :, :, 1:2]
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,
@@ -518,7 +525,29 @@ class vagan:
                 )
             )
 
+            if delta_x0 is not None:
+                sum_delta0 = tf.summary.image(
+                    '%s_example_CN_delta_img' % prefix,
+                    tf_utils.put_kernels_on_grid(
+                        delta_x0,
+                        min_int=display_range[0],
+                        max_int=display_range[1],
+                        batch_size=self.exp_config.batch_size
+                    )
+                )
+                sum_delta1 = tf.summary.image(
+                    '%s_example_AD_delta_img' % prefix,
+                    tf_utils.put_kernels_on_grid(
+                        delta_x1,
+                        min_int=display_range[0],
+                        max_int=display_range[1],
+                        batch_size=self.exp_config.batch_size
+                    )
+                )
+
             difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
+            if self.exp_config.conditioned_gan:
+                difference_map_pl = tf.abs(y_c0_[:, :, :, 1:2])
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
                 tf_utils.put_kernels_on_grid(
@@ -526,8 +555,10 @@ class vagan:
                     batch_size=self.exp_config.batch_size
                 )
             )
-
-            return tf.summary.merge([sum_gen, sum_c1, sum_c0, sum_dif])
+            sums = [sum_gen, sum_c1, sum_c0, sum_dif]
+            if delta_x0 is not None:
+                sums += [sum_delta0, sum_delta1]
+            return tf.summary.merge(sums)
 
         _image_summaries('train', self.y_c0_, self.x_c1, self.x_c0)
 
