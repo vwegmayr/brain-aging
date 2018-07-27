@@ -63,7 +63,13 @@ class CN_AD_Loader(object):
 
         if self.rescale_to_one:
             for i in range(len(images)):
-                images[i] = map_image_to_intensity_range(images[i], -1, 1)
+                # only map the first channel
+                sample = images[i]
+                if len(sample.shape) > 2:
+                    img = map_image_to_intensity_range(sample[:, :, 0:1], -1, 1)
+                    images[i] = np.concatenate((img, sample[:, :, 1:sample.shape[2] + 1]), axis=-1)
+                else:
+                    images[i] = map_image_to_intensity_range(images[i], -1, 1)
 
         # Make train-validation-test split
         images_train_and_val, images_test, labels_train_and_val, labels_test = \

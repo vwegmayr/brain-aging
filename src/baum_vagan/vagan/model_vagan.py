@@ -495,8 +495,9 @@ class vagan:
                 x_c0_disp = x_c0[:, :, :, 0:1]
                 delta_x0 = None
                 if self.exp_config.conditioned_gan:
-                    delta_x0 = x_c0[:, :, :, 1:2]
-                    delta_x1 = x_c1[:, :, :, 1:2]
+                    c = self.exp_config.n_channels
+                    delta_x0 = x_c0[:, :, :, c-1:c]
+                    delta_x1 = x_c1[:, :, :, c-1:c]
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,
@@ -547,7 +548,8 @@ class vagan:
 
             difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
             if self.exp_config.conditioned_gan:
-                difference_map_pl = tf.abs(y_c0_[:, :, :, 1:2])
+                c = self.exp_config.n_channels
+                difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
                 tf_utils.put_kernels_on_grid(
