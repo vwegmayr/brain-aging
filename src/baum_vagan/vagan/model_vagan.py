@@ -498,6 +498,7 @@ class vagan:
                     c = self.exp_config.n_channels
                     delta_x0 = x_c0[:, :, :, c-1:c]
                     delta_x1 = x_c1[:, :, :, c-1:c]
+                    y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,
