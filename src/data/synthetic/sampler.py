@@ -118,6 +118,39 @@ def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
     return img_t0, img_t1, smnoise, delta
 
 
+def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
+                                deltas=[5, 10], big_rad=15):
+    stdbckg = 50.  # std deviation of the background
+    stdkernel = 2.5  # std deviation of the Gaussian smoothing kernel
+    noise = np_random.normal(
+        scale=stdbckg, size=np.asarray([image_size, image_size])
+    )
+    smnoise = filters.gaussian(noise, stdkernel)
+    smnoise = smnoise / np.std(smnoise) * stdbckg
+
+    idx = np.random.randint(0, len(deltas))
+    delta = deltas[idx]
+    small_rad = big_rad - delta
+
+    img_t0, _ = four_disks(
+         effect_size=effect_size,
+         small_rad=small_rad,
+         image_size=image_size,
+         big_rad=big_rad,
+         big=[True, True, True, True]
+    )
+
+    img_t1, _ = four_disks(
+         effect_size=effect_size,
+         image_size=image_size,
+         small_rad=small_rad,
+         big_rad=big_rad,
+         big=[False, False, False, False]
+    )
+
+    return img_t0, img_t1, smnoise, delta
+
+
 class Sampler(object):
     def __init__(self, n_images, cn_func, cn_params, ad_func, ad_params,
                  outdir):
@@ -242,6 +275,60 @@ class TZeroNotFixedDeltaNotFixedSampler(object):
         for i in range(n_ad):
             labels.append(1)
             gt_t0, gt_t1, noise, delta = tzero_not_fixed_delta_not_fixed(**self.sample_params)
+            shape = gt_t0.shape
+            delta_img = delta * np.ones(shape)
+            delta_im = gt_t1 - gt_t0
+            gts.append(gt_t0)
+            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
+
+        images = np.array(images)
+        labels = np.array(labels)
+        gts = np.array(gts)
+
+        # Save images
+        out_path = os.path.join(self.outdir, 'samples.hdf5')
+        with h5py.File(out_path, 'w') as f:
+            f.create_dataset('images', data=images, dtype=np.float32)
+            f.create_dataset('labels', data=labels, dtype=np.uint8)
+            f.create_dataset('gts', data=gts, dtype=np.uint8)
+
+        out_path = os.path.join(self.outdir, 'config.yaml')
+        with open(out_path, 'w') as f:
+            yaml.dump(self.sample_params, f)
+
+
+class TZeroFixedDeltaNotFixedSampler(object):
+    def __init__(self, n_images, sample_params,
+                 outdir):
+        self.n_images = n_images
+        self.sample_params = sample_params
+        self.outdir = outdir
+        self.sample_params["np_random"] = np.random.RandomState(seed=40)
+
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+
+    def transform(self, X=None, y=None):
+        # sample images
+        images = []
+        labels = []
+        gts = []
+
+        n_cn = self.n_images // 2
+        n_ad = self.n_images // 2
+
+        for i in range(n_cn):
+            labels.append(0)
+            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(**self.sample_params)
+            shape = gt_t0.shape
+            delta_img = delta * np.ones(shape)
+            delta_im = gt_t1 - gt_t0
+            gts.append(gt_t1)
+            images.append(np.stack((gt_t1 + noise, delta_img, delta_im), axis=-1))
+
+        for i in range(n_ad):
+            labels.append(1)
+            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(**self.sample_params)
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
