@@ -6,7 +6,8 @@ import yaml
 
 
 def four_disks(effect_size=50., image_size=100, moving_effect=True,
-          big_rad=15, small_rad=9, big=[True, True, True, True]):
+               big_rad=15, small_rad=9, big=[True, True, True, True],
+               center_fixed=True):
     stdbckg = 50.  # std deviation of the background
     stdkernel = 2.5  # std deviation of the Gaussian smoothing kernel
     img = np.zeros([image_size, image_size])
@@ -23,12 +24,19 @@ def four_disks(effect_size=50., image_size=100, moving_effect=True,
 
     # Compute disk centers
     offset = 10
-    # Large disks
-    c1 = (offset + big_rad, offset + big_rad)
-    c2 = (offset + big_rad, image_size - offset - big_rad)
-    # Small disks
-    c3 = (image_size - offset - big_rad, offset + big_rad)
-    c4 = (image_size - offset - big_rad, image_size - offset - big_rad)
+    if not center_fixed:
+        # Large disks
+        c1 = (offset + big_rad, offset + big_rad)
+        c2 = (offset + big_rad, image_size - offset - big_rad)
+        # Small disks
+        c3 = (image_size - offset - big_rad, offset + big_rad)
+        c4 = (image_size - offset - big_rad, image_size - offset - big_rad)
+    else:
+        off = int(image_size / 4)
+        c1 = (off, off)
+        c2 = (off, image_size - off)
+        c3 = (image_size - off, off)
+        c4 = (image_size - off, image_size - off)
 
     centers = [c1, c2, c3, c4]
     for b, c in zip(big, centers):
@@ -48,7 +56,7 @@ def four_disks(effect_size=50., image_size=100, moving_effect=True,
 
 
 def tzero_not_fixed_delta_fixed(np_random, image_size, effect_size=100, delta=5,
-                                big_rads=[10, 12, 15, 17, 20]):
+                                big_rads=[10, 12, 15, 17, 20], center_fixed=True):
     n = len(big_rads)
     idx = np_random.randint(0, n)
     big_rad = big_rads[idx]
@@ -67,7 +75,8 @@ def tzero_not_fixed_delta_fixed(np_random, image_size, effect_size=100, delta=5,
         effect_size=effect_size,
         small_rad=small_rad,
         big_rad=big_rad,
-        big=[True, True, True, True]
+        big=[True, True, True, True],
+        center_fixed=center_fixed
     )
 
     img_t1, _ = four_disks(
@@ -75,14 +84,16 @@ def tzero_not_fixed_delta_fixed(np_random, image_size, effect_size=100, delta=5,
         effect_size=effect_size,
         small_rad=small_rad,
         big_rad=big_rad,
-        big=[False, False, False, False]
+        big=[False, False, False, False],
+        center_fixed=center_fixed
     )
 
     return img_t0, img_t1, smnoise
 
 
 def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
-                                    deltas=[0, 3, 6, 8], big_rads=[10, 12, 15, 17, 20]):
+                                    deltas=[0, 3, 6, 8], big_rads=[10, 12, 15, 17, 20],
+                                    center_fixed=True):
     n = len(big_rads)
     idx = np.random.randint(0, n)
     big_rad = big_rads[idx]
@@ -104,7 +115,8 @@ def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
          small_rad=small_rad,
          image_size=image_size,
          big_rad=big_rad,
-         big=[True, True, True, True]
+         big=[True, True, True, True],
+         center_fixed=center_fixed
     )
 
     img_t1, _ = four_disks(
@@ -112,14 +124,15 @@ def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
          image_size=image_size,
          small_rad=small_rad,
          big_rad=big_rad,
-         big=[False, False, False, False]
+         big=[False, False, False, False],
+         center_fixed=center_fixed
     )
 
     return img_t0, img_t1, smnoise, delta
 
 
 def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
-                                deltas=[5, 10], big_rad=15):
+                                deltas=[5, 10], big_rad=15, center_fixed=True):
     stdbckg = 50.  # std deviation of the background
     stdkernel = 2.5  # std deviation of the Gaussian smoothing kernel
     noise = np_random.normal(
@@ -137,7 +150,8 @@ def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
          small_rad=small_rad,
          image_size=image_size,
          big_rad=big_rad,
-         big=[True, True, True, True]
+         big=[True, True, True, True],
+         center_fixed=center_fixed
     )
 
     img_t1, _ = four_disks(
@@ -145,7 +159,8 @@ def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
          image_size=image_size,
          small_rad=small_rad,
          big_rad=big_rad,
-         big=[False, False, False, False]
+         big=[False, False, False, False],
+         center_fixed=center_fixed
     )
 
     return img_t0, img_t1, smnoise, delta
