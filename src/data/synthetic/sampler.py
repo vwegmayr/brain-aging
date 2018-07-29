@@ -2,6 +2,7 @@ import numpy as np
 from skimage import filters
 import os
 import h5py
+import yaml
 
 
 def four_disks(effect_size=50., image_size=100, moving_effect=True,
@@ -257,3 +258,7 @@ class TZeroNotFixedDeltaNotFixedSampler(object):
             f.create_dataset('images', data=images, dtype=np.float32)
             f.create_dataset('labels', data=labels, dtype=np.uint8)
             f.create_dataset('gts', data=gts, dtype=np.uint8)
+
+        out_path = os.path.join(self.outdir, 'config.yaml')
+        with open(out_path, 'w') as f:
+            yaml.dump(self.sample_params, f)
