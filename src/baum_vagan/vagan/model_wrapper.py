@@ -2,6 +2,9 @@ import importlib
 import pydoc
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
+import yaml
+import os
 
 from src.baum_vagan.vagan.model_vagan import vagan
 from src.baum_vagan.utils import ncc
@@ -35,6 +38,7 @@ class VAGanWrapper(object):
         Arg:
             - kwargs: params dictionary as specified in yaml config 
         """
+        self.loaded_config = copy.deepcopy(kwargs)
         # Transform to object
         exp_config = Dict2Obj(kwargs)
 
@@ -60,9 +64,13 @@ class VAGanWrapper(object):
         self.vagan = vagan(exp_config=exp_config, data=data)
 
     def fit(self, X, y=None):
+        # Dump initial config
+        with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
+            yaml.dump(self.loaded_config, f)
         self.vagan.train()
 
     def set_save_path(self, save_path):
+        self.save_path = save_path
         self.vagan.set_save_path(save_path)
 
     def show_morphed_images(self):
