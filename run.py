@@ -181,7 +181,8 @@ class ConfigAction(Action):
         model_path = normpath(os.path.join(self.save_path, class_name+".pkl"))
 
         try:
-            joblib.dump(self.model, model_path)
+            if "pickle" in self.config and self.config["pickle"]:
+                joblib.dump(self.model, model_path)
         except:
             print(">>>> Could not pickle model")
             return

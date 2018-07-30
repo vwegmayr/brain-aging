@@ -61,6 +61,27 @@ class CN_AD_Loader(object):
         images = self.f["images"][:]
         labels = self.f["labels"][:]
 
+        def normalize_to_range(a, b, mini, maxi, x):
+            return a + (x - mini) / (maxi - mini) * (b - a)
+
+        # normalize delta to [0, 1] scale
+        if "normalize_delta" in self.config:
+            channel = self.config["normalize_delta"]
+            mini = np.inf
+            maxi = -1000000
+            for i in range(len(images)):
+                mini = min(np.min(images[i, :, :, channel]), mini)
+                maxi = max(np.min(images[i, :, :, channel]), maxi)
+
+            for i in range(len(images)):
+                images[i, :, :, channel] = normalize_to_range(
+                    0, 1, mini, maxi, images[i, :, :, channel]
+                )
+
+            def normalize_delta(x):
+                return normalize_to_range(0, 1, mini, maxi, x)
+            self.normalize_delta = normalize_delta
+
         if self.rescale_to_one:
             for i in range(len(images)):
                 # only map the first channel
