@@ -19,11 +19,88 @@ def normalize_to_range(a, b, x):
     return a + (x - mini) / (maxi - mini) * (b - a)
 
 
+class InputWrapper(object):
+    def __init__(self, x):
+        """
+        Arg:
+            - x: batch of inputs
+        """
+        self.x = x
+
+        shape = x.get_shape().as_list()
+        if len(shape) == 4:
+            self.mode2D = True
+        elif len(shape) == 5:
+            self.mode2D = False
+        else:
+            raise ValueError("Invalid shape")
+
+        self.prepare_tensors()
+
+    def prepare_tensors(self):
+        pass
+
+    def get_x_t0(self):
+        return self.x_t0
+
+    def get_x_t1(self):
+        return self.x_t1
+
+    def get_delta(self):
+        return self.delta
+
+    def get_delta_x_t0(self):
+        return self.delta_x_t0
+
+
+class Xt0_DT_Xt1(InputWrapper):
+    def prepare_tensors(self):
+        if self.mode2D:
+            self.x_t0 = self.x[:, :, :, 0:1]
+        else:
+            self.x_t0 = self.x[:, :, :, :, 0:1]
+
+        if self.mode2D:
+            self.delta = self.x[:, :, :, 1:2]
+        else:
+            self.delta = self.x[:, :, :, :, 1:2]
+
+        if self.mode2D:
+            self.x_t1 = self.x[:, :, :, 2:3]
+        else:
+            self.x_t1 = self.x[:, :, :, :, 2:3]
+
+        self.delta_x_t0 = self.x_t1 - self.x_t0
+
+
+class Xt0_DT_DXt0(InputWrapper):
+    def prepare_tensors(self):
+        if self.mode2D:
+            self.x_t0 = self.x[:, :, :, 0:1]
+        else:
+            self.x_t0 = self.x[:, :, :, :, 0:1]
+
+        if self.mode2D:
+            self.delta = self.x[:, :, :, 1:2]
+        else:
+            self.delta = self.x[:, :, :, :, 1:2]
+
+        if self.mode2D:
+            self.delta_x_t0 = self.x[:, :, :, 2:3]
+        else:
+            self.delta_x_t0 = self.x[:, :, :, :, 2:3]
+
+        self.x_t1 = self.x_t0 + self.delta_x_t0
+
+
 class vagan:
 
     """
     This class contains all the methods for defining training
     and evaluating the VA-GAN method.
+
+    For conditioned GAN inputs should be of the form:
+    - [x_t0, delta, delta_x_t0] where x_t0 + delta_x_t0 = x_t1
     """
 
     def __init__(self, exp_config, data, fixed_batch_size=None):
@@ -91,25 +168,75 @@ class vagan:
         if exp_config.conditioned_gan:
             # drop last channel which should be only used by
             # the discriminator
-            if len(exp_config.image_size) == 2:
-                self.gen_x = self.gen_x[:, :, :, 0:-1]
-            else:
-                self.gen_x = self.gen_x[:, :, :, :, 0:-1]
+            self.x_c0_wrapper = exp_config.input_wrapper(self.x_c0)
+            self.x_c1_wrapper = exp_config.input_wrapper(self.x_c1)
 
-        self.M = self.generator_net(self.gen_x, self.training_pl_gen)
-        if exp_config.conditioned_gan:
-            if exp_config.use_tanh:
-                delta_x = tf.tanh(self.M)
+            self.gen_x = tf.concat(
+                [
+                    self.x_c1_wrapper.get_delta_x_t0(),
+                    self.x_c1_wrapper.get_delta()
+                ],
+                axis=-1
+            )
+
+            # the generator generates the difference map
+            if exp_config.generate_diff_map:
+                self.M = self.generator_net(self.gen_x, self.training_pl_gen)
+                if exp_config.use_tanh:
+                    self.M = tf.tanh(self.M)
+            # the generator generates y = x + M(x) directly
             else:
-                delta_x = self.M
-            self.y_c0_ = tf.concat([self.gen_x, delta_x], axis=-1)
+                self.generated = self.generator_net(self.gen_x, self.training_pl_gen)
+                if exp_config.use_tanh:
+                    self.generated = tf.tanh(self.generated)
+
+                self.M = self.generated - self.x_c1_wrapper.get_x_t0()
+
+        # prepare intput for discriminator
+        if exp_config.conditioned_gan:
+            if exp_config.generate_diff_map:
+                self.y_c0_ = tf.concat(
+                    [
+                        self.x_c1_wrapper.get_x_t0(),
+                        self.x_c1_wrapper.get_delta(),
+                        self.M
+                    ],
+                    axis=-1
+                )
+                self.critic_real_inp = tf.concat(
+                    [
+                        self.x_c0_wrapper.get_x_t0(),
+                        self.x_c0_wrapper.get_delta(),
+                        self.x_c0_wrapper.get_delta_x_t0(),
+                    ],
+                    axis=-1
+                )
+            else:
+                self.y_c0_ = tf.concat(
+                    [
+                        self.x_c1_wrapper.get_x_t0(),
+                        self.x_c1_wrapper.get_delta(),
+                        self.generated
+                    ],
+                    axis=-1
+                )
+                self.critic_real_inp = tf.concat(
+                    [
+                        self.x_c0_wrapper.get_x_t0(),
+                        self.x_c0_wrapper.get_delta(),
+                        self.x_c0_wrapper.get_x_t1(),
+                    ],
+                    axis=-1
+                )
+
         else:
             self.y_c0_ = self.gen_x + self.M
+            self.critic_real_inp = self.x_c0
             if exp_config.use_tanh:
                 self.y_c0_ = tf.tanh(self.y_c0_)
 
         self.D = self.critic_net(
-            self.x_c0, self.training_pl_cri, scope_reuse=False
+            self.critic_real_inp, self.training_pl_cri, scope_reuse=False
         )
         self.D_ = self.critic_net(
             self.y_c0_, self.training_pl_cri, scope_reuse=True
@@ -478,6 +605,8 @@ class vagan:
 
         def _image_summaries(prefix, y_c0_, x_c1, x_c0):
 
+            x_c0_wrapper = self.exp_config.input_wrapper(x_c0)
+            x_c1_wrapper = self.exp_config.input_wrapper(x_c1)
             if len(self.img_tensor_shape) == 5:
                 data_dimension = 3
             elif len(self.img_tensor_shape) == 4:
@@ -491,14 +620,17 @@ class vagan:
                 x_c0_disp = x_c0[:, :, :, self.exp_config.image_z_slice, 0:1]
             else:
                 y_c0_disp = y_c0_[:, :, :, 0:1]
-                x_c1_disp = x_c1[:, :, :, 0:1]
-                x_c0_disp = x_c0[:, :, :, 0:1]
+                x_c1_disp = x_c0_wrapper.get_x_t0()
+                x_c0_disp = x_c1_wrapper.get_x_t0()
                 delta_x0 = None
                 if self.exp_config.conditioned_gan:
                     c = self.exp_config.n_channels
-                    delta_x0 = x_c0[:, :, :, c-1:c]
-                    delta_x1 = x_c1[:, :, :, c-1:c]
-                    y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
+                    delta_x0 = x_c0_wrapper.get_delta_x_t0()
+                    delta_x1 = x_c1_wrapper.get_delta_x_t0()
+                    if self.exp_config.generate_diff_map:
+                        y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
+                    else:
+                        y_c0_disp = y_c0_[:, :, :, c-1:c]
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,

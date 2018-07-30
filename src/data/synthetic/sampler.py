@@ -236,8 +236,8 @@ class TZeroNotFixedSampler(object):
             labels.append(0)
             gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(**self.sample_params)
             delta_im = gt_t1 - gt_t0
-            gts.append(gt_t1)
-            images.append(np.stack((gt_t1 + noise, delta_im), axis=-1))
+            gts.append(gt_t0)
+            images.append(np.stack((gt_t0 + noise, delta_im), axis=-1))
 
         for i in range(n_ad):
             labels.append(1)
@@ -284,8 +284,8 @@ class TZeroNotFixedDeltaNotFixedSampler(object):
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
-            gts.append(gt_t1)
-            images.append(np.stack((gt_t1 + noise, delta_img, delta_im), axis=-1))
+            gts.append(gt_t0)
+            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
 
         for i in range(n_ad):
             labels.append(1)
@@ -338,8 +338,8 @@ class TZeroFixedDeltaNotFixedSampler(object):
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
-            gts.append(gt_t1)
-            images.append(np.stack((gt_t1 + noise, delta_img, delta_im), axis=-1))
+            gts.append(gt_t0)
+            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
 
         for i in range(n_ad):
             labels.append(1)
