@@ -52,6 +52,11 @@ class InputWrapper(object):
     def get_delta_x_t0(self):
         return self.delta_x_t0
 
+    def get_delta_x_t0_rescaled(self):
+        return normalize_to_range(
+            -1, 1, self.get_delta_x_t0()
+        )
+
 
 class Xt0_DT_Xt1(InputWrapper):
     def prepare_tensors(self):
@@ -173,7 +178,7 @@ class vagan:
 
             self.gen_x = tf.concat(
                 [
-                    self.x_c1_wrapper.get_delta_x_t0(),
+                    self.x_c1_wrapper.get_x_t0(),
                     self.x_c1_wrapper.get_delta()
                 ],
                 axis=-1
@@ -207,7 +212,7 @@ class vagan:
                     [
                         self.x_c0_wrapper.get_x_t0(),
                         self.x_c0_wrapper.get_delta(),
-                        self.x_c0_wrapper.get_delta_x_t0(),
+                        self.x_c0_wrapper.get_delta_x_t0_rescaled(),
                     ],
                     axis=-1
                 )
