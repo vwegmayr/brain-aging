@@ -675,7 +675,7 @@ class vagan:
                 sum_delta0 = tf.summary.image(
                     '%s_example_CN_delta_img' % prefix,
                     tf_utils.put_kernels_on_grid(
-                        delta_x0,
+                        tf.abs(delta_x0),
                         min_int=display_range[0],
                         max_int=display_range[1],
                         batch_size=self.exp_config.batch_size
@@ -684,7 +684,7 @@ class vagan:
                 sum_delta1 = tf.summary.image(
                     '%s_example_AD_delta_img' % prefix,
                     tf_utils.put_kernels_on_grid(
-                        delta_x1,
+                        tf.abs(delta_x1),
                         min_int=display_range[0],
                         max_int=display_range[1],
                         batch_size=self.exp_config.batch_size
