@@ -184,18 +184,18 @@ class vagan:
                 axis=-1
             )
 
-            # the generator generates the difference map
-            if exp_config.generate_diff_map:
-                self.M = self.generator_net(self.gen_x, self.training_pl_gen)
-                if exp_config.use_tanh:
-                    self.M = tf.tanh(self.M)
-            # the generator generates y = x + M(x) directly
-            else:
-                self.generated = self.generator_net(self.gen_x, self.training_pl_gen)
-                if exp_config.use_tanh:
-                    self.generated = tf.tanh(self.generated)
+        # the generator generates the difference map
+        if exp_config.generate_diff_map:
+            self.M = self.generator_net(self.gen_x, self.training_pl_gen)
+            if exp_config.use_tanh:
+                self.M = tf.tanh(self.M)
+        # the generator generates y = x + M(x) directly
+        else:
+            self.generated = self.generator_net(self.gen_x, self.training_pl_gen)
+            if exp_config.use_tanh:
+                self.generated = tf.tanh(self.generated)
 
-                self.M = self.generated - self.x_c1_wrapper.get_x_t0()
+            self.M = self.generated - self.x_c1_wrapper.get_x_t0()
 
         # prepare intput for discriminator
         if exp_config.conditioned_gan:
@@ -212,7 +212,7 @@ class vagan:
                     [
                         self.x_c0_wrapper.get_x_t0(),
                         self.x_c0_wrapper.get_delta(),
-                        self.x_c0_wrapper.get_delta_x_t0_rescaled(),
+                        self.x_c0_wrapper.get_delta_x_t0(),
                     ],
                     axis=-1
                 )
