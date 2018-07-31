@@ -217,11 +217,17 @@ class vagan:
                     axis=-1
                 )
             else:
+                fake_condition = self.generated
+                real_condition = self.x_c0_wrapper.get_x_t1()
+                if exp_config.condition_on_delta_x:
+                    fake_condition = self.M
+                    real_condition = self.x_c0_wrapper.get_delta_x_t0()
+
                 self.y_c0_ = tf.concat(
                     [
                         self.x_c1_wrapper.get_x_t0(),
                         self.x_c1_wrapper.get_delta(),
-                        self.generated
+                        fake_condition,
                     ],
                     axis=-1
                 )
@@ -229,7 +235,7 @@ class vagan:
                     [
                         self.x_c0_wrapper.get_x_t0(),
                         self.x_c0_wrapper.get_delta(),
-                        self.x_c0_wrapper.get_x_t1(),
+                        real_condition
                     ],
                     axis=-1
                 )
@@ -632,7 +638,8 @@ class vagan:
                     c = self.exp_config.n_channels
                     delta_x0 = x_c0_wrapper.get_delta_x_t0()
                     delta_x1 = x_c1_wrapper.get_delta_x_t0()
-                    if self.exp_config.generate_diff_map:
+                    if self.exp_config.generate_diff_map or \
+                            self.exp_config.condition_on_delta_x:
                         y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
                     else:
                         y_c0_disp = y_c0_[:, :, :, c-1:c]
@@ -687,12 +694,15 @@ class vagan:
             difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
             if self.exp_config.conditioned_gan:
                 c = self.exp_config.n_channels
-                if self.exp_config.generate_diff_map:
+                if self.exp_config.generate_diff_map or \
+                        self.exp_config.condition_on_delta_x:
                     difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
                 else:
-                    difference_map_pl = tf.abs(
-                        y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
-                    )
+                    if not self.exp_config.condition_on_delta_x:
+                        difference_map_pl = tf.abs(
+                            y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
+                        )
+
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
                 tf_utils.put_kernels_on_grid(
