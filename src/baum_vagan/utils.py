@@ -6,7 +6,8 @@ import nibabel as nib
 import numpy as np
 import os
 
-def ncc(a,v, zero_norm=True):
+
+def ncc(a, v, zero_norm=True):
 
     a = a.flatten()
     v = v.flatten()
@@ -21,10 +22,10 @@ def ncc(a,v, zero_norm=True):
         a = (a) / (np.std(a) * len(a))
         v = (v) / np.std(v)
 
-    return np.correlate(a,v)
+    return np.correlate(a, v)
 
 
-def norm_l2(a,v):
+def norm_l2(a, v):
 
     a = a.flatten()
     v = v.flatten()
@@ -33,7 +34,6 @@ def norm_l2(a,v):
     v = (v - np.mean(v)) / np.std(v)
 
     return np.mean(np.sqrt(a**2 + v**2))
-
 
 
 def all_argmax(arr, axis=None):
@@ -52,6 +52,7 @@ def makefolder(folder):
         return True
     return False
 
+
 def load_nii(img_path):
 
     '''
@@ -60,6 +61,7 @@ def load_nii(img_path):
 
     nimg = nib.load(img_path)
     return nimg.get_data(), nimg.affine, nimg.header
+
 
 def save_nii(img_path, data, affine, header):
     '''
@@ -76,7 +78,6 @@ def create_and_save_nii(data, img_path):
     nib.save(img, img_path)
 
 
-
 class Bunch:
     # Useful shortcut for making struct like contructs
     # Example:
@@ -87,11 +88,11 @@ class Bunch:
         self.__dict__.update(kwds)
 
 
-
 def convert_to_uint8(image):
     image = image - image.min()
-    image = 255.0*np.divide(image.astype(np.float32),image.max())
+    image = 255.0*np.divide(image.astype(np.float32), image.max())
     return image.astype(np.uint8)
+
 
 def normalise_image(image):
     '''
@@ -106,7 +107,8 @@ def normalise_image(image):
 
 def map_image_to_intensity_range(image, min_o, max_o, percentiles=0):
 
-    # If percentile = 0 uses min and max. Percentile >0 makes normalisation more robust to outliers.
+    # If percentile = 0 uses min and max. Percentile >0 makes
+    # normalisation more robust to outliers.
 
     if image.dtype in [np.uint8, np.uint16, np.uint32]:
         assert min_o >= 0, 'Input image type is uintXX but you selected a negative min_o: %f' % min_o
@@ -127,21 +129,20 @@ def map_image_to_intensity_range(image, min_o, max_o, percentiles=0):
 
 def normalise_images(X):
     '''
-    Helper for making the images zero mean and unit standard deviation i.e. `white`
+    Helper for making the images zero mean and unit
+    standard deviation i.e. `white`
     '''
 
     X_white = np.zeros(X.shape, dtype=np.float32)
 
     for ii in range(X.shape[0]):
 
-        Xc = X[ii,:,:,:]
+        Xc = X[ii, :, :, :]
         mc = Xc.mean()
         sc = Xc.std()
 
         Xc_white = np.divide((Xc - mc), sc)
 
-        X_white[ii,:,:,:] = Xc_white
+        X_white[ii, :, :, :] = Xc_white
 
     return X_white.astype(np.float32)
-
-

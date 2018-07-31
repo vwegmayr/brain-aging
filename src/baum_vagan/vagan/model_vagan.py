@@ -687,7 +687,12 @@ class vagan:
             difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
             if self.exp_config.conditioned_gan:
                 c = self.exp_config.n_channels
-                difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
+                if self.exp_config.generate_diff_map:
+                    difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
+                else:
+                    difference_map_pl = tf.abs(
+                        y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
+                    )
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
                 tf_utils.put_kernels_on_grid(
