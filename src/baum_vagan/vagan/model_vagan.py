@@ -631,8 +631,8 @@ class vagan:
                 x_c0_disp = x_c0[:, :, :, self.exp_config.image_z_slice, 0:1]
             else:
                 y_c0_disp = y_c0_[:, :, :, 0:1]
-                x_c1_disp = x_c0_wrapper.get_x_t0()
-                x_c0_disp = x_c1_wrapper.get_x_t0()
+                x_c1_disp = x_c1_wrapper.get_x_t0()
+                x_c0_disp = x_c0_wrapper.get_x_t0()
                 delta_x0 = None
                 if self.exp_config.conditioned_gan:
                     c = self.exp_config.n_channels
