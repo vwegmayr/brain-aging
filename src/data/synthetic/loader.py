@@ -87,12 +87,23 @@ class CN_AD_Loader(object):
                 # only map the first channel
                 sample = images[i]
                 if len(sample.shape) > 2:
-                    rescale_groups = self.config["rescale_channels"]
-                    for cs in rescale_groups:
-                        sample[:, :, cs] = map_image_to_intensity_range(sample[:, :, cs], -1, 1)
-                    images[i] = sample
+                    t0_idx = 0
+                    delta_t0_idx = 2
                 else:
-                    images[i] = map_image_to_intensity_range(images[i], -1, 1)
+                    t0_idx = 0
+                    delta_t0_idx = 1
+                # compute delta_x_t0 by computing the difference AFTER
+                # rescaling x_t0 and x_t1
+                x_t0 = sample[:, :, t0_idx:t0_idx + 1]
+                delta_x_t0 = sample[:, :, delta_t0_idx:delta_t0_idx + 1]
+                x_t1 = x_t0 + delta_x_t0
+                resc = map_image_to_intensity_range(
+                    np.concatenate((x_t0, x_t1), axis=-1), -1, 1
+                )
+                x_t0 = resc[:, :, 0]
+                delta_x_t0 = resc[:, :, 1] - resc[:, :, 0]
+                sample[:, :, t0_idx] = x_t0
+                sample[:, :, delta_t0_idx] = delta_x_t0
 
         # Make train-validation-test split
         images_train_and_val, images_test, labels_train_and_val, labels_test = \
