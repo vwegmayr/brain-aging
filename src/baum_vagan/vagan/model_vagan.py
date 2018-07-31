@@ -665,7 +665,7 @@ class vagan:
 
             if delta_x0 is not None:
                 delta_x0 = rescale_image_summary(delta_x0, 0, 255)
-                delta_x1 = rescale_image_summary(delta_x0, 0, 255)
+                delta_x1 = rescale_image_summary(delta_x1, 0, 255)
             difference_map_pl = rescale_image_summary(difference_map_pl, 0, 255)
 
             """
