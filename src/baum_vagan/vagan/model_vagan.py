@@ -99,6 +99,22 @@ class Xt0_DT_DXt0(InputWrapper):
         self.x_t1 = self.x_t0 + self.delta_x_t0
 
 
+class Xt0_DXt0(InputWrapper):
+    def prepare_tensors(self):
+        if self.mode2D:
+            self.x_t0 = self.x[:, :, :, 0:1]
+        else:
+            self.x_t0 = self.x[:, :, :, :, 0:1]
+
+        if self.mode2D:
+            self.delta_x_t0 = self.x[:, :, :, 1:2]
+        else:
+            self.delta_x_t0 = self.x[:, :, :, :, 1:2]
+
+        self.x_t1 = self.x_t0 + self.delta_x_t0
+        self.delta = None
+
+
 class vagan:
 
     """
@@ -177,13 +193,16 @@ class vagan:
             self.x_c0_wrapper = exp_config.input_wrapper(self.x_c0)
             self.x_c1_wrapper = exp_config.input_wrapper(self.x_c1)
 
-            self.gen_x = tf.concat(
-                [
-                    self.x_c1_wrapper.get_x_t0(),
-                    self.x_c1_wrapper.get_delta()
-                ],
-                axis=-1
-            )
+            if exp_config.n_channels == 3:
+                self.gen_x = tf.concat(
+                    [
+                        self.x_c1_wrapper.get_x_t0(),
+                        self.x_c1_wrapper.get_delta()
+                    ],
+                    axis=-1
+                )
+            elif exp_config.n_channels == 2:
+                self.gen_x = self.x_c1_wrapper.get_x_t0()
 
         # the generator generates the difference map
         if exp_config.generate_diff_map:
@@ -201,22 +220,38 @@ class vagan:
         # prepare intput for discriminator
         if exp_config.conditioned_gan:
             if exp_config.generate_diff_map:
-                self.y_c0_ = tf.concat(
-                    [
-                        self.x_c1_wrapper.get_x_t0(),
-                        self.x_c1_wrapper.get_delta(),
-                        self.M
-                    ],
-                    axis=-1
-                )
-                self.critic_real_inp = tf.concat(
-                    [
-                        self.x_c0_wrapper.get_x_t0(),
-                        self.x_c0_wrapper.get_delta(),
-                        self.x_c0_wrapper.get_delta_x_t0(),
-                    ],
-                    axis=-1
-                )
+                if exp_config.n_channels == 3:
+                    self.y_c0_ = tf.concat(
+                        [
+                            self.x_c1_wrapper.get_x_t0(),
+                            self.x_c1_wrapper.get_delta(),
+                            self.M
+                        ],
+                        axis=-1
+                    )
+                    self.critic_real_inp = tf.concat(
+                        [
+                            self.x_c0_wrapper.get_x_t0(),
+                            self.x_c0_wrapper.get_delta(),
+                            self.x_c0_wrapper.get_delta_x_t0(),
+                        ],
+                        axis=-1
+                    )
+                elif exp_config.n_channels == 2:
+                    self.y_c0_ = tf.concat(
+                        [
+                            self.x_c1_wrapper.get_x_t0(),
+                            self.M
+                        ],
+                        axis=-1
+                    )
+                    self.critic_real_inp = tf.concat(
+                        [
+                            self.x_c0_wrapper.get_x_t0(),
+                            self.x_c0_wrapper.get_delta_x_t0(),
+                        ],
+                        axis=-1
+                    )
             else:
                 fake_condition = self.generated
                 real_condition = self.x_c0_wrapper.get_x_t1()
@@ -224,23 +259,38 @@ class vagan:
                     fake_condition = self.M
                     real_condition = self.x_c0_wrapper.get_delta_x_t0()
 
-                self.y_c0_ = tf.concat(
-                    [
-                        self.x_c1_wrapper.get_x_t0(),
-                        self.x_c1_wrapper.get_delta(),
-                        fake_condition,
-                    ],
-                    axis=-1
-                )
-                self.critic_real_inp = tf.concat(
-                    [
-                        self.x_c0_wrapper.get_x_t0(),
-                        self.x_c0_wrapper.get_delta(),
-                        real_condition
-                    ],
-                    axis=-1
-                )
-
+                if exp_config.n_channels == 3:
+                    self.y_c0_ = tf.concat(
+                        [
+                            self.x_c1_wrapper.get_x_t0(),
+                            self.x_c1_wrapper.get_delta(),
+                            fake_condition,
+                        ],
+                        axis=-1
+                    )
+                    self.critic_real_inp = tf.concat(
+                        [
+                            self.x_c0_wrapper.get_x_t0(),
+                            self.x_c0_wrapper.get_delta(),
+                            real_condition
+                        ],
+                        axis=-1
+                    )
+                elif exp_config.n_channels == 2:
+                    self.y_c0_ = tf.concat(
+                        [
+                            self.x_c1_wrapper.get_x_t0(),
+                            fake_condition,
+                        ],
+                        axis=-1
+                    )
+                    self.critic_real_inp = tf.concat(
+                        [
+                            self.x_c0_wrapper.get_x_t0(),
+                            real_condition
+                        ],
+                        axis=-1
+                    )
         else:
             self.y_c0_ = self.gen_x + self.M
             self.critic_real_inp = self.x_c0
@@ -633,9 +683,20 @@ class vagan:
                 raise ValueError('Invalid image dimensions')
 
             if data_dimension == 3:
+                z_slice = self.exp_config.image_z_slice
                 y_c0_disp = y_c0_[:, :, :, self.exp_config.image_z_slice, 0:1]
                 x_c1_disp = x_c1[:, :, :, self.exp_config.image_z_slice, 0:1]
                 x_c0_disp = x_c0[:, :, :, self.exp_config.image_z_slice, 0:1]
+                delta_x0 = None
+                if self.exp_config.conditioned_gan:
+                    c = self.exp_config.n_channels
+                    delta_x0 = tf.abs(x_c0_wrapper.get_delta_x_t0())[:, :, :, z_slice, 0:1]
+                    delta_x1 = tf.abs(x_c1_wrapper.get_delta_x_t0())[:, :, :, z_slice, 0:1]
+                    if self.exp_config.generate_diff_map or \
+                            self.exp_config.condition_on_delta_x:
+                        y_c0_disp += y_c0_[:, :, :, z_slice, c-1:c]  # subtract difference map
+                    else:
+                        y_c0_disp = y_c0_[:, :, :, z_slice, c-1:c]
             else:
                 y_c0_disp = y_c0_[:, :, :, 0:1]
                 x_c1_disp = x_c1_wrapper.get_x_t0()
@@ -656,12 +717,20 @@ class vagan:
                 c = self.exp_config.n_channels
                 if self.exp_config.generate_diff_map or \
                         self.exp_config.condition_on_delta_x:
-                    difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
+                    if data_dimension == 2:
+                        difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
+                    else:
+                        difference_map_pl = tf.abs(y_c0_[:, :, :, z_slice, c-1:c])
                 else:
                     if not self.exp_config.condition_on_delta_x:
-                        difference_map_pl = tf.abs(
-                            y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
-                        )
+                        if data_dimension == 2:
+                            difference_map_pl = tf.abs(
+                                y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
+                            )
+                        else:
+                            difference_map_pl = tf.abs(
+                                y_c0_[:, :, :, z_slice, c-1:c] - y_c0_[:, :, :, z_slice, 0:1]
+                            )
 
             if delta_x0 is not None:
                 delta_x0 = rescale_image_summary(delta_x0, 0, 255)

@@ -86,12 +86,8 @@ class CN_AD_Loader(object):
             for i in range(len(images)):
                 # only map the first channel
                 sample = images[i]
-                if len(sample.shape) > 2:
-                    t0_idx = 0
-                    delta_t0_idx = 2
-                else:
-                    t0_idx = 0
-                    delta_t0_idx = 1
+                t0_idx = self.config["x_t0_idx"]
+                delta_t0_idx = self.config["delta_x_t0_idx"]
                 # compute delta_x_t0 by computing the difference AFTER
                 # rescaling x_t0 and x_t1
                 x_t0 = sample[:, :, t0_idx:t0_idx + 1]
