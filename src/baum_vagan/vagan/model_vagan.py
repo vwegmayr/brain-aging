@@ -54,7 +54,7 @@ class InputWrapper(object):
 
     def get_delta_x_t0_summary_rescaled(self, a, b):
         return tf.map_fn(
-            lambda x: normalize_to_range(a, b, tf.abs(x)),
+            lambda x: normalize_to_range(a, b, x),
             self.get_delta_x_t0()
         )
 
@@ -617,6 +617,12 @@ class vagan:
 
         def _image_summaries(prefix, y_c0_, x_c1, x_c0):
 
+            def rescale_image_summary(batch, a, b):
+                return tf.map_fn(
+                    lambda x: normalize_to_range(a, b, x),
+                    batch
+                )
+
             x_c0_wrapper = self.exp_config.input_wrapper(x_c0)
             x_c1_wrapper = self.exp_config.input_wrapper(x_c1)
             if len(self.img_tensor_shape) == 5:
@@ -637,13 +643,44 @@ class vagan:
                 delta_x0 = None
                 if self.exp_config.conditioned_gan:
                     c = self.exp_config.n_channels
-                    delta_x0 = x_c0_wrapper.get_delta_x_t0_summary_rescaled(0, 255)
-                    delta_x1 = x_c1_wrapper.get_delta_x_t0_summary_rescaled(0, 255)
+                    delta_x0 = tf.abs(x_c0_wrapper.get_delta_x_t0())
+                    delta_x1 = tf.abs(x_c1_wrapper.get_delta_x_t0())
                     if self.exp_config.generate_diff_map or \
                             self.exp_config.condition_on_delta_x:
                         y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
                     else:
                         y_c0_disp = y_c0_[:, :, :, c-1:c]
+
+            difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
+            if self.exp_config.conditioned_gan:
+                c = self.exp_config.n_channels
+                if self.exp_config.generate_diff_map or \
+                        self.exp_config.condition_on_delta_x:
+                    difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
+                else:
+                    if not self.exp_config.condition_on_delta_x:
+                        difference_map_pl = tf.abs(
+                            y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
+                        )
+
+            if delta_x0 is not None:
+                delta_x0 = rescale_image_summary(delta_x0, 0, 255)
+                delta_x1 = rescale_image_summary(delta_x0, 0, 255)
+            difference_map_pl = rescale_image_summary(difference_map_pl, 0, 255)
+
+            """
+            # Rescale generated and GT difference maps together
+            conc_diffs = tf.concat(
+                [delta_x0, delta_x1, difference_map_pl],
+                axis=-1
+            )
+            conc_diffs = rescale_image_summary(conc_diffs, 0, 255)
+            delta_x0, delta_x1, difference_map_pl = tf.split(
+                conc_diffs,
+                3,
+                axis=-1
+            )
+            """
 
             sum_gen = tf.summary.image(
                 '%s_a_generated_CN' % prefix,
@@ -692,17 +729,6 @@ class vagan:
                     )
                 )
 
-            difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
-            if self.exp_config.conditioned_gan:
-                c = self.exp_config.n_channels
-                if self.exp_config.generate_diff_map or \
-                        self.exp_config.condition_on_delta_x:
-                    difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
-                else:
-                    if not self.exp_config.condition_on_delta_x:
-                        difference_map_pl = tf.abs(
-                            y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
-                        )
 
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
