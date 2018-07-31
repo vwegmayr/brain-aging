@@ -115,6 +115,18 @@ class Xt0_DXt0(InputWrapper):
         self.delta = None
 
 
+class Xt0(InputWrapper):
+    def prepare_tensors(self):
+        if self.mode2D:
+            self.x_t0 = self.x[:, :, :, 0:1]
+        else:
+            self.x_t0 = self.x[:, :, :, :, 0:1]
+
+        self.delta_x_t0 = None
+        self.x_t1 = None
+        self.delta = None
+
+
 class vagan:
 
     """
@@ -187,11 +199,11 @@ class vagan:
 
         # network outputs
         self.gen_x = self.x_c1
+        self.x_c0_wrapper = exp_config.input_wrapper(self.x_c0)
+        self.x_c1_wrapper = exp_config.input_wrapper(self.x_c1)
         if exp_config.conditioned_gan:
             # drop last channel which should be only used by
             # the discriminator
-            self.x_c0_wrapper = exp_config.input_wrapper(self.x_c0)
-            self.x_c1_wrapper = exp_config.input_wrapper(self.x_c1)
 
             if exp_config.n_channels == 3:
                 self.gen_x = tf.concat(

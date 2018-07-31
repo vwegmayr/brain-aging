@@ -52,9 +52,10 @@ class VAGanWrapper(object):
         )
 
         # Input wrapper
-        exp_config.input_wrapper = pydoc.locate(
-            exp_config.input_wrapper
-        )
+        if exp_config.input_wrapper is not None:
+            exp_config.input_wrapper = pydoc.locate(
+                exp_config.input_wrapper
+            )
 
         # Should be done in the end, import data loader and create
         data_loader = import_string(exp_config.data_loader)

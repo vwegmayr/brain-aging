@@ -75,11 +75,11 @@ class CN_AD_Loader(object):
 
             for i in range(len(images)):
                 images[i, :, :, channel] = normalize_to_range(
-                    0, 1, mini, maxi, images[i, :, :, channel]
+                    10, 100, mini, maxi, images[i, :, :, channel]
                 )
 
             def normalize_delta(x):
-                return normalize_to_range(0, 1, mini, maxi, x)
+                return normalize_to_range(10, 100, mini, maxi, x)
             self.normalize_delta = normalize_delta
 
         if self.rescale_to_one:
