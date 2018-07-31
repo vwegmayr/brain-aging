@@ -52,9 +52,10 @@ class InputWrapper(object):
     def get_delta_x_t0(self):
         return self.delta_x_t0
 
-    def get_delta_x_t0_rescaled(self):
-        return normalize_to_range(
-            -1, 1, self.get_delta_x_t0()
+    def get_delta_x_t0_summary_rescaled(self, a, b):
+        return tf.map_fn(
+            lambda x: normalize_to_range(a, b, tf.abs(x)),
+            self.get_delta_x_t0()
         )
 
 
@@ -636,8 +637,8 @@ class vagan:
                 delta_x0 = None
                 if self.exp_config.conditioned_gan:
                     c = self.exp_config.n_channels
-                    delta_x0 = x_c0_wrapper.get_delta_x_t0()
-                    delta_x1 = x_c1_wrapper.get_delta_x_t0()
+                    delta_x0 = x_c0_wrapper.get_delta_x_t0_summary_rescaled(0, 255)
+                    delta_x1 = x_c1_wrapper.get_delta_x_t0_summary_rescaled(0, 255)
                     if self.exp_config.generate_diff_map or \
                             self.exp_config.condition_on_delta_x:
                         y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
