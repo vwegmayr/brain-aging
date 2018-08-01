@@ -368,10 +368,33 @@ class vagan:
         """
         Get the critic loss as defined in the Wasserstein GAN paper,
         with optional gradient penalty as described in the "improved
-        training of Wasserstein GAN paper". 
+        training of Wasserstein GAN paper".
         """
-
-        cri_loss = tf.reduce_mean(self.D) - tf.reduce_mean(self.D_)
+        if self.exp_config.use_sigmoid:
+            real_sig = tf.nn.sigmoid(self.D)
+            fake_sig = tf.nn.sigmoid(self.D_)
+            cri_loss = tf.reduce_mean(real_sig) - tf.reduce_mean(fake_sig)
+            # Compute accuracy
+            real_preds = tf.round(real_sig)
+            real_labels = real_preds * 0
+            fake_preds = tf.round(fake_sig)
+            fake_labels = fake_preds * 0 + 1
+            self.critic_acc_real = tf.reduce_mean(
+                tf.cast(
+                    tf.equal(real_labels, real_preds),
+                    tf.float32
+                )
+            )
+            self.critic_acc_fake = tf.reduce_mean(
+                tf.cast(
+                    tf.equal(fake_labels, fake_preds),
+                    tf.float32
+                )
+            )
+            self.critic_acc = self.critic_acc_real * 0.5 + \
+                self.critic_acc_fake * 0.5
+        else:
+            cri_loss = tf.reduce_mean(self.D) - tf.reduce_mean(self.D_)
 
         # if using improved training
         if self.exp_config.improved_training:
@@ -404,7 +427,10 @@ class vagan:
         matter what the value of l1_map_reg to tensorboard.
         """
 
-        gen_loss = tf.reduce_mean(self.D_)
+        if self.exp_config.use_sigmoid:
+            gen_loss = tf.reduce_mean(tf.nn.sigmoid(self.D_))
+        else:
+            gen_loss = tf.reduce_mean(self.D_)
 
         if not self.exp_config.use_tanh:
             self.l1_map_reg = tf.reduce_mean(tf.abs(self.M))  # Set the term no matter what for TB summaries
@@ -827,6 +853,11 @@ class vagan:
 
         tf.summary.scalar('critic_loss', self.cri_loss)
         tf.summary.scalar('generator_loss', self.gen_loss)
+
+        if self.exp_config.use_sigmoid:
+            tf.summary.scalar('critic_accuracy', self.critic_acc)
+            tf.summary.scalar('critic_acc_real', self.critic_acc_real)
+            tf.summary.scalar('critic_acc_fake', self.critic_acc_fake)
 
         # Build the summary Tensor based on the TF collection of Summaries.
         self.summary_op = tf.summary.merge_all()
