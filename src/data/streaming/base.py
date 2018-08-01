@@ -90,8 +90,10 @@ class FileStream(abc.ABC):
             n_missing = csv_len - len(self.all_file_paths)
             print("Number of files missing: {}".format(n_missing))
 
+        # Select all images that will be used
+        self.all_file_ids = self.select_file_ids(self.all_file_ids)
         # Make train-test split
-        all_patient_groups = self.make_patient_groups()
+        all_patient_groups = self.make_patient_groups(fids=self.all_file_ids)
         train_ids, test_ids = self.make_train_test_split(all_patient_groups)
         all_train_test_ids = set(train_ids + test_ids)
         assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
@@ -401,6 +403,9 @@ class FileStream(abc.ABC):
 
         return meta_info
 
+    def select_file_ids(self, file_ids):
+        return file_ids
+
     def get_test_retest_pairs(self, image_labels):
         # Groupy by patient
         image_labels = sorted(list(set(image_labels)))
@@ -466,6 +471,10 @@ class FileStream(abc.ABC):
     def get_age(self, file_id):
         record = self.file_id_to_meta[file_id]
         return record["age"]
+
+    def get_exact_age(self, file_id):
+        record = self.file_id_to_meta[file_id]
+        return record["age_exact"]
 
     def get_gender(self, file_id):
         record = self.file_id_to_meta[file_id]
