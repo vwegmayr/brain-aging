@@ -46,6 +46,7 @@ for disease in [
     adni_aibl.add('health_%s' % disease, disease, default=0)
 
 AGE = adni_aibl.add("age", default=-1, py_type=np.float32, t=tf.float32)
+AGE_EXACT = adni_aibl.add("age_exact", default=-1, py_type=np.float32, t=tf.float32)
 HEALTHY = adni_aibl.add('healthy', 'hc', default=0)
 MRI = adni_aibl.add('mri', t=tf.float32, py_type=float)
 SEX = adni_aibl.add('sex', doc='male = 0; female = 1', default=-1)

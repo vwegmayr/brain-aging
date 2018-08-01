@@ -182,6 +182,17 @@ class TestAnySingleStream(unittest.TestCase):
         """
 
 
+class TestAgeFixedDeltaStream(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_age_fixed_delta_stream.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def test_init(self):
+        streamer = create_object(self.config)
+
+
 class TestImageNormalization(unittest.TestCase):
     def setUp(self):
         with open("tests/configs/test_image_normalization.yaml") as f:

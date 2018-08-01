@@ -1,6 +1,8 @@
 import numpy as np
+import copy
 
 from src.data.streaming.mri_streaming import MRISingleStream
+from src.baum_vagan.utils import map_image_to_intensity_range
 
 
 class BatchProvider(object):
@@ -203,28 +205,51 @@ class MRIImagePair(MRISample):
         self.fid1 = fid1
         self.fid2 = fid2
 
+    def get_age_delta(self):
+        age2 = self.streamer.get_exact_age(self.fid2)
+        age1 = self.streamer.get_exact_age(self.fid1)
+
+        return age2 - age1
+
+    def load_image(self, fid):
+        p = self.streamer.get_file_path(fid)
+        im = self.streamer.load_sample(p)
+        if self.streamer.normalize_images:
+            im = self.streamer.normalize_image(im)
+        if self.streamer.rescale_to_one:
+            im = map_image_to_intensity_range(im, -1, 1, 0.05)
+
+        im = np.reshape(im, tuple(list(im.shape) + [1]))
+        return im
+
     def load(self):
-        pass
+        im1 = self.load_image(self.fid1)
+        im2 = self.load_image(self.fid2)
+        delta_im = im2 - im1
+        im = np.concatenate((im1, delta_im), axis=-1)
+        return im
 
 
 class AgeFixedDeltaStream(MRISingleStream):
-    def __init__(self, *args, **kwargs):
-        super(MRISingleStream, self).__init__(
-            *args,
-            **kwargs
-        )
-
+    def __init__(self, stream_config):
+        config = copy.deepcopy(stream_config)
         # Age difference tolerance between two images
-        self.delta_min = self.config["delta_min"]
-        self.delta_max = self.config["delta_max"]
+        self.delta_min = config["delta_min"]
+        self.delta_max = config["delta_max"]
         # True if multiple images taken the same day
         # should be used.
-        self.use_retest = self.config["use_retest"]
+        self.use_retest = config["use_retest"]
         # Diagnoses that should be used
-        self.use_diagnoses = self.config["use_diagnoses"]
+        self.use_diagnoses = config["use_diagnoses"]
         # True if patients having multiple distinct diagnoses
         # should be used
-        self.use_converting = self.config["use_converting"]
+        self.use_converting = config["use_converting"]
+        # Rescaling
+        self.rescale_to_one = config["rescale_to_one"]
+
+        super(AgeFixedDeltaStream, self).__init__(
+            stream_config=stream_config
+        )
 
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
@@ -266,9 +291,11 @@ class AgeFixedDeltaStream(MRISingleStream):
             n = len(age_ascending)
             # Consider all possible pairs of images
             for i in range(n):
-                age_i = self.get_exact_age(age_ascending[i])
+                i_fid = age_ascending[i]
+                age_i = self.get_exact_age(i_fid)
                 for j in range(i + 1, n):
-                    age_j = self.get_exact_age(age_ascending[j])
+                    j_fid = age_ascending[j]
+                    age_j = self.get_exact_age(j_fid)
                     delta = age_j - age_i
                     if delta > self.delta_max:
                         break
@@ -276,13 +303,16 @@ class AgeFixedDeltaStream(MRISingleStream):
                     if delta < self.delta_min:
                         continue
 
-                    diag_i = self.get_diagnose(age_ascending[i])
-                    diag_j = self.get_diagnose(age_ascending[j])
+                    diag_i = self.get_diagnose(i_fid)
+                    diag_j = self.get_diagnose(j_fid)
 
                     if diag_i in self.use_diagnoses and \
                             diag_j in self.use_diagnoses:
-                        keep_fids.append(diag_i)
-                        keep_fids.append(diag_j)
+                        keep_fids.append(i_fid)
+                        keep_fids.append(j_fid)
+
+                        with open("labels_delta_1.csv", "a") as f:
+                            f.write("{},{}\n".format(i_fid, j_fid))
 
         return keep_fids
 
@@ -318,6 +348,12 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Train batches
         train_ids = self.get_train_ids()
         train_pairs = self.build_pairs(train_ids)
+
+        # Some checks
+        for p in train_pairs:
+            assert p.get_age_delta() >= self.delta_min
+            assert p.get_age_delta() <= self.delta_max
+
         self.trainAD = FlexibleBatchProvider(
             streamer=self,
             samples=train_pairs,

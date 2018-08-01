@@ -58,6 +58,8 @@ class FileStream(abc.ABC):
         # Match files with meta information, only data specified
         # in csv file is used
         self.all_file_paths = []
+        if self.debugging():
+            self.all_file_paths += list(self.file_id_to_meta.keys())
         n_files_not_used = 0
         for name in self.name_to_data_source:
             ds = self.name_to_data_source[name]
@@ -91,7 +93,7 @@ class FileStream(abc.ABC):
             print("Number of files missing: {}".format(n_missing))
 
         # Select all images that will be used
-        self.all_file_ids = self.select_file_ids(self.all_file_ids)
+        self.all_file_ids = set(self.select_file_ids(self.all_file_ids))
         # Make train-test split
         all_patient_groups = self.make_patient_groups(fids=self.all_file_ids)
         train_ids, test_ids = self.make_train_test_split(all_patient_groups)
@@ -399,9 +401,15 @@ class FileStream(abc.ABC):
                         ty = self.feature_desc[k]["py_type"]
                         row[k] = (ty)(row[k])  # cast to type
 
+                if self.debugging():
+                    row["file_path"] = "no_path"
+
                 meta_info[key] = row
 
         return meta_info
+
+    def debugging(self):
+        return "test_streamer" in self.config and self.config["test_streamer"]
 
     def select_file_ids(self, file_ids):
         return file_ids
