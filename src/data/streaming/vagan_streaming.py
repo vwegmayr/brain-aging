@@ -211,6 +211,10 @@ class MRIImagePair(MRISample):
 
         return age2 - age1
 
+    def same_patient(self):
+        return self.streamer.get_patient_id(self.fid1) == \
+            self.streamer.get_patient_id(self.fid2)
+
     def load_image(self, fid):
         p = self.streamer.get_file_path(fid)
         im = self.streamer.load_sample(p)
@@ -319,28 +323,31 @@ class AgeFixedDeltaStream(MRISingleStream):
     def build_pairs(self, fids):
         pairs = []
 
-        age_ascending = sorted(
-            fids,
-            key=lambda x: self.get_exact_age(x)
-        )
+        patient_groups = self.make_patient_groups(fids)
+        for g in patient_groups:
+            g_ids = g.file_ids
+            age_ascending = sorted(
+                g_ids,
+                key=lambda x: self.get_exact_age(x)
+            )
 
-        n = len(age_ascending)
-        for i in range(n):
-            age_i = self.get_exact_age(age_ascending[i])
-            for j in range(i + 1, n):
-                age_j = self.get_exact_age(age_ascending[j])
-                delta = age_j - age_i
-                if delta > self.delta_max:
-                    break
+            n = len(age_ascending)
+            for i in range(n):
+                age_i = self.get_exact_age(age_ascending[i])
+                for j in range(i + 1, n):
+                    age_j = self.get_exact_age(age_ascending[j])
+                    delta = age_j - age_i
+                    if delta > self.delta_max:
+                        break
 
-                if delta < self.delta_min:
-                    continue
+                    if delta < self.delta_min:
+                        continue
 
-                pairs.append(MRIImagePair(
-                    streamer=self,
-                    fid1=age_ascending[i],
-                    fid2=age_ascending[j]
-                ))
+                    pairs.append(MRIImagePair(
+                        streamer=self,
+                        fid1=age_ascending[i],
+                        fid2=age_ascending[j]
+                    ))
 
         return pairs
 
@@ -353,6 +360,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         for p in train_pairs:
             assert p.get_age_delta() >= self.delta_min
             assert p.get_age_delta() <= self.delta_max
+            assert p.same_patient()
 
         self.trainAD = FlexibleBatchProvider(
             streamer=self,
