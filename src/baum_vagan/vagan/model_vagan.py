@@ -394,7 +394,27 @@ class vagan:
             self.critic_acc = self.critic_acc_real * 0.5 + \
                 self.critic_acc_fake * 0.5
         else:
-            cri_loss = tf.reduce_mean(self.D) - tf.reduce_mean(self.D_)
+            self.mean_logits_real = tf.reduce_mean(self.D)
+            self.mean_logits_fake = tf.reduce_mean(self.D_)
+            cri_loss = self.mean_logits_real - self.mean_logits_fake
+            # Estimate the accuracy of the critic
+            # Real inputs should have label 0, because the objective
+            # here is minimized
+            all_logits = tf.concat([self.D, self.D_], axis=0)
+            rescaled = normalize_to_range(0, 1, all_logits)
+            preds = tf.round(rescaled)
+            real_labels = self.D * 0
+            fake_labels = self.D_ * 0 + 1
+            labels = tf.concat([real_labels, fake_labels], axis=0)
+            # Overall accuracy
+            self.critic_acc = tf.reduce_mean(
+                tf.cast(
+                    tf.equal(labels, preds),
+                    tf.float32
+                )
+            )
+            self.critic_acc_real = 0
+            self.critic_acc_fake = 0
 
         # if using improved training
         if self.exp_config.improved_training:
@@ -836,7 +856,6 @@ class vagan:
                     )
                 )
 
-
             sum_dif = tf.summary.image(
                 '%s_b_difference_CN' % prefix,
                 tf_utils.put_kernels_on_grid(
@@ -854,10 +873,12 @@ class vagan:
         tf.summary.scalar('critic_loss', self.cri_loss)
         tf.summary.scalar('generator_loss', self.gen_loss)
 
-        if self.exp_config.use_sigmoid:
-            tf.summary.scalar('critic_accuracy', self.critic_acc)
-            tf.summary.scalar('critic_acc_real', self.critic_acc_real)
-            tf.summary.scalar('critic_acc_fake', self.critic_acc_fake)
+        tf.summary.scalar('critic_accuracy', self.critic_acc)
+        tf.summary.scalar('critic_acc_real', self.critic_acc_real)
+        tf.summary.scalar('critic_acc_fake', self.critic_acc_fake)
+
+        tf.summary.scalar('mean_logits_real', self.mean_logits_real)
+        tf.summary.scalar('mean_logits_fake', self.mean_logits_fake)
 
         # Build the summary Tensor based on the TF collection of Summaries.
         self.summary_op = tf.summary.merge_all()
@@ -877,13 +898,41 @@ class vagan:
             'validation_generator_loss', self.val_gen_loss_pl
         )
 
+        self.val_critic_acc_pl = tf.placeholder(
+            tf.float32, shape=[], name='critic_val_acc',
+        )
+
+        disc_val_acc_summary_op = tf.summary.scalar(
+            'validation_critic_acc', self.val_critic_acc_pl
+        )
+
+        self.val_critic_logits_real = tf.placeholder(
+            tf.float32, shape=[], name='critic_val_logits_real'
+        )
+
+        disc_val_mean_logits_real_summary_op = tf.summary.scalar(
+            'validation_critic_mean_logits_real',
+            self.val_critic_logits_real
+        )
+
+        self.val_critic_logits_fake = tf.placeholder(
+            tf.float32, shape=[], name='critic_val_logits_fake'
+        )
+
+        disc_val_mean_logits_fake_summary_op = tf.summary.scalar(
+            'validation_critic_mean_logits_fake',
+            self.val_critic_logits_fake
+        )
+
         # val images
         img_val_summary_op = _image_summaries(
             'val', self.y_c0_, self.x_c1, self.x_c0
         )
 
         self.val_summary_op = tf.summary.merge(
-            [disc_val_summary_op, gen_val_summary_op, img_val_summary_op]
+            [disc_val_summary_op, gen_val_summary_op, img_val_summary_op,
+             disc_val_acc_summary_op, disc_val_mean_logits_real_summary_op,
+             disc_val_mean_logits_fake_summary_op]
         )
 
     def _update_tensorboard(self, step):
@@ -921,6 +970,9 @@ class vagan:
 
         total_g_loss_val = 0
         total_d_loss_val = 0
+        total_d_acc_val = 0
+        total_d_log_real_val = 0
+        total_d_log_fake_val = 0
 
         for _ in range(self.exp_config.num_val_batches):
             c1_imgs = self.data.validationAD.next_batch(
@@ -930,21 +982,29 @@ class vagan:
                 self.exp_config.batch_size
             )[0]
 
-            g_loss_val, d_loss_val = self.sess.run(
-                [self.gen_loss, self.cri_loss],
-                feed_dict={
-                    self.x_c1: c1_imgs,
-                    self.x_c0: c0_imgs,
-                    self.training_pl_cri: False,
-                    self.training_pl_gen: False
-                }
-            )
+            g_loss_val, d_loss_val, d_acc_val, d_log_real_val, \
+                d_log_fake_val = self.sess.run(
+                    [self.gen_loss, self.cri_loss, self.critic_acc,
+                     self.mean_logits_real, self.mean_logits_fake],
+                    feed_dict={
+                        self.x_c1: c1_imgs,
+                        self.x_c0: c0_imgs,
+                        self.training_pl_cri: False,
+                        self.training_pl_gen: False
+                    }
+                )
 
             total_d_loss_val += d_loss_val
             total_g_loss_val += g_loss_val
+            total_d_acc_val += d_acc_val
+            total_d_log_real_val += d_log_real_val
+            total_d_log_fake_val += d_log_fake_val
 
         total_d_loss_val /= self.exp_config.num_val_batches
         total_g_loss_val /= self.exp_config.num_val_batches
+        total_d_acc_val /= self.exp_config.num_val_batches
+        total_d_log_real_val /= self.exp_config.num_val_batches
+        total_d_log_fake_val /= self.exp_config.num_val_batches
 
         c1_imgs = self.data.validationAD.next_batch(
             self.exp_config.batch_size
@@ -957,6 +1017,9 @@ class vagan:
             feed_dict={
                 self.val_disc_loss_pl: total_d_loss_val,
                 self.val_gen_loss_pl: total_g_loss_val,
+                self.val_critic_acc_pl: total_d_acc_val,
+                self.val_critic_logits_real: total_d_log_real_val,
+                self.val_critic_logits_fake: total_d_log_fake_val,
                 self.x_c0: c0_imgs,
                 self.x_c1: c1_imgs,
                 self.training_pl_gen: False,
