@@ -222,6 +222,19 @@ class FileStream(abc.ABC):
         self.dump_groups(outfolder, False, sep)
         self.dump_stats(outfolder)
 
+    def dump_train_val_test_split(self, outfolder):
+        def dump(fname, fids):
+            with open(os.path.join(outfolder, fname), 'w') as f:
+                for fid in fids:
+                    f.write("{}\n".format(fid))
+
+        train_ids = self.get_train_ids()
+        val_ids = self.get_validation_ids()
+        test_ids = self.get_test_ids()
+        dump("train.txt", train_ids)
+        dump("validation.txt", val_ids)
+        dump("test.txt", test_ids)
+
     def dump_normalization(self, outfolder):
         pass
 

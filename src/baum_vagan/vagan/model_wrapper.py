@@ -62,8 +62,10 @@ class VAGanWrapper(object):
 
         if "stream_config" in kwargs:
             data = data_loader(exp_config.stream_config)
+            self.use_streamer = True
         else:
             data = data_loader(exp_config)
+            self.use_streamer = False
 
         self.config = exp_config
         self.data = data
@@ -78,6 +80,8 @@ class VAGanWrapper(object):
     def set_save_path(self, save_path):
         self.save_path = save_path
         self.vagan.set_save_path(save_path)
+        if self.use_streamer:
+            self.data.dump_train_val_test_split(save_path)
 
     def show_morphed_images(self):
         # Run predictions in an endless loop

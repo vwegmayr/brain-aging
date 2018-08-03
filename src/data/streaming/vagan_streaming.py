@@ -211,6 +211,12 @@ class MRIImagePair(MRISample):
 
         return age2 - age1
 
+    def get_diagnoses(self):
+        return [
+            self.streamer.get_diagnose(self.fid1),
+            self.streamer.get_diagnose(self.fid2)
+        ]
+
     def same_patient(self):
         return self.streamer.get_patient_id(self.fid1) == \
             self.streamer.get_patient_id(self.fid2)
@@ -351,16 +357,20 @@ class AgeFixedDeltaStream(MRISingleStream):
 
         return pairs
 
+    def check_pairs(self, pairs):
+        # Some checks
+        for p in pairs:
+            assert p.get_age_delta() >= self.delta_min
+            assert p.get_age_delta() <= self.delta_max
+            assert p.same_patient()
+            for diag in p.get_diagnoses():
+                assert diag in self.use_diagnoses
+
     def set_up_batches(self):
         # Train batches
         train_ids = self.get_train_ids()
         train_pairs = self.build_pairs(train_ids)
-
-        # Some checks
-        for p in train_pairs:
-            assert p.get_age_delta() >= self.delta_min
-            assert p.get_age_delta() <= self.delta_max
-            assert p.same_patient()
+        self.check_pairs(train_pairs)
 
         self.trainAD = FlexibleBatchProvider(
             streamer=self,
@@ -378,6 +388,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Validation batches
         val_ids = self.get_validation_ids()
         val_pairs = self.build_pairs(val_ids)
+        self.check_pairs(val_pairs)
         self.validationAD = FlexibleBatchProvider(
             streamer=self,
             samples=val_pairs,
@@ -394,6 +405,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Test batches
         test_ids = self.get_test_ids()
         test_pairs = self.build_pairs(test_ids)
+        self.check_pairs(test_pairs)
         self.testAD = FlexibleBatchProvider(
             streamer=self,
             samples=test_pairs,
