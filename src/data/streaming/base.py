@@ -94,6 +94,8 @@ class FileStream(abc.ABC):
 
         # Select all images that will be used
         self.all_file_ids = set(self.select_file_ids(self.all_file_ids))
+        if not self.silent:
+            print("Splitting {} images".format(len(self.all_file_ids)))
         # Make train-test split
         all_patient_groups = self.make_patient_groups(fids=self.all_file_ids)
         train_ids, test_ids = self.make_train_test_split(all_patient_groups)
