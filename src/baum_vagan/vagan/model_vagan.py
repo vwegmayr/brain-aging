@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import os.path
 import tensorflow as tf
+import shutil
 
 from src.baum_vagan.grad_accum_optimizers import grad_accum_optimizer_gan
 from src.baum_vagan.tfwrapper import utils as tf_utils
@@ -695,6 +696,15 @@ class vagan:
 
         # Default values
         self.log_dir = os.path.join(self.save_path, 'logdir')
+
+        if hasattr(self.exp_config, 'continue_training') \
+                and self.exp_config.continue_training:
+
+            shutil.copytree(
+                self.exp_config.trained_model_dir,
+                self.log_dir
+            )
+
         self.init_checkpoint_path = None
         self.continue_run = False
         self.init_step = 0

@@ -30,6 +30,7 @@ def get_loader_from_extension(file_path):
 
     return loader
 
+
 def load(file_path, loader):
     try:
         data = loader(file_path)
@@ -41,6 +42,7 @@ def load(file_path, loader):
         data = file_path
 
     return data
+
 
 def load_data(data_path):
 
@@ -59,7 +61,7 @@ def load_data(data_path):
 
     else:
         raise ValueError("Expected data_path as strings "
-        "or list of strings.")
+                         "or list of strings.")
 
     return data
 
@@ -111,7 +113,6 @@ class Action(object):
             self._save()
             print(self.save_path)
 
-
     def _mk_save_folder(self):
         if self.args.smt_label != "debug":
             self.time_stamp = self.args.smt_label
@@ -146,7 +147,7 @@ class ConfigAction(Action):
         super(ConfigAction, self).__init__(args, more_args)
         self.raw_config = ConfigParser().parse_raw(config)
         self.config = ConfigParser().parse(config)
-        #self.pprint_config(self.raw_config)
+        # self.pprint_config(self.raw_config)
         self.act()
 
     def fit(self):
