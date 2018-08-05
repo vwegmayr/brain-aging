@@ -143,6 +143,7 @@ class AnySingleStream(MRISingleStream):
         # Train batches
         train_ids = self.get_train_ids()
         train_AD_ids, train_CN_ids = self.get_ad_cn_ids(train_ids)
+        self.n_train_samples = len(train_AD_ids)
         self.trainAD = BatchProvider(
             streamer=self,
             file_ids=train_AD_ids,
@@ -159,6 +160,7 @@ class AnySingleStream(MRISingleStream):
         # Validation batches
         validation_ids = self.get_validation_ids()
         valid_AD_ids, valid_CN_ids = self.get_ad_cn_ids(validation_ids)
+        self.n_val_samples = len(valid_AD_ids)
         self.validationAD = BatchProvider(
             streamer=self,
             file_ids=valid_AD_ids,
@@ -175,6 +177,7 @@ class AnySingleStream(MRISingleStream):
         # Test batches
         test_ids = self.get_test_ids()
         test_AD_ids, test_CN_ids = self.get_ad_cn_ids(test_ids)
+        self.n_test_samples = len(test_AD_ids)
         self.testAD = BatchProvider(
             streamer=self,
             file_ids=test_AD_ids,
@@ -321,9 +324,6 @@ class AgeFixedDeltaStream(MRISingleStream):
                         keep_fids.append(i_fid)
                         keep_fids.append(j_fid)
 
-                        with open("labels_delta_1.csv", "a") as f:
-                            f.write("{},{}\n".format(i_fid, j_fid))
-
         return keep_fids
 
     def build_pairs(self, fids):
@@ -370,6 +370,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Train batches
         train_ids = self.get_train_ids()
         train_pairs = self.build_pairs(train_ids)
+        self.n_train_samples = len(train_pairs)
         self.check_pairs(train_pairs)
 
         self.trainAD = FlexibleBatchProvider(
@@ -388,6 +389,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Validation batches
         val_ids = self.get_validation_ids()
         val_pairs = self.build_pairs(val_ids)
+        self.n_val_samples = len(val_pairs)
         self.check_pairs(val_pairs)
         self.validationAD = FlexibleBatchProvider(
             streamer=self,
@@ -405,6 +407,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Test batches
         test_ids = self.get_test_ids()
         test_pairs = self.build_pairs(test_ids)
+        self.n_test_samples = len(test_pairs)
         self.check_pairs(test_pairs)
         self.testAD = FlexibleBatchProvider(
             streamer=self,

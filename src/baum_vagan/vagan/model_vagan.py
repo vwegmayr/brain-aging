@@ -19,6 +19,8 @@ def normalize_to_range(a, b, x):
     return a + (x - mini) / (maxi - mini) * (b - a)
 
 
+# Wrappers to extract information more easily
+# from streamed samples
 class InputWrapper(object):
     def __init__(self, x):
         """
@@ -60,6 +62,13 @@ class InputWrapper(object):
 
 
 class Xt0_DT_Xt1(InputWrapper):
+    """
+    The input consists of 3 channels:
+        - 0: input a time t0
+        - 1: delta, respresenting the difference in
+          time between t0 and t1
+        - 2: input a time t1
+    """
     def prepare_tensors(self):
         if self.mode2D:
             self.x_t0 = self.x[:, :, :, 0:1]
@@ -80,6 +89,14 @@ class Xt0_DT_Xt1(InputWrapper):
 
 
 class Xt0_DT_DXt0(InputWrapper):
+    """
+    The input consists of 3 channels:
+        - 0: input a time t0
+        - 1: delta, respresenting the difference in
+          time between t0 and t1
+        - 2: input a time t1 minus the input at
+          time t0
+    """
     def prepare_tensors(self):
         if self.mode2D:
             self.x_t0 = self.x[:, :, :, 0:1]
@@ -100,6 +117,12 @@ class Xt0_DT_DXt0(InputWrapper):
 
 
 class Xt0_DXt0(InputWrapper):
+    """
+    The input consists of 3 channels:
+        - 0: input a time t0
+        - 1: input a time t1 minus the input at
+          time t0
+    """
     def prepare_tensors(self):
         if self.mode2D:
             self.x_t0 = self.x[:, :, :, 0:1]
@@ -116,6 +139,11 @@ class Xt0_DXt0(InputWrapper):
 
 
 class Xt0(InputWrapper):
+    """
+    The input consists of 1 channel, the input
+    at time step t0. Can be use for non-temporal
+    samples.
+    """
     def prepare_tensors(self):
         if self.mode2D:
             self.x_t0 = self.x[:, :, :, 0:1]
@@ -160,6 +188,7 @@ class vagan:
         self.sampler_c1 = lambda bs: data.trainAD.next_batch(bs)[0]
         self.sampler_c0 = lambda bs: data.trainCN.next_batch(bs)[0]
 
+        # Check if the samples contain multiple channels
         if not exp_config.conditioned_gan:
             self.img_tensor_shape = [fixed_batch_size] + \
                 list(exp_config.image_size) + [1]

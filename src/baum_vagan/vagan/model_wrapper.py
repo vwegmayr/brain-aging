@@ -154,6 +154,13 @@ class VAGanWrapper(object):
 
             self.plot_evaluation(ad_in, morphed, delta_gt, mask)
 
+    def evaluate_fixed_delta(self):
+        """
+        ASSUMPTIONS:
+            - inputs are of the form [x_t0, delta_x_t0] where
+              x_t0 + delta_x_t0 = x_t1
+        """
+
     def transform(self, X=None, y=None):
         # Load model
         path = self.config.trained_model_dir
