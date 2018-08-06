@@ -19,3 +19,8 @@ notebooks/*.csv
 notebooks/*.pdf
 generate_configs.py
 run_configs.py
+.ipynb_checkpoints
+.mypy_cache/
+.vscode/
+configs/vagan/*
+

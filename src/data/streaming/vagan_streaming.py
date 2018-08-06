@@ -3,6 +3,7 @@ import copy
 
 from src.data.streaming.mri_streaming import MRISingleStream
 from src.baum_vagan.utils import map_image_to_intensity_range
+from src.data.streaming.base import Group
 
 
 class BatchProvider(object):
@@ -365,6 +366,22 @@ class AgeFixedDeltaStream(MRISingleStream):
             assert p.same_patient()
             for diag in p.get_diagnoses():
                 assert diag in self.use_diagnoses
+
+    def group_data(self, train_ids, test_ids):
+        train_pairs = self.build_pairs(train_ids)
+        test_pairs = self.build_pairs(test_ids)
+
+        train_groups = [
+            Group(file_ids=[p.fid1, p.fid2], is_train=True)
+            for p in train_pairs
+        ]
+
+        test_groups = [
+            Group(file_ids=[p.fid1, p.fid2], is_train=False)
+            for p in test_pairs
+        ]
+
+        return train_groups + test_groups
 
     def set_up_batches(self):
         # Train batches

@@ -142,9 +142,15 @@ class FileStream(abc.ABC):
             print(">>>>>>>> Test stats")
             self.print_stats(self.test_groups)
 
-    def get_batches(self, train=True):
-        groups = [group for group in self.groups
-                  if group.is_train == train]
+    def get_batches(self, mode):
+        if mode == "train":
+            groups = self.train_groups
+        elif mode == "validation":
+            groups = self.validation_groups
+        elif mode == "test":
+            groups = self.test_groups
+        else:
+            raise ValueError("Invalid mode {}".format(mode))
 
         if self.shuffle:
             self.np_random.shuffle(groups)
@@ -165,6 +171,10 @@ class FileStream(abc.ABC):
             bi = n_batches * self.batch_size
             batches.append(groups[bi:])
 
+        n_groups = 0
+        for batch in batches:
+            n_groups += len(batch)
+        assert n_groups == len(groups)
         return batches
 
     @abc.abstractmethod
@@ -248,7 +258,10 @@ class FileStream(abc.ABC):
         return self.name_to_data_source[name]
 
     def get_groups(self, train):
-        return [g for g in self.groups if g.is_train == train]
+        if train:
+            return self.train_groups
+        else:
+            return self.test_groups
 
     def get_set_file_ids(self, train=True):
         groups = [group for group in self.groups if group.is_train == train]
@@ -607,8 +620,8 @@ class FileStream(abc.ABC):
 
         return patient_to_file_ids
 
-    def get_input_fn(self, train):
-        batches = self.get_batches(train)
+    def get_input_fn(self, mode):
+        batches = self.get_batches(mode)
         groups = [group for batch in batches for group in batch]
         group_size = len(groups[0].file_ids)
         files = [group.file_ids for group in groups]

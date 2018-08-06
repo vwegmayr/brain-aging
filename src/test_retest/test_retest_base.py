@@ -383,20 +383,37 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.current_epoch = i
             # train
             self.estimator.train(
-                input_fn=self.gen_input_fn(X, y, True, self.input_fn_config)
+                input_fn=self.gen_input_fn(X, y, "train", self.input_fn_config)
             )
 
             # evaluate
             # evaluation on test set
             evaluation_fn = self.gen_input_fn(
-                X, y, False, self.input_fn_config
+                X, y, "test", self.input_fn_config
             )
             if evaluation_fn is None:
                 custom_print("No evaluation - skipping evaluation.")
                 return
-            evaluation = self.estimator.evaluate(input_fn=evaluation_fn)
+            evaluation = self.estimator.evaluate(
+                input_fn=evaluation_fn,
+                name="test"
+            )
             print(evaluation)
             self.metric_logger.add_evaluations("test", evaluation)
+
+            # validation
+            validation_fn = self.gen_input_fn(
+                X, y, "validation", self.input_fn_config
+            )
+            if validation_fn is None:
+                custom_print("No evaluation - skipping evaluation.")
+                return
+            validation = self.estimator.evaluate(
+                input_fn=validation_fn,
+                name="validation"
+            )
+            print(validation)
+            self.metric_logger.add_evaluations("validation", evaluation)
 
             if (self.sumatra_params is not None) and \
                (self.sumatra_params["log_train"]):

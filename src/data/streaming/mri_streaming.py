@@ -70,35 +70,6 @@ class MRISingleStream(FileStream, MRIImageLoader):
         if self.normalize_images:
             self.compute_image_normalization()
 
-    def get_batches(self, train=True):
-        groups = [group for group in self.groups
-                  if group.is_train == train]
-
-        if self.shuffle:
-            self.np_random.shuffle(groups)
-
-        if self.batch_size == -1:
-            return [[group for group in groups]]
-
-        n_samples = len(groups)
-        n_batches = int(n_samples / self.batch_size)
-
-        batches = []
-        for i in range(n_batches):
-            bi = i * self.batch_size
-            ei = (i + 1) * self.batch_size
-            batches.append(groups[bi:ei])
-
-        if n_batches * self.batch_size < n_samples:
-            bi = n_batches * self.batch_size
-            batches.append(groups[bi:])
-
-        n_groups = 0
-        for batch in batches:
-            n_groups += len(batch)
-        assert n_groups == len(groups)
-        return batches
-
     def group_data(self, train_ids, test_ids):
         # We just to stream the images one by one
         groups = []
