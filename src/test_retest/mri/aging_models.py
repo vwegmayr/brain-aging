@@ -3,6 +3,7 @@ import os
 
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from src.baum_vagan.vagan.network_zoo.nets3D.mask_generators import unet_16_bn
+from src.baum_vagan.vagan.network_zoo.nets2D.mask_generators import unet_16_2D_bn
 from src.baum_vagan.tfwrapper.utils import put_kernels_on_grid
 
 
@@ -20,11 +21,23 @@ class MSEDifferenceMap(EvaluateEpochsBaseTF):
         training = mode == tf.estimator.ModeKeys.TRAIN
         # training = tf.constant(training, dtype=tf.bool)
 
+        if len(img_size) == 2:
+            mode_2D = True
+            gen_net = unet_16_2D_bn
+        else:
+            mode_2D = False
+            gen_net = unet_16_bn
+
         gt_delta_x_t0 = x_t1 - x_t0
-        gen_delta_x_t0 = unet_16_bn(
+        gen_delta_x_t0 = gen_net(
             x=x_t0,
             training=training
         )
+
+        if params["use_tanh"]:
+            gen_delta_x_t0 = tf.tanh(gen_delta_x_t0)
+
+        l1_map_reg = tf.reduce_mean(tf.abs(gen_delta_x_t0))
         gen_x_t1 = x_t0 + gen_delta_x_t0
 
         predictions = {
@@ -43,6 +56,8 @@ class MSEDifferenceMap(EvaluateEpochsBaseTF):
             predictions=gen_delta_x_t0
         )
 
+        loss += l1_map_reg * params["l1_map_weight"]
+
         optimizer = tf.train.AdamOptimizer(
             learning_rate=params["learning_rate"]
         )
@@ -58,27 +73,39 @@ class MSEDifferenceMap(EvaluateEpochsBaseTF):
             img_summ_dir = os.path.join(self.save_path, "eval")
 
         z_slice = params["z_slice"]
+
+        if mode_2D:
+            disp_gt_delta_x_t0 = gt_delta_x_t0
+            disp_x_t0 = x_t0
+            disp_gen_delta_x_t0 = gen_delta_x_t0
+            disp_gen_x_t1 = gen_x_t1
+        else:
+            disp_gt_delta_x_t0 = gt_delta_x_t0[:, :, :, z_slice, :]
+            disp_x_t0 = x_t0[:, :, :, z_slice, :]
+            disp_gen_delta_x_t0 = gen_delta_x_t0[:, :, :, z_slice, :]
+            disp_gen_x_t1 = gen_x_t1[:, :, :, z_slice, :]
+
         gt_summ = tf.summary.image(
             name='difference_map_gt',
-            tensor=gt_delta_x_t0[:, :, :, z_slice, :],
-            max_outputs=8
-        )
-
-        x_t0_summ = tf.summary.image(
-            name='x_t0',
-            tensor=x_t0[:, :, :, z_slice, :],
+            tensor=tf.abs(disp_gt_delta_x_t0),
             max_outputs=8
         )
 
         diff_gen_summ = tf.summary.image(
             name="difference_map_gen",
-            tensor=gen_delta_x_t0[:, :, :, z_slice, :],
+            tensor=tf.abs(disp_gen_delta_x_t0),
+            max_outputs=8
+        )
+
+        x_t0_summ = tf.summary.image(
+            name='x_t0',
+            tensor=disp_x_t0,
             max_outputs=8
         )
 
         gen_x_t1_summ = tf.summary.image(
             name="x_t1_gen",
-            tensor=gen_x_t1[:, :, :, z_slice, :],
+            tensor=disp_gen_x_t1,
             max_outputs=8
         )
 
@@ -99,14 +126,19 @@ class MSEDifferenceMap(EvaluateEpochsBaseTF):
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                #training_hooks=train_hooks
+                training_hooks=train_hooks
             )
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            #evaluation_hooks=eval_hooks
+            evaluation_hooks=eval_hooks
         )
 
     def gen_input_fn(self, X, y=None, mode="train", input_fn_config={}):
+        return self.streamer.get_input_fn(mode)
+
+
+class SyntheticMSEDifferenceMap(MSEDifferenceMap):
+    def gen_input_fn(self, X, y=None, mode='train', input_fn_config={}):
         return self.streamer.get_input_fn(mode)

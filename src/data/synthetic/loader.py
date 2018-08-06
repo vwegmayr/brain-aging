@@ -1,7 +1,18 @@
 import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
+from sklearn.utils import shuffle
+import pydoc
+
 from src.baum_vagan.utils import map_image_to_intensity_range
+
+
+def prepare_x_t0_delta_x_t0(images):
+    x_0 = images[:, :, :, 0]
+    x_1 = images[:, :, :, 0] + images[:, :, :, 1]
+
+    return x_0, x_1
 
 
 class BatchProvider(object):
@@ -54,8 +65,17 @@ class CN_AD_Loader(object):
         self.rescale_to_one = stream_config["rescale_to_one"]
         self.image_shape = stream_config["image_shape"]
         self.config = stream_config
+        self.config["prepare_images"] = pydoc.locate(
+            self.config["prepare_images"]
+        )
 
         self.set_up_batches()
+
+    def dump_split(self, path):
+        pass
+
+    def dump_normalization(self, path):
+        pass
 
     def set_up_batches(self):
         images = self.f["images"][:]
@@ -177,3 +197,38 @@ class CN_AD_Loader(object):
             labels=labels_test,
             image_shape=self.image_shape
         )
+
+        self.random_state = 0
+
+        def gen_input_fn(images):
+            x_0, x_1 = self.config["prepare_images"](images)
+            self.random_state += 1
+            x_0, x_1 = shuffle(
+                x_0,
+                x_1,
+                random_state=self.random_state
+            )
+
+            return tf.estimator.inputs.numpy_input_fn(
+                x={
+                    "X_0": x_0,
+                    "X_1": x_1,
+                },
+                shuffle=False,
+                batch_size=self.config["batch_size"]
+            )
+
+        # tf compatible streamers
+        self.train_fn = gen_input_fn(images_train)
+        self.validation_fn = gen_input_fn(images_val)
+        self.test_fn = gen_input_fn(images_test)
+
+    def get_input_fn(self, mode):
+        if mode == "train":
+            return self.train_fn
+        elif mode == "validation":
+            return self.validation_fn
+        elif mode == "test":
+            return self.test_fn
+        else:
+            raise ValueError("Invalid mode {}".format(mode))
