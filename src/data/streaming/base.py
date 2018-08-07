@@ -98,22 +98,30 @@ class FileStream(abc.ABC):
             print("Splitting {} images".format(len(self.all_file_ids)))
         # Make train-test split
         all_patient_groups = self.make_patient_groups(fids=self.all_file_ids)
-        train_ids, test_ids = self.make_train_test_split(all_patient_groups)
-        all_train_test_ids = set(train_ids + test_ids)
-        assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
-        # all files are used
-        assert len(set(self.all_file_ids).difference(all_train_test_ids)) == 0
-        # Exchange train and test set
-        if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
-            tmp = train_ids
-            train_ids = test_ids
-            test_ids = tmp
 
-        # build validation set
-        train_groups = self.make_patient_groups(fids=train_ids)
-        train_ids, validation_ids = self.make_train_test_split(train_groups)
-        assert len(train_ids) + len(validation_ids) + len(test_ids) == \
-            len(self.all_file_ids)
+        if not self.do_load_split():
+            train_ids, test_ids = self.make_train_test_split(
+                all_patient_groups
+            )
+            all_train_test_ids = set(train_ids + test_ids)
+            assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
+            # all files are used
+            assert len(set(self.all_file_ids).difference(all_train_test_ids)) == 0
+            # Exchange train and test set
+            if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
+                tmp = train_ids
+                train_ids = test_ids
+                test_ids = tmp
+
+            # build validation set
+            train_groups = self.make_patient_groups(fids=train_ids)
+            train_ids, validation_ids = self.make_train_test_split(
+                train_groups
+            )
+            assert len(train_ids) + len(validation_ids) + len(test_ids) == \
+                len(self.all_file_ids)
+        else:
+            train_ids, validation_ids, test_ids = self.load_split()
 
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
@@ -203,6 +211,27 @@ class FileStream(abc.ABC):
     @abc.abstractmethod
     def load_sample(self, file_path):
         pass
+
+    def do_load_split(self):
+        if "load_split" in self.config:
+            return True
+        else:
+            return False
+
+    def load_split(self):
+        folder = self.config["load_split"]
+
+        def load(fname):
+            with open(os.path.join(folder, fname), 'r') as f:
+                fids = [line.strip() for line in f]
+
+            return fids
+
+        train_ids = load("train.txt")
+        val_ids = load("validation.txt")
+        test_ids = load("test.txt")
+
+        return train_ids, val_ids, test_ids
 
     def dump_groups(self, outfolder, train, sep):
         groups = self.get_groups(train)

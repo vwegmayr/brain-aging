@@ -98,7 +98,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         validation_ids = set(self.get_validation_ids())
         # some files may not be used by sampler, but all available
         # images should be used to compute the normalization
-        file_ids = self.all_file_ids.difference(test_ids)
+        file_ids = set(self.all_file_ids).difference(test_ids)
         file_ids = file_ids.difference(validation_ids)
         n = len(file_ids)
 
