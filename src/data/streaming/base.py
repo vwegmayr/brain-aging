@@ -85,6 +85,16 @@ class FileStream(abc.ABC):
 
         self.all_file_ids = set(self.all_file_paths)
 
+        # Process blacklist
+        black_list = self.load_black_list()
+        to_remove = set()
+        for fid in self.all_file_ids:
+            if self.get_image_label(fid) in black_list:
+                to_remove.add(fid)
+        if not self.silent:
+            print("{} images blacklisted".format(len(to_remove)))
+        self.all_file_ids = self.all_file_ids.difference(to_remove)
+
         if not self.silent:
             print("{} files found but not specified meta csv"
                   .format(n_files_not_used))
@@ -217,6 +227,12 @@ class FileStream(abc.ABC):
             return True
         else:
             return False
+
+    def load_black_list(self):
+        if "black_list" in self.config:
+            return set(self.config["black_list"])
+        else:
+            return set()
 
     def load_split(self):
         folder = self.config["load_split"]
