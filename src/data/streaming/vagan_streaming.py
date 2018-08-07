@@ -231,7 +231,7 @@ class MRIImagePair(MRISample):
         if self.streamer.normalize_images:
             im = self.streamer.normalize_image(im)
         if self.streamer.rescale_to_one:
-            im = map_image_to_intensity_range(im, -1, 1, 0.05)
+            im = map_image_to_intensity_range(im, -1, 1, 5)
 
         im = np.reshape(im, tuple(list(im.shape) + [1]))
         return im
@@ -441,3 +441,6 @@ class AgeFixedDeltaStream(MRISingleStream):
             prefetch=self.prefetch
         )
         self.test_pairs = test_pairs
+
+    def get_all_pairs(self):
+        return self.train_pairs + self.val_pairs + self.test_pairs
