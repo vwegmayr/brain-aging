@@ -93,7 +93,7 @@ class FileStream(abc.ABC):
             print("Number of files missing: {}".format(n_missing))
 
         # Select all images that will be used
-        self.all_file_ids = set(self.select_file_ids(self.all_file_ids))
+        self.all_file_ids = sorted(list(set(self.select_file_ids(self.all_file_ids))))
         if not self.silent:
             print("Splitting {} images".format(len(self.all_file_ids)))
         # Make train-test split
@@ -102,7 +102,7 @@ class FileStream(abc.ABC):
         all_train_test_ids = set(train_ids + test_ids)
         assert len(train_ids) + len(test_ids) == len(self.all_file_ids)
         # all files are used
-        assert len(self.all_file_ids.difference(all_train_test_ids)) == 0
+        assert len(set(self.all_file_ids).difference(all_train_test_ids)) == 0
         # Exchange train and test set
         if "exchange_train_test" in self.config and self.config["exchange_train_test"]:
             tmp = train_ids

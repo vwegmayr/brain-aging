@@ -1,7 +1,7 @@
 class: src.data.streaming.mri_streaming.MRIDiagnosePairStream
 params:
   stream_config:
-    meta_csv: data/raw/csv/adni_aibl__ad_hc.csv
+    meta_csv: data/raw/csv/adni_aibl_exact_age.csv
     meta_id_column: image_label
     batch_size: -1
     prefetch: 1
@@ -28,6 +28,12 @@ params:
       - "health_ad"
     n_patient_pairs: 1
     same_patient: False
+    delta_min: 0.8
+    delta_max: 1.2
+    use_retest: False
+    use_diagnoses: [healthy]
+    use_converting: False
+    rescale_to_one: False
     seed: 47
     shuffle: True
     downsample:

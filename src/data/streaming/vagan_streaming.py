@@ -402,6 +402,7 @@ class AgeFixedDeltaStream(MRISingleStream):
             label_key=None,
             prefetch=self.prefetch
         )
+        self.train_pairs = train_pairs
 
         # Validation batches
         val_ids = self.get_validation_ids()
@@ -420,6 +421,7 @@ class AgeFixedDeltaStream(MRISingleStream):
             label_key=None,
             prefetch=self.prefetch
         )
+        self.val_pairs = val_pairs
 
         # Test batches
         test_ids = self.get_test_ids()
@@ -438,3 +440,4 @@ class AgeFixedDeltaStream(MRISingleStream):
             label_key=None,
             prefetch=self.prefetch
         )
+        self.test_pairs = test_pairs

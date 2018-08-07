@@ -5,6 +5,9 @@ from src.data.streaming.mri_streaming import \
     MRISingleStream, MRIDiagnosePairStream, MRISamePatientSameAgePairStream, \
     SimilarPairStream, AnyPairStream, MixedPairStream
 
+from src.data.streaming.vagan_streaming import \
+    AgeFixedDeltaStream
+
 import subprocess
 import numpy as np
 
@@ -104,6 +107,11 @@ class TestReproducibility(unittest.TestCase):
 
     def test_mixed_pair_stream(self):
         self.config["class"] = qualified_path(MixedPairStream)
+        self.reproducibility_within_run()
+        self.reproducibility_accross_runs()
+
+    def test_age_fixed_delta_stream(self):
+        self.config["class"] = qualified_path(AgeFixedDeltaStream)
         self.reproducibility_within_run()
         self.reproducibility_accross_runs()
 
