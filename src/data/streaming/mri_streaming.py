@@ -85,6 +85,12 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
         return groups
 
+    def do_clip(self):
+        return "clip" in self.config and self.config["clip"]
+
+    def clip_image(self, img):
+        return np.clip(img, np.min(img), np.percentile(img, 95))
+
     def compute_image_normalization(self):
         """
         1. Normalize every image to 0 mean and 1 std.
@@ -115,6 +121,8 @@ class MRISingleStream(FileStream, MRIImageLoader):
         for fid in file_ids:
             p = self.get_file_path(fid)
             im = self.load_image(p)
+            if self.do_clip():
+                im = self.clip_image(im)
             std = np.std(im)
 
             if np.isclose(std, 0):
@@ -158,6 +166,9 @@ class MRISingleStream(FileStream, MRIImageLoader):
 
     def normalize_image(self, im):
         assert self.normalization_computed
+        if self.do_clip():
+            im = self.clip_image(im)
+
         std = np.std(im)
         if np.isclose(0, std):
             std = 1
