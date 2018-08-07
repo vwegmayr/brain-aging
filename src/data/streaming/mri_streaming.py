@@ -163,6 +163,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             std = 1
         im = (im - np.mean(im)) / std
         im = (im - self.voxel_means) / self.voxel_stds
+        std = np.std(im)
         if np.isclose(0, std):
             std = 1
         im = (im - np.mean(im)) / std
