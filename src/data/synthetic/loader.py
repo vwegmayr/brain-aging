@@ -17,7 +17,7 @@ def prepare_x_t0_delta_x_t0(images):
 
 class BatchProvider(object):
     def __init__(self, images, ids, labels, image_shape,
-                 add_delta_noise=False):
+                 add_delta_noise=0):
         self.images = images
         self.labels = labels
         self.ids = ids
@@ -46,10 +46,10 @@ class BatchProvider(object):
             if list(img.shape) != list(self.image_shape):
                 img = np.reshape(img, self.image_shape)
 
-            if self.add_delta_noise:
+            if self.add_delta_noise > 0:
                 noise = self.np_random.normal(
                     loc=0.0,
-                    scale=0.1
+                    scale=self.add_delta_noise
                 )
                 img[:, :, 1] += noise
 
@@ -93,7 +93,10 @@ class CN_AD_Loader(object):
         pass
 
     def add_delta_noise(self):
-        return "delta_noise" in self.config and self.config["delta_noise"]
+        if "delta_noise" in self.config:
+            return self.config["delta_noise"]
+        else:
+            return 0
 
     def set_up_batches(self):
         images = self.f["images"][:]
