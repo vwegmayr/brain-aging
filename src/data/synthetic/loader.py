@@ -65,9 +65,11 @@ class CN_AD_Loader(object):
         self.rescale_to_one = stream_config["rescale_to_one"]
         self.image_shape = stream_config["image_shape"]
         self.config = stream_config
-        self.config["prepare_images"] = pydoc.locate(
-            self.config["prepare_images"]
-        )
+
+        if "prepare_images" in self.config:
+            self.config["prepare_images"] = pydoc.locate(
+                self.config["prepare_images"]
+            )
 
         self.set_up_batches()
 
@@ -218,10 +220,11 @@ class CN_AD_Loader(object):
                 batch_size=self.config["batch_size"]
             )
 
-        # tf compatible streamers
-        self.train_fn = gen_input_fn(images_train)
-        self.validation_fn = gen_input_fn(images_val)
-        self.test_fn = gen_input_fn(images_test)
+        if "prepare_images" in self.config:
+            # tf compatible streamers
+            self.train_fn = gen_input_fn(images_train)
+            self.validation_fn = gen_input_fn(images_val)
+            self.test_fn = gen_input_fn(images_test)
 
     def get_input_fn(self, mode):
         if mode == "train":

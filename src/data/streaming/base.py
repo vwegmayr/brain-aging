@@ -93,6 +93,7 @@ class FileStream(abc.ABC):
                 to_remove.add(fid)
         if not self.silent:
             print("{} images blacklisted".format(len(to_remove)))
+
         self.all_file_ids = self.all_file_ids.difference(to_remove)
 
         if not self.silent:
