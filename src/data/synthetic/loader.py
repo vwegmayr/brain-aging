@@ -16,13 +16,15 @@ def prepare_x_t0_delta_x_t0(images):
 
 
 class BatchProvider(object):
-    def __init__(self, images, ids, labels, image_shape):
+    def __init__(self, images, ids, labels, image_shape,
+                 add_delta_noise=False):
         self.images = images
         self.labels = labels
         self.ids = ids
         assert len(ids) > 0
         self.image_shape = image_shape
         self.np_random = np.random.RandomState(seed=11)
+        self.add_delta_noise = add_delta_noise
         self.fid_gen = self.next_fid()
         self.img_gen = self.next_image()
 
@@ -43,6 +45,14 @@ class BatchProvider(object):
             img = self.images[iid]
             if list(img.shape) != list(self.image_shape):
                 img = np.reshape(img, self.image_shape)
+
+            if self.add_delta_noise:
+                noise = self.np_random.normal(
+                    loc=0.0,
+                    scale=0.1
+                )
+                img[:, :, 1] += noise
+
             yield img, self.labels[iid]
 
     def next_batch(self, batch_size):
@@ -78,6 +88,12 @@ class CN_AD_Loader(object):
 
     def dump_normalization(self, path):
         pass
+
+    def dump_train_val_test_split(self, path):
+        pass
+
+    def add_delta_noise(self):
+        return "delta_noise" in self.config and self.config["delta_noise"]
 
     def set_up_batches(self):
         images = self.f["images"][:]
@@ -162,14 +178,16 @@ class CN_AD_Loader(object):
             images=images_train,
             ids=train_AD_ids,
             labels=labels_train,
-            image_shape=self.image_shape
+            image_shape=self.image_shape,
+            add_delta_noise=self.add_delta_noise()
         )
 
         self.trainCN = BatchProvider(
             images=images_train,
             ids=train_CN_ids,
             labels=labels_train,
-            image_shape=self.image_shape
+            image_shape=self.image_shape,
+            add_delta_noise=self.add_delta_noise()
         )
 
         self.validationAD = BatchProvider(
