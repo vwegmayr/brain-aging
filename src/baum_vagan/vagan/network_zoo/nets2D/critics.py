@@ -39,7 +39,6 @@ def C3D_fcn_16_2D(x, training, scope_name='critic', scope_reuse=False):
 
         logits = layers.averagepool2D_layer(convD_2, name='diagnosis_avg')
 
-
     return logits
 
 
@@ -145,45 +144,29 @@ def C3D_fcn_16_2D_conditioned_with_delta(x, training, scope_name='critic', scope
     return decision
 
 
-def C3D_fcn_16_2D(x, training, scope_name='critic', scope_reuse=False):
+def C3D_fcn_16_2D_conditioned_with_delta_channel(x, training, scope_name='critic', scope_reuse=False):
 
-    with tf.variable_scope(scope_name) as scope:
-        if scope_reuse:
-            scope.reuse_variables()
+    delta_x0_with_delta = x[:, :, :, 1:3]
+    x0 = x[:, :, :, 0:1]
 
-        conv1_1 = layers.conv2D_layer(x, 'conv1_1', num_filters=16)
+    x0_logits = C3D_fcn_16_2D(
+        x0,
+        training,
+        scope_name="critic_x0",
+        scope_reuse=scope_reuse
+    )
 
-        pool1 = layers.maxpool2D_layer(conv1_1)
+    delta_x0_logits = C3D_fcn_16_2D(
+        delta_x0_with_delta,
+        training,
+        scope_name="critic_delta_x0",
+        scope_reuse=scope_reuse
+    )
 
-        conv2_1 = layers.conv2D_layer(pool1, 'conv2_1', num_filters=32)
+    all_logits = tf.concat([x0_logits, delta_x0_logits], axis=-1)
+    out = tf.layers.dense(all_logits, 1, reuse=scope_reuse)
 
-        pool2 = layers.maxpool2D_layer(conv2_1)
-
-        conv3_1 = layers.conv2D_layer(pool2, 'conv3_1', num_filters=64)
-        conv3_2 = layers.conv2D_layer(conv3_1, 'conv3_2', num_filters=64)
-
-        pool3 = layers.maxpool2D_layer(conv3_2)
-
-        conv4_1 = layers.conv2D_layer(pool3, 'conv4_1', num_filters=128)
-        conv4_2 = layers.conv2D_layer(conv4_1, 'conv4_2', num_filters=128)
-
-        pool4 = layers.maxpool2D_layer(conv4_2)
-
-        conv5_1 = layers.conv2D_layer(pool4, 'conv5_1', num_filters=256)
-        conv5_2 = layers.conv2D_layer(conv5_1, 'conv5_2', num_filters=256)
-
-        convD_1 = layers.conv2D_layer(conv5_2, 'convD_1', num_filters=256)
-        convD_2 = layers.conv2D_layer(convD_1,
-                                         'convD_2',
-                                         num_filters=1,
-                                         kernel_size=(1,1,1),
-                                         activation=tf.identity)
-
-        logits = layers.averagepool2D_layer(convD_2, name='diagnosis_avg')
-
-
-    return logits
-
+    return out
 
 
 def C3D_fcn_16_2D_bn(x, training, scope_name='critic', scope_reuse=False):
@@ -221,6 +204,5 @@ def C3D_fcn_16_2D_bn(x, training, scope_name='critic', scope_reuse=False):
                                          activation=tf.identity)
 
         logits = layers.averagepool2D_layer(convD_2, name='diagnosis_avg')
-
 
     return logits
