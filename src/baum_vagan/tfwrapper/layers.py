@@ -12,10 +12,17 @@ from tensorflow.contrib.layers import variance_scaling_initializer, xavier_initi
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
+
+def summary_name(s):
+    return s.replace(":", "_")
+
+
 def leaky_relu(x, alpha=0.01):
     return tf.maximum(x, alpha * x)
 
+
 STANDARD_NONLINEARITY = tf.nn.relu  #leaky_relu  # was tf.nn.relu
+
 
 def maxpool2D_layer(x, kernel_size=(2, 2), strides=(2, 2), padding="SAME"):
     '''
@@ -29,6 +36,7 @@ def maxpool2D_layer(x, kernel_size=(2, 2), strides=(2, 2), padding="SAME"):
 
     return op
 
+
 def maxpool3D_layer(x, kernel_size=(2, 2, 2), strides=(2, 2, 2), padding="SAME"):
     '''
     nets3D max pooling layer with 2x2x2 pooling as default
@@ -41,13 +49,14 @@ def maxpool3D_layer(x, kernel_size=(2, 2, 2), strides=(2, 2, 2), padding="SAME")
 
     return op
 
+
 def averagepool3D_layer(x, name=None):
     '''
     nets3D max pooling layer with 2x2x2 pooling as default
     '''
 
-    op = tf.reduce_mean(x, axis=(1,2,3), keep_dims=False, name=name)
-    tf.summary.histogram(op.op.name + '/activations', op)
+    op = tf.reduce_mean(x, axis=(1, 2, 3), keep_dims=False, name=name)
+    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
 
     return op
 
@@ -57,8 +66,8 @@ def averagepool2D_layer(x, name=None):
     nets3D max pooling layer with 2x2x2 pooling as default
     '''
 
-    op = tf.reduce_mean(x, axis=(1,2), keep_dims=False, name=name)
-    tf.summary.histogram(op.op.name + '/activations', op)
+    op = tf.reduce_mean(x, axis=(1, 2), keep_dims=False, name=name)
+    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
 
     return op
 
@@ -904,7 +913,7 @@ def _bilinear_upsample_weights(shape):
 def _add_summaries(op, weights, biases):
 
     # Tensorboard variables
-    tf.summary.histogram(weights.name, weights)
+    tf.summary.histogram(summary_name(weights.name), weights)
     if biases:
-        tf.summary.histogram(biases.name, biases)
-    tf.summary.histogram(op.op.name + '/activations', op)
+        tf.summary.histogram(summary_name(biases.name), biases)
+    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
