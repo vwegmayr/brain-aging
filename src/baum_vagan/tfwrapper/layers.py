@@ -56,7 +56,7 @@ def averagepool3D_layer(x, name=None):
     '''
 
     op = tf.reduce_mean(x, axis=(1, 2, 3), keep_dims=False, name=name)
-    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
+    # tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
 
     return op
 
@@ -67,7 +67,7 @@ def averagepool2D_layer(x, name=None):
     '''
 
     op = tf.reduce_mean(x, axis=(1, 2), keep_dims=False, name=name)
-    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
+    # tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
 
     return op
 
@@ -97,7 +97,7 @@ def crop_and_concat_layer(inputs, axis=-1):
         
         for i in range(len(start_crop)):
             start_crop[i] = max(start_crop[i], 0)
-        print(start_crop)
+
         if len(output_size) == 4:  # nets3D images
         # if output_size.shape[0] == 5:  # nets3D images
             cropped_tensor = tf.slice(inputs[ii],
@@ -296,8 +296,8 @@ def batch_renormalisation_layer(bottom, name, training, moving_average_decay=0.9
     clip_r = parametrize_variable(global_step, rmin, rmax, x_min_r, x_max_r)
     clip_d = parametrize_variable(global_step, dmin, dmax, x_min_d, x_max_d)
 
-    tf.summary.scalar('rmax_clip', clip_r)
-    tf.summary.scalar('dmax_clip', clip_d)
+    # tf.summary.scalar('rmax_clip', clip_r)
+    # tf.summary.scalar('dmax_clip', clip_d)
 
 
     h_bn = tf.contrib.layers.batch_norm(inputs=bottom,
@@ -328,7 +328,8 @@ def batch_normalisation_layer(bottom, name, training, moving_average_decay=0.99)
                                         is_training=training,
                                         scope=name,
                                         center=True,
-                                        scale=True)
+                                        scale=True,
+                                        updates_collections=None)
 
     return h_bn
 
@@ -406,7 +407,7 @@ def conv3D_layer(bottom,
         op = activation(op)
 
         # Add Tensorboard summaries
-        _add_summaries(op, weights, biases)
+        # _add_summaries(op, weights, biases)
 
         return op
 
@@ -913,7 +914,8 @@ def _bilinear_upsample_weights(shape):
 def _add_summaries(op, weights, biases):
 
     # Tensorboard variables
-    tf.summary.histogram(summary_name(weights.name), weights)
-    if biases:
-        tf.summary.histogram(summary_name(biases.name), biases)
-    tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
+    # tf.summary.histogram(summary_name(weights.name), weights)
+    # if biases:
+      #   tf.summary.histogram(summary_name(biases.name), biases)
+    # tf.summary.histogram(summary_name(op.op.name) + '/activations', op)
+    return
