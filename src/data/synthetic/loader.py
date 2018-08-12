@@ -98,6 +98,12 @@ class CN_AD_Loader(object):
         else:
             return 0
 
+    def divide_delta(self):
+        if "divide_delta" in self.config:
+            return self.config["divide_delta"]
+        else:
+            return 1
+
     def set_up_batches(self):
         images = self.f["images"][:]
         labels = self.f["labels"][:]
@@ -141,6 +147,12 @@ class CN_AD_Loader(object):
                 delta_x_t0 = resc[:, :, 1] - resc[:, :, 0]
                 sample[:, :, t0_idx] = x_t0
                 sample[:, :, delta_t0_idx] = delta_x_t0
+
+        if self.divide_delta() > 1:
+            d = self.divide_delta()
+            delta_idx = self.config["delta_idx"]
+            for i in range(len(images)):
+                images[i, :, :, delta_idx] /= d
 
         # Make train-validation-test split
         images_train_and_val, images_test, labels_train_and_val, labels_test = \
