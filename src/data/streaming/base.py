@@ -486,7 +486,13 @@ class FileStream(abc.ABC):
         return "test_streamer" in self.config and self.config["test_streamer"]
 
     def select_file_ids(self, file_ids):
-        return file_ids
+        # Only use specified diagnoses
+        diagnoses = self.config["use_diagnoses"]
+        selected = [fid for fid in file_ids
+                    if self.get_diagnose(fid) in diagnoses]
+        if not self.silent:
+            print("Selected {} out of {}".format(len(selected), len(file_ids)))
+        return selected
 
     def get_test_retest_pairs(self, image_labels):
         # Groupy by patient

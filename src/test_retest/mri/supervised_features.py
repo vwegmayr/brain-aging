@@ -5,15 +5,16 @@ from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
     PairClassificationHead, Conv3DEncoder
 from src.train_hooks import SumatraLoggingHook, HookFactory
+from src.baum_vagan.vagan.network_zoo.nets3D.critics import C3D_fcn_16
 
 
 class PairClassification(EvaluateEpochsBaseTF):
     @abc.abstractmethod
-    def get_encodings(self, features, params):
+    def get_encodings(self, features, params, mode):
         pass
 
     def model_fn(self, features, labels, mode, params):
-        enc_0, enc_1 = self.get_encodings(features, params)
+        enc_0, enc_1 = self.get_encodings(features, params, mode)
 
         clf = PairClassificationHead(
             features=features,
@@ -177,7 +178,7 @@ class PairClassification(EvaluateEpochsBaseTF):
 
 
 class LinearPairClassification(PairClassification):
-    def get_encodings(self, features, params):
+    def get_encodings(self, features, params, mode):
         encoder = MultiLayerPairEncoder(
             features=features,
             params=params,
@@ -189,7 +190,7 @@ class LinearPairClassification(PairClassification):
 
 
 class ConvPairClassification(PairClassification):
-    def get_encodings(self, features, params):
+    def get_encodings(self, features, params, mode):
         with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
             encoder_0 = Conv3DEncoder(
                 input_key="X_0",
@@ -210,3 +211,25 @@ class ConvPairClassification(PairClassification):
         z_1 = encoder_1.get_encoding()
 
         return z_0, z_1
+
+
+class UnetPairClassification(PairClassification):
+    def get_encodings(self, features, params, mode):
+        shape = [-1] + params["input_shape"] + [1]
+        x_0 = tf.reshape(features["X_0"], shape)
+        x_1 = tf.reshape(features["X_1"], shape)
+        enc_0 = C3D_fcn_16(
+            x=x_0,
+            training=tf.estimator.ModeKeys.TRAIN == mode,
+            scope_name="unet",
+            scope_reuse=False
+        )
+
+        enc_1 = C3D_fcn_16(
+            x=x_1,
+            training=tf.estimator.ModeKeys.TRAIN == mode,
+            scope_name="unet",
+            scope_reuse=True
+        )
+
+        return enc_0, enc_1

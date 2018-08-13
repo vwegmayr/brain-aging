@@ -537,7 +537,6 @@ class MRISamePatientSameAgePairStream(MRISingleStream):
         train_files = train_ids
         test_files = test_ids
 
-        self.groups = None
         # Make arbitrary test 
         groups = []
         test_groups = self.produce_groups(test_files, 2, train=False)
@@ -848,7 +847,6 @@ class MRIDiagnosePairStream(MRISingleStream):
 
         assert len(train_labels.intersection(test_labels)) == 0
 
-        self.groups = None
         # Make arbitrary test 
         groups = []
 
@@ -1035,7 +1033,6 @@ class SimilarPairStream(MRISingleStream):
         train_files = train_ids
         test_files = test_ids
 
-        self.groups = None
         # Make arbitrary test 
         groups = []
         test_groups = self.produce_groups(test_files, 2, train=False)
