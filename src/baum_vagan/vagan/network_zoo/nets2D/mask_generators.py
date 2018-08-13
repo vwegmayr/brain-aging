@@ -135,7 +135,7 @@ def unet_16_2D_allow_reuse(x, training, scope_name='generator', scope_reuse=True
     return conv8_2
 
 
-def unet_16_2D_bn_iterated(x, training, scope_name='generator'):
+def unet_16_2D_bn_iterated(x, training, scope_name='generator', max_iterations=3):
     """
     Second channel should contain the number of iterations.
     """
@@ -166,39 +166,54 @@ def unet_16_2D_bn_iterated(x, training, scope_name='generator'):
 
         return out
 
-    """
-    case_dic = {}
-    for i in range(1, 4):
-        case_dic[tf.equal(delta, i)] = lambda: iterate(x, i)
+    iterations = [x]
+    for i in range(1, max_iterations + 1):
+        last = iterations[i - 1]
+        iterations.append(iterate(last, 1))
 
-    output = tf.case(case_dic)
-    """
+    conditions = [None for i in range(max_iterations)]
+    conditions[max_iterations - 1] = tf.cond(
+        tf.equal(delta, max_iterations - 1),
+        lambda: iterations[max_iterations - 1],
+        lambda: iterations[max_iterations]
+    )
 
+    for i in range(max_iterations - 2, 0, -1):
+        cond = tf.cond(
+            tf.equal(delta, i),
+            lambda: iterations[i],
+            lambda: conditions[i + 1]
+        )
+        conditions[i] = cond
+
+    res = conditions[1]
+    """
     cond4 = tf.cond(
         tf.equal(delta, 4),
-        lambda: iterate(x, 4),
-        lambda: iterate(x, 5)
+        lambda: iterations[4],
+        lambda: iterations[5]
     )
 
     cond3 = tf.cond(
         tf.equal(delta, 3),
-        lambda: iterate(x, 3),
+        lambda: iterations[3],
         lambda: cond4
     )
 
     cond2 = tf.cond(
         tf.equal(delta, 2),
-        lambda: iterate(x, 2),
+        lambda: iterations[2],
         lambda: cond3
     )
 
     res = tf.cond(
         tf.equal(delta, 1),
-        lambda: iterate(x, 1),
+        lambda: iterations[1],
         lambda: cond2,
         strict=True,
         name="output_cond"
     )
+    """
 
     return res
 

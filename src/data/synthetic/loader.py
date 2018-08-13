@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from sklearn.utils import shuffle
 import pydoc
+import itertools
 
 from src.baum_vagan.utils import map_image_to_intensity_range
 
@@ -66,6 +67,53 @@ class BatchProvider(object):
         X_batch = np.array(X_batch)
         y_batch = np.array(y_batch)
 
+        return X_batch, y_batch
+
+
+class SameDeltaBatchProvider(object):
+    def __init__(self, images, ids, labels, image_shape,
+                 add_delta_noise=0):
+        self.images = images
+        self.labels = labels
+        self.ids = ids
+        assert len(ids) > 0
+        self.image_shape = image_shape
+        self.np_random = np.random.RandomState(seed=11)
+        self.add_delta_noise = add_delta_noise
+
+        # map deltas to IDs
+        self.match_delta_to_ids()
+
+        # one provider for each delta
+        self.delta_to_provider = {}
+        for delta in self.deltas:
+            self.delta_to_provider[delta] = BatchProvider(
+                images=images,
+                ids=self.delta_to_ids[delta],
+                labels=labels,
+                image_shape=image_shape,
+                add_delta_noise=add_delta_noise
+            )
+
+    def match_delta_to_ids(self):
+        self.delta_to_ids = {}
+        for iid in self.ids:
+            # Extract delta
+            img = self.images[iid]
+            delta = img[0, 0, 1]
+            if delta not in self.delta_to_ids:
+                self.delta_to_ids[delta] = [iid]
+            else:
+                self.delta_to_ids[delta].append(iid)
+
+        self.deltas = sorted(self.delta_to_ids.keys())
+        self.delta_gen = itertools.cycle(self.deltas)
+
+    def next_batch(self, batch_size):
+        delta = next(self.delta_gen)
+        provider = self.delta_to_provider[delta]
+
+        X_batch, y_batch = provider.next_batch(batch_size)
         return X_batch, y_batch
 
 
@@ -189,7 +237,9 @@ class CN_AD_Loader(object):
         val_AD_ids = val_ids[np.where(labels_val == 1)]
         val_CN_ids = val_ids[np.where(labels_val == 0)]
 
-        self.trainAD = BatchProvider(
+        Provider = pydoc.locate(self.config["batch_provider"])
+
+        self.trainAD = Provider(
             images=images_train,
             ids=train_AD_ids,
             labels=labels_train,
@@ -197,7 +247,7 @@ class CN_AD_Loader(object):
             add_delta_noise=self.add_delta_noise()
         )
 
-        self.trainCN = BatchProvider(
+        self.trainCN = Provider(
             images=images_train,
             ids=train_CN_ids,
             labels=labels_train,
@@ -205,28 +255,28 @@ class CN_AD_Loader(object):
             add_delta_noise=self.add_delta_noise()
         )
 
-        self.validationAD = BatchProvider(
+        self.validationAD = Provider(
             images=images_val,
             ids=val_AD_ids,
             labels=labels_val,
             image_shape=self.image_shape
         )
 
-        self.validationCN = BatchProvider(
+        self.validationCN = Provider(
             images=images_val,
             ids=val_CN_ids,
             labels=labels_val,
             image_shape=self.image_shape
         )
 
-        self.testAD = BatchProvider(
+        self.testAD = Provider(
             images=images_test,
             ids=test_AD_ids,
             labels=labels_test,
             image_shape=self.image_shape
         )
 
-        self.testCN = BatchProvider(
+        self.testCN = Provider(
             images=images_test,
             ids=test_CN_ids,
             labels=labels_test,

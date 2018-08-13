@@ -248,12 +248,12 @@ class vagan:
 
         # the generator generates the difference map
         if exp_config.generate_diff_map:
-            self.M = self.generator_net(self.gen_x, self.training_pl_gen)
+            self.M = self.get_generator_net()
             if exp_config.use_tanh:
                 self.M = tf.tanh(self.M)
         # the generator generates y = x + M(x) directly
         else:
-            self.generated = self.generator_net(self.gen_x, self.training_pl_gen)
+            self.generated = self.get_generator_net()
             if exp_config.use_tanh:
                 self.generated = tf.tanh(self.generated)
 
@@ -393,6 +393,19 @@ class vagan:
 
         # Create a session for running Ops on the Graph.
         self.sess = tf.Session(config=config)
+
+    def get_generator_net(self):
+        if hasattr(self.exp_config, 'generator_kwargs'):
+            return self.generator_net(
+                x=self.gen_x,
+                training=self.training_pl_gen,
+                **self.exp_config.generator_kwargs
+            )
+        else:
+            return self.generator_net(
+                x=self.gen_x,
+                training=self.training_pl_gen
+            )
 
     def critic_loss(self):
         """
