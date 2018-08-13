@@ -5,6 +5,7 @@ from functools import reduce
 from src.test_retest import regularizer
 from src.test_retest.test_retest_base import \
     linear_trafo_multiple_input_tensors
+from src.baum_vagan.tfwrapper import layers
 
 
 def name_to_hidden_regularization(layer_id, reg_name, activations_test,
@@ -729,3 +730,69 @@ class Conv3DDecoder(Head):
 
     def get_nodes(self):
         return [self.y]
+
+
+def C3D_fcn_16_classifier(x, training, scope_name='classifier', scope_reuse=False):
+    with tf.variable_scope(scope_name) as scope:
+        if scope_reuse:
+            scope.reuse_variables()
+
+        conv1_1 = layers.conv3D_layer(x, 'conv1_1', num_filters=16)
+
+        pool1 = layers.maxpool3D_layer(conv1_1)
+
+        conv2_1 = layers.conv3D_layer(pool1, 'conv2_1', num_filters=32)
+
+        pool2 = layers.maxpool3D_layer(conv2_1)
+
+        conv3_1 = layers.conv3D_layer(pool2, 'conv3_1', num_filters=64)
+        conv3_2 = layers.conv3D_layer(conv3_1, 'conv3_2', num_filters=64)
+
+        pool3 = layers.maxpool3D_layer(conv3_2)
+
+        conv4_1 = layers.conv3D_layer(pool3, 'conv4_1', num_filters=128)
+        conv4_2 = layers.conv3D_layer(conv4_1, 'conv4_2', num_filters=128)
+
+        pool4 = layers.maxpool3D_layer(conv4_2)
+
+        conv5_1 = layers.conv3D_layer(pool4, 'conv5_1', num_filters=256)
+        conv5_2 = layers.conv3D_layer(conv5_1, 'conv5_2', num_filters=256)
+
+        convD_1 = layers.conv3D_layer(conv5_2, 'convD_1', num_filters=256)
+
+        logits = tf.reduce_mean(convD_1, axis=(1, 2, 3))
+
+    return logits
+
+
+def C3D_fcn_16_bn_classifier(x, training, scope_name='classifier', scope_reuse=False):
+    with tf.variable_scope(scope_name) as scope:
+        if scope_reuse:
+            scope.reuse_variables()
+
+        conv1_1 = layers.conv3D_layer_bn(x, 'conv1_1', training, num_filters=16)
+
+        pool1 = layers.maxpool3D_layer(conv1_1)
+
+        conv2_1 = layers.conv3D_layer_bn(pool1, 'conv2_1', training, num_filters=32)
+
+        pool2 = layers.maxpool3D_layer(conv2_1)
+
+        conv3_1 = layers.conv3D_layer_bn(pool2, 'conv3_1', training, num_filters=64)
+        conv3_2 = layers.conv3D_layer_bn(conv3_1, 'conv3_2', training, num_filters=64)
+
+        pool3 = layers.maxpool3D_layer(conv3_2)
+
+        conv4_1 = layers.conv3D_layer_bn(pool3, 'conv4_1', training, num_filters=128)
+        conv4_2 = layers.conv3D_layer_bn(conv4_1, 'conv4_2', training, num_filters=128)
+
+        pool4 = layers.maxpool3D_layer(conv4_2)
+
+        conv5_1 = layers.conv3D_layer_bn(pool4, 'conv5_1', training, num_filters=256)
+        conv5_2 = layers.conv3D_layer_bn(conv5_1, 'conv5_2', training, num_filters=256)
+
+        convD_1 = layers.conv3D_layer_bn(conv5_2, 'convD_1', training, num_filters=256)
+
+        logits = tf.reduce_mean(convD_1, axis=(1, 2, 3))
+
+    return logits

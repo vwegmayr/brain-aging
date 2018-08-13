@@ -1,5 +1,6 @@
 import tensorflow as tf
 import abc
+import pydoc
 
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
@@ -21,6 +22,7 @@ class PairClassification(EvaluateEpochsBaseTF):
             params=params,
             encodings=[enc_0, enc_1]
         )
+
 
         preds_0, preds_1 = clf.get_predictions()
 
@@ -215,17 +217,18 @@ class ConvPairClassification(PairClassification):
 
 class UnetPairClassification(PairClassification):
     def get_encodings(self, features, params, mode):
+        architecture = pydoc.locate(params["architecture"])
         shape = [-1] + params["input_shape"] + [1]
         x_0 = tf.reshape(features["X_0"], shape)
         x_1 = tf.reshape(features["X_1"], shape)
-        enc_0 = C3D_fcn_16(
+        enc_0 = architecture(
             x=x_0,
             training=tf.estimator.ModeKeys.TRAIN == mode,
             scope_name="unet",
             scope_reuse=False
         )
 
-        enc_1 = C3D_fcn_16(
+        enc_1 = architecture(
             x=x_1,
             training=tf.estimator.ModeKeys.TRAIN == mode,
             scope_name="unet",
