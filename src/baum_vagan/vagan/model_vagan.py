@@ -6,9 +6,11 @@ import numpy as np
 import os.path
 import tensorflow as tf
 import shutil
+from collections import OrderedDict
 
 from src.baum_vagan.grad_accum_optimizers import grad_accum_optimizer_gan
 from src.baum_vagan.tfwrapper import utils as tf_utils
+from src.baum_vagan.utils import ncc
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
@@ -18,6 +20,65 @@ def normalize_to_range(a, b, x):
     mini = tf.reduce_min(x)
 
     return a + (x - mini) / (maxi - mini) * (b - a)
+
+
+def tf_ncc_py_wrap(a, v, zero_norm=True):
+    return tf.py_func(ncc, [a, v, zero_norm], tf.float32)
+
+
+class ValidationSummary(object):
+    def __init__(self, name, compute_op):
+        self.name = name
+        # TF operation use to compute the value
+        self.compute_op = compute_op
+        # Create placeholder used to feed computed value
+        # to summary
+        self.placeholder = tf.placeholder(
+            tf.float32, shape=[], name=self.name + '_pl'
+        )
+
+        # Create summary op
+        self.summary_op = tf.summary.scalar(
+            'validation_' + self.name, self.placeholder
+        )
+
+
+class ValidationSummaries(object):
+    """
+    Helper class to collect and build validation summary
+    operations in a more structered way.
+    """
+    def __init__(self):
+        self.name_to_summary = OrderedDict()
+
+    def add_summary(self, name, compute_op):
+        if name not in self.name_to_summary:
+            summ = ValidationSummary(
+                name=name,
+                compute_op=compute_op
+            )
+            self.name_to_summary[name] = summ
+        else:
+            raise ValueError("Summary already exists")
+
+    def get_validation_summary_ops(self):
+        ops = [s.summary_op for s in self.name_to_summary.values()]
+
+        return ops
+
+    def get_compute_ops(self):
+        ops = [s.compute_op for s in self.name_to_summary.values()]
+
+        return ops
+
+    def get_placeholders(self):
+        pls = [s.placeholder for s in self.name_to_summary.values()]
+
+        return pls
+
+    def get_summary_idx(self, name):
+        names = list(self.name_to_summary.keys())
+        return names.index(name)
 
 
 # Wrappers to extract information more easily
@@ -349,6 +410,21 @@ class vagan:
         # Generator and critic losses
         self.gen_loss = self.generator_loss()
         self.cri_loss = self.critic_loss()
+
+        # NCC
+        if self.x_c1_wrapper.get_delta_x_t0() is not None:
+            ncc_inp = tf.concat([self.M, self.x_c1_wrapper.get_delta_x_t0()], axis=-1)
+            if self.mode3D:
+                self.ncc = tf.map_fn(
+                    lambda x: tf_ncc_py_wrap(x[:, :, :, 0], x[:, :, :, 1]),
+                    ncc_inp
+                )
+            else:
+                self.ncc = tf.map_fn(
+                    lambda x: tf_ncc_py_wrap(x[:, :, 0], x[:, :, 1]),
+                    ncc_inp
+                )
+            self.ncc = tf.reduce_mean(self.ncc)
 
         # Make optimizers
         train_vars = tf.trainable_variables()
@@ -932,49 +1008,40 @@ class vagan:
         tf.summary.scalar('mean_logits_real', self.mean_logits_real)
         tf.summary.scalar('mean_logits_fake', self.mean_logits_fake)
 
+        if hasattr(self, 'ncc'):
+            tf.summary.scalar('ncc_score', self.ncc)
+
         # Build the summary Tensor based on the TF collection of Summaries.
         self.summary_op = tf.summary.merge_all()
 
         # validation summaries
-        self.val_disc_loss_pl = tf.placeholder(
-            tf.float32, shape=[], name='disc_val_loss'
+        self.val_summaries = ValidationSummaries()
+        self.val_summaries.add_summary(
+            name='critic_loss',
+            compute_op=self.cri_loss
         )
-        disc_val_summary_op = tf.summary.scalar(
-            'validation_critic_loss', self.val_disc_loss_pl
+        self.val_summaries.add_summary(
+            name='generator_loss',
+            compute_op=self.gen_loss
         )
-
-        self.val_gen_loss_pl = tf.placeholder(
-            tf.float32, shape=[], name='gen_val_loss'
+        self.val_summaries.add_summary(
+            name='critic_acc',
+            compute_op=self.critic_acc
         )
-        gen_val_summary_op = tf.summary.scalar(
-            'validation_generator_loss', self.val_gen_loss_pl
+        self.val_summaries.add_summary(
+            name='critic_mean_logits_real',
+            compute_op=self.mean_logits_real
         )
-
-        self.val_critic_acc_pl = tf.placeholder(
-            tf.float32, shape=[], name='critic_val_acc',
-        )
-
-        disc_val_acc_summary_op = tf.summary.scalar(
-            'validation_critic_acc', self.val_critic_acc_pl
-        )
-
-        self.val_critic_logits_real = tf.placeholder(
-            tf.float32, shape=[], name='critic_val_logits_real'
+        self.val_summaries.add_summary(
+            name='critic_mean_logits_fake',
+            compute_op=self.mean_logits_fake
         )
 
-        disc_val_mean_logits_real_summary_op = tf.summary.scalar(
-            'validation_critic_mean_logits_real',
-            self.val_critic_logits_real
-        )
-
-        self.val_critic_logits_fake = tf.placeholder(
-            tf.float32, shape=[], name='critic_val_logits_fake'
-        )
-
-        disc_val_mean_logits_fake_summary_op = tf.summary.scalar(
-            'validation_critic_mean_logits_fake',
-            self.val_critic_logits_fake
-        )
+        if hasattr(self, 'ncc'):
+            self.val_summaries.add_summary(
+                name='ncc_score',
+                compute_op=self.ncc
+            )
 
         # val images
         img_val_summary_op = _image_summaries(
@@ -982,9 +1049,8 @@ class vagan:
         )
 
         self.val_summary_op = tf.summary.merge(
-            [disc_val_summary_op, gen_val_summary_op, img_val_summary_op,
-             disc_val_acc_summary_op, disc_val_mean_logits_real_summary_op,
-             disc_val_mean_logits_fake_summary_op]
+            self.val_summaries.get_validation_summary_ops() +
+            [img_val_summary_op]
         )
 
     def _update_tensorboard(self, step):
@@ -1019,12 +1085,9 @@ class vagan:
         Evaluate model on the validation set and save the required
         checkpoints at a given step.
         """
-
-        total_g_loss_val = 0
-        total_d_loss_val = 0
-        total_d_acc_val = 0
-        total_d_log_real_val = 0
-        total_d_log_fake_val = 0
+        compute_ops = self.val_summaries.get_compute_ops()
+        n_values = len(compute_ops)
+        total_values = np.zeros((n_values,))
 
         for _ in range(self.exp_config.num_val_batches):
             c1_imgs = self.data.validationAD.next_batch(
@@ -1034,29 +1097,19 @@ class vagan:
                 self.exp_config.batch_size
             )[0]
 
-            g_loss_val, d_loss_val, d_acc_val, d_log_real_val, \
-                d_log_fake_val = self.sess.run(
-                    [self.gen_loss, self.cri_loss, self.critic_acc,
-                     self.mean_logits_real, self.mean_logits_fake],
-                    feed_dict={
-                        self.x_c1: c1_imgs,
-                        self.x_c0: c0_imgs,
-                        self.training_pl_cri: False,
-                        self.training_pl_gen: False
-                    }
-                )
+            values = self.sess.run(
+                compute_ops,
+                feed_dict={
+                    self.x_c1: c1_imgs,
+                    self.x_c0: c0_imgs,
+                    self.training_pl_cri: False,
+                    self.training_pl_gen: False
+                }
+            )
 
-            total_d_loss_val += d_loss_val
-            total_g_loss_val += g_loss_val
-            total_d_acc_val += d_acc_val
-            total_d_log_real_val += d_log_real_val
-            total_d_log_fake_val += d_log_fake_val
+            total_values += values
 
-        total_d_loss_val /= self.exp_config.num_val_batches
-        total_g_loss_val /= self.exp_config.num_val_batches
-        total_d_acc_val /= self.exp_config.num_val_batches
-        total_d_log_real_val /= self.exp_config.num_val_batches
-        total_d_log_fake_val /= self.exp_config.num_val_batches
+        total_values /= self.exp_config.num_val_batches
 
         c1_imgs = self.data.validationAD.next_batch(
             self.exp_config.batch_size
@@ -1064,24 +1117,31 @@ class vagan:
         c0_imgs = self.data.validationCN.next_batch(
             self.exp_config.batch_size
         )[0]
+
+        feed_dict = {
+            self.x_c0: c0_imgs,
+            self.x_c1: c1_imgs,
+            self.training_pl_gen: False,
+            self.training_pl_cri: False
+        }
+
+        for pl, val in zip(self.val_summaries.get_placeholders(), total_values):
+            feed_dict[pl] = val
+
         validation_summary_str = self.sess.run(
             self.val_summary_op,
-            feed_dict={
-                self.val_disc_loss_pl: total_d_loss_val,
-                self.val_gen_loss_pl: total_g_loss_val,
-                self.val_critic_acc_pl: total_d_acc_val,
-                self.val_critic_logits_real: total_d_log_real_val,
-                self.val_critic_logits_fake: total_d_log_fake_val,
-                self.x_c0: c0_imgs,
-                self.x_c1: c1_imgs,
-                self.training_pl_gen: False,
-                self.training_pl_cri: False
-            }
+            feed_dict=feed_dict
         )
 
         self.summary_writer.add_summary(validation_summary_str, step)
         self.summary_writer.flush()
 
+        total_g_loss_val = values[
+            self.val_summaries.get_summary_idx('generator_loss')
+        ]
+        total_d_loss_val = values[
+            self.val_summaries.get_summary_idx('critic_loss')
+        ]
         logging.info("[Validation], generator loss: %g, critic_loss: %g" %
                      (total_g_loss_val, total_d_loss_val))
 
