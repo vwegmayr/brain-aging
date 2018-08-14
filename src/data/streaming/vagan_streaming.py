@@ -1,5 +1,8 @@
 import numpy as np
 import copy
+import pydoc
+from collections import OrderedDict
+import itertools
 
 from src.data.streaming.mri_streaming import MRISingleStream
 from src.baum_vagan.utils import map_image_to_intensity_range
@@ -65,25 +68,26 @@ class BatchProvider(object):
 class FlexibleBatchProvider(object):
     def __init__(self, streamer, samples, label_key, prefetch=100):
         self.samples = samples
+        self.indices = list(range(len(samples)))
         assert len(samples) > 0
         self.streamer = streamer
         self.label_key = label_key
         self.prefetch = prefetch
         self.loaded = []
         self.np_random = np.random.RandomState(seed=11)
-        self.sample_gen = self.next_sample()
+        self.idx_gen = self.next_idx()
         self.img_gen = self.next_image()
 
-    def next_sample(self):
-        self.np_random.shuffle(self.samples)
+    def next_idx(self):
+        self.np_random.shuffle(self.indices)
         p = 0
         while (1):
-            if p < len(self.samples):
-                yield self.samples[p]
+            if p < len(self.indices):
+                yield self.indices[p]
                 p += 1
             else:
                 p = 0
-                self.np_random.shuffle(self.samples)
+                self.np_random.shuffle(self.indices)
 
     def next_image(self):
         loaded = []
@@ -92,7 +96,8 @@ class FlexibleBatchProvider(object):
             if len(loaded) == 0:
                 # prefetch
                 for i in range(self.prefetch):
-                    sample = next(self.sample_gen)
+                    idx = next(self.idx_gen)
+                    sample = self.samples[idx]
                     # labels are not used by VAGAN, only needed
                     # for compatibility
                     label = -1
@@ -112,6 +117,49 @@ class FlexibleBatchProvider(object):
             y_batch.append(y)
 
         return np.array(X_batch), np.array(y_batch)
+
+
+class SameDeltaBatchProvider(object):
+    def __init__(self, streamer, samples, label_key, prefetch=100):
+        self.samples = samples
+
+        assert len(samples) > 0
+        self.streamer = streamer
+        self.label_key = label_key
+        self.prefetch = prefetch
+        self.loaded = []
+        self.np_random = np.random.RandomState(seed=11)
+
+        self.match_delta_to_samples()
+
+        # one provider for each delta
+        self.delta_to_provider = {}
+        for delta in self.deltas:
+            self.delta_to_provider[delta] = FlexibleBatchProvider(
+                streamer=streamer,
+                samples=self.delta_to_samples[delta],
+                label_key=label_key,
+                prefetch=prefetch
+            )
+
+    def match_delta_to_samples(self):
+        self.delta_to_samples = OrderedDict()
+        for sample in self.samples:
+            approx_delta = sample.get_approx_delta()
+            if approx_delta not in self.delta_to_samples:
+                self.delta_to_samples[approx_delta] = [sample]
+            else:
+                self.delta_to_samples[approx_delta].append(sample)
+
+        self.deltas = sorted(self.delta_to_samples.keys())
+        self.delta_gen = itertools.cycle(self.deltas)
+
+    def next_batch(self, batch_size):
+        delta = next(self.delta_gen)
+        provider = self.delta_to_provider[delta]
+
+        X_batch, y_batch = provider.next_batch(batch_size)
+        return X_batch, y_batch
 
 
 class AnySingleStream(MRISingleStream):
@@ -208,12 +256,18 @@ class MRIImagePair(MRISample):
         )
         self.fid1 = fid1
         self.fid2 = fid2
+        self.age2 = self.streamer.get_exact_age(self.fid2)
+        self.age1 = self.streamer.get_exact_age(self.fid1)
+        self.delta = self.age2 - self.age1
+
+    def set_approx_delta(self, delta):
+        self.approx_delta = delta
+
+    def get_approx_delta(self):
+        return self.approx_delta
 
     def get_age_delta(self):
-        age2 = self.streamer.get_exact_age(self.fid2)
-        age1 = self.streamer.get_exact_age(self.fid1)
-
-        return age2 - age1
+        return self.delta
 
     def get_diagnoses(self):
         return [
@@ -244,6 +298,32 @@ class MRIImagePair(MRISample):
         return im
 
 
+class MRIImagePairWithDelta(MRIImagePair):
+    def __init__(self, *args, **kwargs):
+        super(MRIImagePairWithDelta, self).__init__(
+            *args,
+            **kwargs
+        )
+
+        approx_delta = -1
+        for approx, delta_range in self.streamer.delta_ranges.items():
+            if delta_range[0] <= self.get_age_delta() <= delta_range[1]:
+                approx_delta = approx
+                break
+
+        assert approx_delta >= 0
+        self.set_approx_delta(approx_delta)
+
+    def load(self):
+        im1 = self.load_image(self.fid1)
+        im2 = self.load_image(self.fid2)
+        delta_im = im2 - im1
+        delta = self.get_approx_delta()
+        delta_channel = 0 * im1 + delta
+        im = np.concatenate((im1, delta_channel, delta_im), axis=-1)
+        return im
+
+
 class AgeFixedDeltaStream(MRISingleStream):
     def __init__(self, stream_config):
         config = copy.deepcopy(stream_config)
@@ -261,12 +341,17 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Rescaling
         self.rescale_to_one = config["rescale_to_one"]
 
+        self.provider = FlexibleBatchProvider
+        self.image_type = MRIImagePair
         super(AgeFixedDeltaStream, self).__init__(
             stream_config=stream_config
         )
 
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
+
+    def is_valid_delta(self, delta):
+        return delta >= self.delta_min and delta <= self.delta_max
 
     def select_file_ids(self, file_ids):
         patient_groups = self.make_patient_groups(file_ids)
@@ -311,10 +396,7 @@ class AgeFixedDeltaStream(MRISingleStream):
                     j_fid = age_ascending[j]
                     age_j = self.get_exact_age(j_fid)
                     delta = age_j - age_i
-                    if delta > self.delta_max:
-                        break
-
-                    if delta < self.delta_min:
+                    if not self.is_valid_delta(delta):
                         continue
 
                     diag_i = self.get_diagnose(i_fid)
@@ -344,13 +426,11 @@ class AgeFixedDeltaStream(MRISingleStream):
                 for j in range(i + 1, n):
                     age_j = self.get_exact_age(age_ascending[j])
                     delta = age_j - age_i
-                    if delta > self.delta_max:
-                        break
 
-                    if delta < self.delta_min:
+                    if not self.is_valid_delta(delta):
                         continue
 
-                    pairs.append(MRIImagePair(
+                    pairs.append(self.image_type(
                         streamer=self,
                         fid1=age_ascending[i],
                         fid2=age_ascending[j]
@@ -361,8 +441,7 @@ class AgeFixedDeltaStream(MRISingleStream):
     def check_pairs(self, pairs):
         # Some checks
         for p in pairs:
-            assert p.get_age_delta() >= self.delta_min
-            assert p.get_age_delta() <= self.delta_max
+            assert self.is_valid_delta(p.get_age_delta())
             assert p.same_patient()
             for diag in p.get_diagnoses():
                 assert diag in self.use_diagnoses
@@ -390,13 +469,13 @@ class AgeFixedDeltaStream(MRISingleStream):
         self.n_train_samples = len(train_pairs)
         self.check_pairs(train_pairs)
 
-        self.trainAD = FlexibleBatchProvider(
+        self.trainAD = self.provider(
             streamer=self,
             samples=train_pairs,
             label_key=None,
             prefetch=self.prefetch
         )
-        self.trainCN = FlexibleBatchProvider(
+        self.trainCN = self.provider(
             streamer=self,
             samples=train_pairs,
             label_key=None,
@@ -415,7 +494,7 @@ class AgeFixedDeltaStream(MRISingleStream):
             label_key=None,
             prefetch=self.prefetch
         )
-        self.validationCN = FlexibleBatchProvider(
+        self.validationCN = self.provider(
             streamer=self,
             samples=val_pairs,
             label_key=None,
@@ -432,15 +511,53 @@ class AgeFixedDeltaStream(MRISingleStream):
             streamer=self,
             samples=test_pairs,
             label_key=None,
-            prefetch=self.prefetch
+            prefetch=10
         )
-        self.testCN = FlexibleBatchProvider(
+        self.testCN = self.provider(
             streamer=self,
             samples=test_pairs,
             label_key=None,
-            prefetch=self.prefetch
+            prefetch=10
         )
         self.test_pairs = test_pairs
 
     def get_all_pairs(self):
         return self.train_pairs + self.val_pairs + self.test_pairs
+
+
+class AgeVariableDeltaStream(AgeFixedDeltaStream):
+    def __init__(self, stream_config):
+        config = copy.deepcopy(stream_config)
+        # Dictionary mapping deltas to ranges
+        # Make sure keys are floats
+        self.delta_ranges = OrderedDict()
+        for k, v in config["delta_ranges"].items():
+            self.delta_ranges[float(k)] = v
+
+        # True if multiple images taken the same day
+        # should be used.
+        self.use_retest = config["use_retest"]
+        # Diagnoses that should be used
+        self.use_diagnoses = config["use_diagnoses"]
+        # True if patients having multiple distinct diagnoses
+        # should be used
+        self.use_converting = config["use_converting"]
+        # Rescaling
+        self.rescale_to_one = config["rescale_to_one"]
+
+        self.provider = pydoc.locate(config["batch_provider"])
+        self.image_type = MRIImagePairWithDelta
+
+        super(AgeFixedDeltaStream, self).__init__(
+            stream_config=stream_config
+        )
+
+        self.prefetch = self.config["prefetch"]
+        self.set_up_batches()
+
+    def is_valid_delta(self, delta):
+        for delta_range in self.delta_ranges.values():
+            if delta_range[0] <= delta <= delta_range[1]:
+                return True
+
+        return False
