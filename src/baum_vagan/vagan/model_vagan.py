@@ -532,8 +532,19 @@ class vagan:
                     tf.float32
                 )
             )
-            self.critic_acc_real = 0
-            self.critic_acc_fake = 0
+            real_preds, fake_preds = tf.split(preds, 2, axis=0)
+            self.critic_acc_real = tf.reduce_mean(
+                tf.cast(
+                    tf.equal(real_labels, real_preds),
+                    tf.float32
+                )
+            )
+            self.critic_acc_fake = tf.reduce_mean(
+                tf.cast(
+                    tf.equal(fake_labels, fake_preds),
+                    tf.float32
+                )
+            )
 
         # if using improved training
         if self.exp_config.improved_training:
@@ -1027,6 +1038,14 @@ class vagan:
         self.val_summaries.add_summary(
             name='critic_acc',
             compute_op=self.critic_acc
+        )
+        self.val_summaries.add_summary(
+            name='critic_acc_real',
+            compute_op=self.critic_acc_real
+        )
+        self.val_summaries.add_summary(
+            name='critic_acc_fake',
+            compute_op=self.critic_acc_fake
         )
         self.val_summaries.add_summary(
             name='critic_mean_logits_real',
