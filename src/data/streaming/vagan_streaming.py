@@ -100,7 +100,7 @@ class FlexibleBatchProvider(object):
                     sample = self.samples[idx]
                     # labels are not used by VAGAN, only needed
                     # for compatibility
-                    label = -1
+                    label = (sample.fid1, sample.fid2)
                     im = sample.load()
                     loaded.append([im, label])
             else:

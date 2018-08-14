@@ -201,6 +201,26 @@ class TestAgeFixedDeltaStream(unittest.TestCase):
         streamer = create_object(self.config)
 
 
+class TestAgeVariableDeltaStream(unittest.TestCase):
+    def setUp(self):
+        with open("tests/configs/test_age_variable_delta_stream.yaml") as f:
+            config = yaml.load(f)
+
+        self.config = config
+
+    def test_init(self):
+        streamer = create_object(self.config)
+
+    def test_shuffling(self):
+        streamer = create_object(self.config)
+        sampler = streamer.trainAD
+        distinct = set()
+        for i in range(200):
+            im, id_pair = sampler.next_batch(1)
+            distinct.add(tuple(id_pair[0]))
+        self.assertEqual(len(distinct), streamer.n_train_samples)
+
+
 class TestImageNormalization(unittest.TestCase):
     def setUp(self):
         with open("tests/configs/test_image_normalization.yaml") as f:

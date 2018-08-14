@@ -1,0 +1,48 @@
+class: src.data.streaming.vagan_streaming.AgeVariableDeltaStream
+params:
+  stream_config:
+    test_streamer: False
+    delta_ranges:
+      '1': [0.8, 1]
+      '2': [1.0000001, 1.2]
+    batch_provider: src.data.streaming.vagan_streaming.SameDeltaBatchProvider
+    delta_min: 0.8
+    delta_max: 1.2
+    use_retest: False
+    use_diagnoses: ["healthy"]
+    use_converting: False
+    meta_csv: data/raw/csv/adni_aibl_exact_age.csv
+    meta_id_column: image_label
+    batch_size: -1
+    prefetch: 1
+    train_ratio: 1
+    n_folds: 5
+    test_fold: 0
+    categorical_split:
+      - healthy
+      - health_ad
+      - sex
+    numerical_split:
+      - age
+    normalize_images: False
+    rescale_to_one: False
+    silent: True
+    balanced_labels:
+      - healthy
+      - health_ad
+      #- health_mci
+    diagnoses:
+      - "healthy"
+      - "health_ad"
+    seed: 47
+    shuffle: True
+    downsample:
+      enabled: True
+      shape: [4, 4]
+    data_sources:
+      - name: ADNI_AIBL
+        glob_pattern: brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/*_*.nii.gz
+        id_from_filename:
+          regexp: .*/([AI0-9]+)_{0,1}mni_aligned\.nii\.gz
+          regex_id_group: 1
+    feature_collection: adni_aibl
