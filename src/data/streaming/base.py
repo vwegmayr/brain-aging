@@ -129,8 +129,19 @@ class FileStream(abc.ABC):
             train_ids, validation_ids = self.make_train_test_split(
                 train_groups
             )
+
+            train_ids, validation_ids, test_ids = self.rebalance_ids(
+                train_ids=train_ids,
+                validation_ids=validation_ids,
+                test_ids=test_ids
+            )
+
             assert len(train_ids) + len(validation_ids) + len(test_ids) == \
                 len(self.all_file_ids)
+            train_set = set(train_ids)
+            val_set = set(validation_ids)
+            test_set = set(test_ids)
+            assert (train_set | val_set | test_set) == set(self.all_file_ids)
         else:
             train_ids, validation_ids, test_ids = self.load_split()
 
@@ -493,6 +504,9 @@ class FileStream(abc.ABC):
         if not self.silent:
             print("Selected {} out of {}".format(len(selected), len(file_ids)))
         return selected
+
+    def rebalance_ids(self, train_ids, validation_ids, test_ids):
+        return train_ids, validation_ids, test_ids
 
     def get_test_retest_pairs(self, image_labels):
         # Groupy by patient

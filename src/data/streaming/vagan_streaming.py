@@ -488,7 +488,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         val_pairs = self.build_pairs(val_ids)
         self.n_val_samples = len(val_pairs)
         self.check_pairs(val_pairs)
-        self.validationAD = FlexibleBatchProvider(
+        self.validationAD = self.provider(
             streamer=self,
             samples=val_pairs,
             label_key=None,
@@ -507,7 +507,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         test_pairs = self.build_pairs(test_ids)
         self.n_test_samples = len(test_pairs)
         self.check_pairs(test_pairs)
-        self.testAD = FlexibleBatchProvider(
+        self.testAD = self.provider(
             streamer=self,
             samples=test_pairs,
             label_key=None,
@@ -523,6 +523,99 @@ class AgeFixedDeltaStream(MRISingleStream):
 
     def get_all_pairs(self):
         return self.train_pairs + self.val_pairs + self.test_pairs
+
+
+class Patient(object):
+    def __init__(self, patient_id, delta_to_pairs):
+        self.patient_id = patient_id
+        self.delta_to_pairs = delta_to_pairs
+
+
+class PairCollection(object):
+    def __init__(self, pairs):
+        self.delta_to_pairs = self.compute_delta_to_pairs(pairs)
+
+    def get_pairs(self):
+        all_pairs = []
+        for pairs in self.delta_to_pairs.values():
+            all_pairs += pairs
+
+        return all_pairs
+
+    def get_fids(self):
+        fids = set()
+        for p in self.get_pairs():
+            fids.add(p.fid1)
+            fids.add(p.fid2)
+
+        return sorted(list(fids))
+
+    def get_patients(self):
+        patient_ids = set()
+        for p in self.get_pairs():
+            pid = p.streamer.get_patient_id(p.fid1)
+            patient_ids.add(pid)
+
+        return sorted(list(patient_ids))
+
+    def compute_delta_to_pairs(self, pairs):
+        delta_to_pairs = OrderedDict()
+        for pair in pairs:
+            delta = pair.get_approx_delta()
+            if delta not in delta_to_pairs:
+                delta_to_pairs[delta] = set([pair])
+            else:
+                delta_to_pairs[delta].add(pair)
+
+        return delta_to_pairs
+
+    def get_patient_pairs(self, patient_id):
+        patient_pairs = []
+        for delta, pairs in self.delta_to_pairs.items():
+            for p in pairs:
+                fid = p.fid1
+                pid = p.streamer.get_patient_id(fid)
+                if pid == patient_id:
+                    patient_pairs.append(p)
+
+        return patient_pairs
+
+    def add_pairs(self, pairs):
+        for pair in pairs:
+            delta = pair.get_approx_delta()
+            if delta not in self.delta_to_pairs:
+                self.delta_to_pairs[delta] = set([pair])
+            else:
+                self.delta_to_pairs[delta].add(pair)
+
+    def remove_pairs(self, pairs):
+        B = set(pairs)
+        for delta in self.delta_to_pairs.keys():
+            self.delta_to_pairs[delta] -= B
+
+    def compute_delta_score(self, add_patient, remove_patient, delta_targets):
+        init_score = 0
+        new_score = 0
+        for delta, pairs in self.delta_to_pairs.items():
+            init_score += abs(delta_targets[delta] - len(pairs))
+            diff = 0
+            for p in pairs:
+                fid = p.fid1
+                patient_id = p.streamer.get_patient_id(fid)
+                if patient_id == add_patient:
+                    diff += 1
+                if patient_id == remove_patient:
+                    diff -= 1
+
+            new_score += abs(delta_targets[delta] - (len(pairs) + diff))
+
+        return new_score - init_score
+
+    def print_counts(self, targets):
+        for delta, pairs in self.delta_to_pairs.items():
+            print("Delta {}, got {}, target {}".format(
+                delta, len(pairs), targets[delta]
+            ))
 
 
 class AgeVariableDeltaStream(AgeFixedDeltaStream):
@@ -554,6 +647,107 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
 
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
+        if not self.silent:
+            self.print_some_stats()
+
+    def get_delta_to_pairs(self, pairs):
+        delta_to_pairs = OrderedDict()
+        for pair in pairs:
+            delta = pair.get_approx_delta()
+            if delta not in delta_to_pairs:
+                delta_to_pairs[delta] = [pair]
+            else:
+                delta_to_pairs[delta].append(pair)
+
+        return delta_to_pairs
+
+    def _rebalance(self, train_ids, test_ids):
+        self.np_random.shuffle(train_ids)
+        self.np_random.shuffle(test_ids)
+        train_pairs = self.build_pairs(train_ids)
+        test_pairs = self.build_pairs(test_ids)
+
+        delta_targets = self.get_delta_to_pairs(train_pairs + test_pairs)
+        train_targets = {}
+        test_targets = {}
+        for delta, pairs in delta_targets.items():
+            test_target = len(pairs) * 1.0 / self.config["n_folds"]
+            test_targets[delta] = int(test_target)
+            train_targets[delta] = len(pairs) - int(test_target)
+
+        train_collection = PairCollection(train_pairs)
+        test_collection = PairCollection(test_pairs)
+
+        print(">>>>>>>> before")
+        train_collection.print_counts(train_targets)
+        test_collection.print_counts(test_targets)
+
+        train_patients = train_collection.get_patients()
+        test_patients = test_collection.get_patients()
+
+        for train_p in train_patients:
+            best_score = 0
+            best_p = None
+            for test_p in test_patients:
+                delta_sc = 0
+                sc_0 = train_collection.compute_delta_score(
+                    add_patient=test_p,
+                    remove_patient=train_p,
+                    delta_targets=train_targets
+                )
+
+                sc_1 = test_collection.compute_delta_score(
+                    add_patient=train_p,
+                    remove_patient=test_p,
+                    delta_targets=test_targets
+                )
+                delta_sc = sc_0 + sc_1
+                if sc_0 < 0 and sc_1 < 0 and delta_sc < best_score:
+                    best_score = delta_sc
+                    best_p = test_p
+
+            if best_score < 0:
+                new_train_pairs = test_collection.get_patient_pairs(best_p)
+                train_collection.add_pairs(new_train_pairs)
+
+                new_test_pairs = train_collection.get_patient_pairs(train_p)
+                test_collection.add_pairs(new_test_pairs)
+
+                train_collection.remove_pairs(new_test_pairs)
+                test_collection.remove_pairs(new_train_pairs)
+
+                # train_collection.print_counts(train_targets)
+
+        new_train_ids = train_collection.get_fids()
+        new_test_ids = test_collection.get_fids()
+
+        print(">>>>>>>> after")
+        train_collection.print_counts(train_targets)
+        test_collection.print_counts(test_targets)
+
+        return new_train_ids, new_test_ids
+
+    """
+    def rebalance_ids(self, train_ids, validation_ids, test_ids):
+        train_ids, validation_ids = self._rebalance(train_ids, validation_ids)
+        train_ids, test_ids = self._rebalance(train_ids, test_ids)
+
+        return train_ids, validation_ids, test_ids
+    """
+
+    def print_some_stats(self):
+        def print_provider(provider):
+            for delta, p in provider.delta_to_provider.items():
+                print("Delta {}, nbr samples {}".format(
+                    delta, len(p.samples)
+                ))
+
+        print("Train samples")
+        print_provider(self.trainAD)
+        print("Validation samples")
+        print_provider(self.validationAD)
+        print("Test samples")
+        print_provider(self.testAD)
 
     def is_valid_delta(self, delta):
         for delta_range in self.delta_ranges.values():
