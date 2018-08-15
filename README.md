@@ -37,4 +37,5 @@ python run.py --config toy_vagan/disks_synthetic.yaml -a fit -S data
 The input folder has to be adapted by setting `params.stream_config.data_path` in `toy_vagan/disks_synthetic.yaml`, if it was changed in the previous step.
 A new folder will be created in the `data` folder and the folder's name will contain the initial timestamp corresponding to the training starting point. This folder will contain tensorboard summaries and model checkpoints. The images summaries are named as follows. The `train_a_generated_CN` images correspond to the generated training images. The `train_b_difference_CN` correspond to the generated difference maps. The `train_example_AD_delta_img` images correspond to the ground-truth difference maps. The `train_example_AD` images correspond to the inputs fed to the generator.
 Example images can be found in the `toy_vagan` folder. The model should be trained for at least 1500 steps, depending on the diversity of the input images.
+![generated difference maps](toy_vagan/toy_generated.png)
 
