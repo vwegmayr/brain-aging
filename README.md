@@ -3,13 +3,9 @@
 
 1. A complete list of packages can be found in `env.yaml`. This python environment can be imported with `conda`. See [conda documentation](https://conda.io/docs/user-guide/tasks/manage-environments.html) for more information.
 
-2. Some required pip packages
-
-    ```shell
-    pip install scipy pandas numpy tensorflow-gpu gitpython pyyaml
-    ```
-
-3. If the `conda` import is not working, try running the code until all import errors go away :)
+2. Refer to [link](https://pyradiomics.readthedocs.io/en/latest/) to install pyradiomcs if needed.
+3. See below to install sumatra.
+4. If the `conda` import is not working, try running the code until all import errors go away :)
 
 ## Contribute (Sumatra setup for experiment tracking)
 
