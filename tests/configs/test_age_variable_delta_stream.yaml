@@ -3,8 +3,8 @@ params:
   stream_config:
     test_streamer: False
     delta_ranges:
-      '1': [0.8, 1]
-      '2': [1.0000001, 1.2]
+      '1': [1.8, 2.2]
+      '2': [3.8, 4.2]
     batch_provider: src.data.streaming.vagan_streaming.SameDeltaBatchProvider
     delta_min: 0.8
     delta_max: 1.2
@@ -26,7 +26,7 @@ params:
       - age
     normalize_images: False
     rescale_to_one: False
-    silent: True
+    silent: False
     balanced_labels:
       - healthy
       - health_ad

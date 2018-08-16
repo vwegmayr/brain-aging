@@ -30,6 +30,9 @@ params:
     same_patient: False
     delta_min: 0.8
     delta_max: 1.2
+    delta_ranges:
+      '1': [1.8, 2.2]
+      '2': [3.8, 4.2]
     use_retest: False
     use_diagnoses: [healthy]
     use_converting: False

@@ -6,7 +6,7 @@ from src.data.streaming.mri_streaming import \
     SimilarPairStream, AnyPairStream, MixedPairStream
 
 from src.data.streaming.vagan_streaming import \
-    AgeFixedDeltaStream
+    AgeFixedDeltaStream, AgeVariableDeltaStream
 
 import subprocess
 import numpy as np
@@ -112,6 +112,13 @@ class TestReproducibility(unittest.TestCase):
 
     def test_age_fixed_delta_stream(self):
         self.config["class"] = qualified_path(AgeFixedDeltaStream)
+        self.reproducibility_within_run()
+        self.reproducibility_accross_runs()
+
+    def test_age_variable_delta_stream(self):
+        self.config["params"]["stream_config"]["batch_provider"] = \
+            "src.data.streaming.vagan_streaming.SameDeltaBatchProvider"
+        self.config["class"] = qualified_path(AgeVariableDeltaStream)
         self.reproducibility_within_run()
         self.reproducibility_accross_runs()
 
