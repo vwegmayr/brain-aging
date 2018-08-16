@@ -712,6 +712,16 @@ class vagan:
         )
         return logits
 
+    def predict_critic_input(self, input_image):
+        res = self.sess.run(
+            self.critic_real_inp,
+            feed_dict={
+                self.x_c0: input_image,
+                self.training_pl_cri: False
+            }
+        )
+        return res
+
     def load_weights(self, log_dir=None, type='latest', **kwargs):
         """
         Load weights into the model.
