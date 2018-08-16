@@ -312,88 +312,55 @@ class vagan:
             self.M = self.get_generator_net()
             if exp_config.use_tanh:
                 self.M = tf.tanh(self.M)
+            self.generated_x_t1 = self.x_c0_wrapper.get_x_t0 + self.M
         # the generator generates y = x + M(x) directly
         else:
-            self.generated = self.get_generator_net()
+            self.generated_x_t1 = self.get_generator_net()
             if exp_config.use_tanh:
-                self.generated = tf.tanh(self.generated)
+                self.generated_x_t1 = tf.tanh(self.generated_x_t1)
 
-            self.M = self.generated - self.x_c1_wrapper.get_x_t0()
+            self.M = self.generated_x_t1 - self.x_c1_wrapper.get_x_t0()
 
         # prepare intput for discriminator
         if exp_config.conditioned_gan:
-            if exp_config.generate_diff_map:
-                if exp_config.n_channels == 3:
-                    self.y_c0_ = tf.concat(
-                        [
-                            self.x_c1_wrapper.get_x_t0(),
-                            self.x_c1_wrapper.get_delta(),
-                            self.M
-                        ],
-                        axis=-1
-                    )
-                    self.critic_real_inp = tf.concat(
-                        [
-                            self.x_c0_wrapper.get_x_t0(),
-                            self.x_c0_wrapper.get_delta(),
-                            self.x_c0_wrapper.get_delta_x_t0(),
-                        ],
-                        axis=-1
-                    )
-                elif exp_config.n_channels == 2:
-                    self.y_c0_ = tf.concat(
-                        [
-                            self.x_c1_wrapper.get_x_t0(),
-                            self.M
-                        ],
-                        axis=-1
-                    )
-                    self.critic_real_inp = tf.concat(
-                        [
-                            self.x_c0_wrapper.get_x_t0(),
-                            self.x_c0_wrapper.get_delta_x_t0(),
-                        ],
-                        axis=-1
-                    )
-            else:
-                fake_condition = self.generated
-                real_condition = self.x_c0_wrapper.get_x_t1()
-                if exp_config.condition_on_delta_x:
-                    fake_condition = self.M
-                    real_condition = self.x_c0_wrapper.get_delta_x_t0()
+            fake_condition = self.generated_x_t1
+            real_condition = self.x_c0_wrapper.get_x_t1()
+            if exp_config.condition_on_delta_x:
+                fake_condition = self.M
+                real_condition = self.x_c0_wrapper.get_delta_x_t0()
 
-                if exp_config.n_channels == 3:
-                    self.y_c0_ = tf.concat(
-                        [
-                            self.x_c1_wrapper.get_x_t0(),
-                            self.x_c1_wrapper.get_delta(),
-                            fake_condition,
-                        ],
-                        axis=-1
-                    )
-                    self.critic_real_inp = tf.concat(
-                        [
-                            self.x_c0_wrapper.get_x_t0(),
-                            self.x_c0_wrapper.get_delta(),
-                            real_condition
-                        ],
-                        axis=-1
-                    )
-                elif exp_config.n_channels == 2:
-                    self.y_c0_ = tf.concat(
-                        [
-                            self.x_c1_wrapper.get_x_t0(),
-                            fake_condition,
-                        ],
-                        axis=-1
-                    )
-                    self.critic_real_inp = tf.concat(
-                        [
-                            self.x_c0_wrapper.get_x_t0(),
-                            real_condition
-                        ],
-                        axis=-1
-                    )
+            if exp_config.n_channels == 3:
+                self.y_c0_ = tf.concat(
+                    [
+                        self.x_c1_wrapper.get_x_t0(),
+                        self.x_c1_wrapper.get_delta(),
+                        fake_condition,
+                    ],
+                    axis=-1
+                )
+                self.critic_real_inp = tf.concat(
+                    [
+                        self.x_c0_wrapper.get_x_t0(),
+                        self.x_c0_wrapper.get_delta(),
+                        real_condition
+                    ],
+                    axis=-1
+                )
+            elif exp_config.n_channels == 2:
+                self.y_c0_ = tf.concat(
+                    [
+                        self.x_c1_wrapper.get_x_t0(),
+                        fake_condition,
+                    ],
+                    axis=-1
+                )
+                self.critic_real_inp = tf.concat(
+                    [
+                        self.x_c0_wrapper.get_x_t0(),
+                        real_condition
+                    ],
+                    axis=-1
+                )
         else:
             self.y_c0_ = self.gen_x + self.M
             self.critic_real_inp = self.x_c0
