@@ -1,0 +1,71 @@
+class: src.baum_vagan.vagan.model_wrapper.VAGanWrapper
+pickle: False
+params:
+  experiment_name: synth_vagan
+  data_loader: src.data.synthetic.loader.CN_AD_Loader
+  stream_config:
+    data_path: data/4disks_t0_not_fixed/samples.hdf5
+    rescale_to_one: True
+    image_shape: [112, 112, 2]
+    x_t0_idx: 0
+    delta_x_t0_idx: 1
+    batch_provider: src.data.synthetic.loader.BatchProvider
+
+  # Path to trained model if we are testing
+  trained_model_dir: logdir/gan/synth_vagan_no_mod
+
+  # Model settings
+  critic_net: src.baum_vagan.vagan.network_zoo.nets2D.critics.C3D_fcn_16_2D
+  generator_net: src.baum_vagan.vagan.network_zoo.nets2D.mask_generators.unet_16_2D_bn
+  #generator_kwargs:
+   # max_iterations: 3
+  conditioned_gan: True
+  n_channels: 2
+  input_wrapper: src.baum_vagan.vagan.model_vagan.Xt0_DXt0
+  generate_diff_map: False
+  condition_on_delta_x: True
+  use_sigmoid: False
+
+  # Data settings
+  data_identifier: synthetic
+  preproc_folder: data/preproc_data/synthetic
+  image_size: [112, 112]
+  moving_effect: True
+  rescale_to_one: True
+  tf_rescale_to_one: False
+
+  # Optimizer Settings
+  optimizer_handle: tensorflow.train.AdamOptimizer
+  beta1: 0.0
+  beta2: 0.9
+
+  # Training settings
+  batch_size: 32
+  n_accum_grads: 1
+  learning_rate: 1e-4  # Used 1e-3 for experiments in paper, but 1e-4 works a bit better
+  divide_lr_frequency: None
+  critic_iter: 5
+  critic_iter_long: 100
+  critic_retune_frequency: 100
+  critic_initial_train_duration: 25
+
+  # Cost function settings
+  l1_map_weight: 100.0
+  use_tanh: True  # Using the tanh activation function at the output of the generator will scale the outputs in the
+                  # range of [-1, 1]. This can make training a bit more stable (obviously the input data must be scaled
+                  # accordingly.
+
+  # Improved training settings
+  improved_training: True
+  scale: 10.0
+
+  # Normal WGAN training settings (only used if improved_training=False)
+  clip_min: -0.01
+  clip_max: 0.01
+
+  # Rarely changed settings
+  max_iterations: 1000
+  save_frequency: 10
+  validation_frequency: 1
+  num_val_batches: 20
+  update_tensorboard_frequency: 2

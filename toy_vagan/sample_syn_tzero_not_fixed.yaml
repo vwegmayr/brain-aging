@@ -1,0 +1,10 @@
+class: src.data.synthetic.sampler.TZeroNotFixedSampler
+params:
+  n_images: 5000
+  sample_params:
+    big_rads: [10, 15]
+    delta: 5
+    effect_size: 100.0
+    image_size: 112
+    center_fixed: True
+  outdir: data/4disks_t0_not_fixed
