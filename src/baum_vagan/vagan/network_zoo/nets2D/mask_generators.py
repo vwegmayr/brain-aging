@@ -7,7 +7,6 @@ def unet_16_2D_bn(x, training, scope_name='generator'):
     n_ch_0 = 16
 
     with tf.variable_scope(scope_name):
-
         conv1_1 = layers.conv2D_layer_bn(x, 'conv1_1', num_filters=n_ch_0, training=training)
         conv1_2 = layers.conv2D_layer_bn(conv1_1, 'conv1_2', num_filters=n_ch_0, training=training)
         pool1 = layers.maxpool2D_layer(conv1_2)
@@ -24,20 +23,20 @@ def unet_16_2D_bn(x, training, scope_name='generator'):
         conv4_2 = layers.conv2D_layer_bn(conv4_1, 'conv4_2', num_filters=n_ch_0*8, training=training)
 
         upconv3 = layers.deconv2D_layer_bn(conv4_2, name='upconv3', num_filters=n_ch_0, training=training)
-        concat3 = layers.crop_and_concat_layer([upconv3, conv3_2], axis=-1)
+        concat3 = layers.crop_and_concat_layer_fixed([upconv3, conv3_2], axis=-1)
 
         conv5_1 = layers.conv2D_layer_bn(concat3, 'conv5_1', num_filters=n_ch_0*4, training=training)
 
         conv5_2 = layers.conv2D_layer_bn(conv5_1, 'conv5_2', num_filters=n_ch_0*4, training=training)
 
         upconv2 = layers.deconv2D_layer_bn(conv5_2, name='upconv2', num_filters=n_ch_0, training=training)
-        concat2 = layers.crop_and_concat_layer([upconv2, conv2_2], axis=-1)
+        concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_2], axis=-1)
 
         conv6_1 = layers.conv2D_layer_bn(concat2, 'conv6_1', num_filters=n_ch_0*2, training=training)
         conv6_2 = layers.conv2D_layer_bn(conv6_1, 'conv6_2', num_filters=n_ch_0*2, training=training)
 
         upconv1 = layers.deconv2D_layer_bn(conv6_2, name='upconv1', num_filters=n_ch_0, training=training)
-        concat1 = layers.crop_and_concat_layer([upconv1, conv1_2], axis=-1)
+        concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_2], axis=-1)
 
         conv8_1 = layers.conv2D_layer_bn(concat1, 'conv8_1', num_filters=n_ch_0, training=training)
         conv8_2 = layers.conv2D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)
@@ -69,20 +68,20 @@ def unet_16_2D_bn_allow_reuse(x, training, scope_name='generator', scope_reuse=T
         conv4_2 = layers.conv2D_layer_bn(conv4_1, 'conv4_2', num_filters=n_ch_0*8, training=training)
 
         upconv3 = layers.deconv2D_layer_bn(conv4_2, name='upconv3', num_filters=n_ch_0, training=training)
-        concat3 = layers.crop_and_concat_layer([upconv3, conv3_2], axis=-1)
+        concat3 = layers.crop_and_concat_layer_fixed([upconv3, conv3_2], axis=-1)
 
         conv5_1 = layers.conv2D_layer_bn(concat3, 'conv5_1', num_filters=n_ch_0*4, training=training)
 
         conv5_2 = layers.conv2D_layer_bn(conv5_1, 'conv5_2', num_filters=n_ch_0*4, training=training)
 
         upconv2 = layers.deconv2D_layer_bn(conv5_2, name='upconv2', num_filters=n_ch_0, training=training)
-        concat2 = layers.crop_and_concat_layer([upconv2, conv2_2], axis=-1)
+        concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_2], axis=-1)
 
         conv6_1 = layers.conv2D_layer_bn(concat2, 'conv6_1', num_filters=n_ch_0*2, training=training)
         conv6_2 = layers.conv2D_layer_bn(conv6_1, 'conv6_2', num_filters=n_ch_0*2, training=training)
 
         upconv1 = layers.deconv2D_layer_bn(conv6_2, name='upconv1', num_filters=n_ch_0, training=training)
-        concat1 = layers.crop_and_concat_layer([upconv1, conv1_2], axis=-1)
+        concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_2], axis=-1)
 
         conv8_1 = layers.conv2D_layer_bn(concat1, 'conv8_1', num_filters=n_ch_0, training=training)
         conv8_2 = layers.conv2D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)
@@ -114,20 +113,20 @@ def unet_16_2D_allow_reuse(x, training, scope_name='generator', scope_reuse=True
         conv4_2 = layers.conv2D_layer(conv4_1, 'conv4_2', num_filters=n_ch_0*8)
 
         upconv3 = layers.deconv2D_layer(conv4_2, name='upconv3', num_filters=n_ch_0)
-        concat3 = layers.crop_and_concat_layer([upconv3, conv3_2], axis=-1)
+        concat3 = layers.crop_and_concat_layer_fixed([upconv3, conv3_2], axis=-1)
 
         conv5_1 = layers.conv2D_layer(concat3, 'conv5_1', num_filters=n_ch_0*4)
 
         conv5_2 = layers.conv2D_layer(conv5_1, 'conv5_2', num_filters=n_ch_0*4)
 
         upconv2 = layers.deconv2D_layer(conv5_2, name='upconv2', num_filters=n_ch_0)
-        concat2 = layers.crop_and_concat_layer([upconv2, conv2_2], axis=-1)
+        concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_2], axis=-1)
 
         conv6_1 = layers.conv2D_layer(concat2, 'conv6_1', num_filters=n_ch_0*2)
         conv6_2 = layers.conv2D_layer(conv6_1, 'conv6_2', num_filters=n_ch_0*2)
 
         upconv1 = layers.deconv2D_layer(conv6_2, name='upconv1', num_filters=n_ch_0)
-        concat1 = layers.crop_and_concat_layer([upconv1, conv1_2], axis=-1)
+        concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_2], axis=-1)
 
         conv8_1 = layers.conv2D_layer(concat1, 'conv8_1', num_filters=n_ch_0)
         conv8_2 = layers.conv2D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)

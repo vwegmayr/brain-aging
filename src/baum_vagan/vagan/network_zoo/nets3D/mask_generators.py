@@ -38,7 +38,7 @@ def unet_16_bn(x, training, scope_name='generator'):
 
         upconv1 = layers.deconv3D_layer_bn(conv6_2, name='upconv1', num_filters=n_ch_0, training=training)
   
-        concat1 = layers.crop_and_concat_layer_fixed([conv1_2, upconv1], axis=-1)
+        concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_2], axis=-1)
         #concat1 = upconv1
 
         conv8_1 = layers.conv3D_layer_bn(concat1, 'conv8_1', num_filters=n_ch_0, training=training)
