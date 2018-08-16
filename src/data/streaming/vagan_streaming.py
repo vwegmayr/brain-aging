@@ -93,20 +93,29 @@ class FlexibleBatchProvider(object):
         loaded = []
 
         while (1):
-            if len(loaded) == 0:
-                # prefetch
-                for i in range(self.prefetch):
-                    idx = next(self.idx_gen)
-                    sample = self.samples[idx]
-                    # labels are not used by VAGAN, only needed
-                    # for compatibility
-                    label = (sample.fid1, sample.fid2)
-                    im = sample.load()
-                    loaded.append([im, label])
+            if self.prefetch > 0:
+                if len(loaded) == 0:
+                    # prefetch
+                    for i in range(self.prefetch):
+                        idx = next(self.idx_gen)
+                        sample = self.samples[idx]
+                        # labels are not used by VAGAN, only needed
+                        # for compatibility
+                        label = (sample.fid1, sample.fid2)
+                        im = sample.load()
+                        loaded.append([im, label])
+                else:
+                    el = loaded[0]
+                    loaded.pop(0)
+                    yield el
             else:
-                el = loaded[0]
-                loaded.pop(0)
-                yield el
+                idx = next(self.idx_gen)
+                sample = self.samples[idx]
+                # labels are not used by VAGAN, only needed
+                # for compatibility
+                label = (sample.fid1, sample.fid2)
+                im = sample.load()
+                yield im, label
 
     def next_batch(self, batch_size):
         X_batch = []
@@ -260,6 +269,13 @@ class MRIImagePair(MRISample):
         self.age1 = self.streamer.get_exact_age(self.fid1)
         self.delta = self.age2 - self.age1
 
+        self.slice = False
+        if self.streamer.load_only_slice():
+            self.slice = True
+            self.slice_axis, self.slice_idx = self.streamer.get_slice_info()
+
+        self.raw_data = None
+
     def set_approx_delta(self, delta):
         self.approx_delta = delta
 
@@ -286,15 +302,25 @@ class MRIImagePair(MRISample):
             im = self.streamer.normalize_image(im)
         if self.streamer.rescale_to_one:
             im = map_image_to_intensity_range(im, -1, 1, 5)
-
+        if self.slice:
+            im = np.take(im, self.slice_idx, axis=self.slice_axis)
         im = np.reshape(im, tuple(list(im.shape) + [1]))
         return im
 
     def load(self):
-        im1 = self.load_image(self.fid1)
-        im2 = self.load_image(self.fid2)
-        delta_im = im2 - im1
-        im = np.concatenate((im1, delta_im), axis=-1)
+        if not self.slice or self.raw_data is None:
+            im1 = self.load_image(self.fid1)
+            im2 = self.load_image(self.fid2)
+
+            delta_im = im2 - im1
+            im = np.concatenate((im1, delta_im), axis=-1)
+
+            if self.slice:
+                self.raw_data = im
+
+        elif self.slice and self.raw_data is not None:
+            im = self.raw_data
+
         return im
 
 
@@ -315,12 +341,20 @@ class MRIImagePairWithDelta(MRIImagePair):
         self.set_approx_delta(approx_delta)
 
     def load(self):
-        im1 = self.load_image(self.fid1)
-        im2 = self.load_image(self.fid2)
-        delta_im = im2 - im1
-        delta = self.get_approx_delta()
-        delta_channel = 0 * im1 + delta
-        im = np.concatenate((im1, delta_channel, delta_im), axis=-1)
+        if not self.slice or self.raw_data is None:
+            im1 = self.load_image(self.fid1)
+            im2 = self.load_image(self.fid2)
+            delta_im = im2 - im1
+            delta = self.get_approx_delta()
+            delta_channel = 0 * im1 + delta
+            im = np.concatenate((im1, delta_channel, delta_im), axis=-1)
+
+            if self.slice:
+                self.raw_data = im
+
+        elif self.slice and self.raw_data is not None:
+            im = self.raw_data
+
         return im
 
 

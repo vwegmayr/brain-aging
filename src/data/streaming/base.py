@@ -496,6 +496,12 @@ class FileStream(abc.ABC):
     def debugging(self):
         return "test_streamer" in self.config and self.config["test_streamer"]
 
+    def load_only_slice(self):
+        return "slice" in self.config
+
+    def get_slice_info(self):
+        return self.config["slice"]["axis"], self.config["slice"]["idx"]
+
     def select_file_ids(self, file_ids):
         # Only use specified diagnoses
         diagnoses = self.config["use_diagnoses"]
