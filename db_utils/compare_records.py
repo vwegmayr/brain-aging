@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+from tabulate import tabulate
 
 
 from db_utils.db_connection import SumatraDB
@@ -139,6 +140,7 @@ def plot_groups(groups):
         mean = np.mean(ys, axis=0)
         print(mean)
         print(std)
+        print(tabulate(np.vstack((mean, std)), tablefmt="latex", floatfmt=".4f"))
 
         c = next(color)
         line = plt.plot(x, mean, c=c, marker='o', linewidth=2,
