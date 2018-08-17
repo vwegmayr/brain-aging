@@ -867,8 +867,7 @@ class vagan:
                     c = self.exp_config.n_channels
                     delta_x0 = tf.abs(x_c0_wrapper.get_delta_x_t0())[:, :, :, z_slice, 0:1]
                     delta_x1 = tf.abs(x_c1_wrapper.get_delta_x_t0())[:, :, :, z_slice, 0:1]
-                    if self.exp_config.generate_diff_map or \
-                            self.exp_config.condition_on_delta_x:
+                    if self.exp_config.condition_on_delta_x:
                         y_c0_disp += y_c0_[:, :, :, z_slice, c-1:c]  # subtract difference map
                     else:
                         y_c0_disp = y_c0_[:, :, :, z_slice, c-1:c]
@@ -881,8 +880,7 @@ class vagan:
                     c = self.exp_config.n_channels
                     delta_x0 = tf.abs(x_c0_wrapper.get_delta_x_t0())
                     delta_x1 = tf.abs(x_c1_wrapper.get_delta_x_t0())
-                    if self.exp_config.generate_diff_map or \
-                            self.exp_config.condition_on_delta_x:
+                    if self.exp_config.condition_on_delta_x:
                         y_c0_disp += y_c0_[:, :, :, c-1:c]  # subtract difference map
                     else:
                         y_c0_disp = y_c0_[:, :, :, c-1:c]
@@ -890,22 +888,20 @@ class vagan:
             difference_map_pl = tf.abs(y_c0_disp - x_c1_disp)
             if self.exp_config.conditioned_gan:
                 c = self.exp_config.n_channels
-                if self.exp_config.generate_diff_map or \
-                        self.exp_config.condition_on_delta_x:
+                if self.exp_config.condition_on_delta_x:
                     if data_dimension == 2:
                         difference_map_pl = tf.abs(y_c0_[:, :, :, c-1:c])
                     else:
                         difference_map_pl = tf.abs(y_c0_[:, :, :, z_slice, c-1:c])
                 else:
-                    if not self.exp_config.condition_on_delta_x:
-                        if data_dimension == 2:
-                            difference_map_pl = tf.abs(
-                                y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
-                            )
-                        else:
-                            difference_map_pl = tf.abs(
-                                y_c0_[:, :, :, z_slice, c-1:c] - y_c0_[:, :, :, z_slice, 0:1]
-                            )
+                    if data_dimension == 2:
+                        difference_map_pl = tf.abs(
+                            y_c0_[:, :, :, c-1:c] - y_c0_[:, :, :, 0:1]
+                        )
+                    else:
+                        difference_map_pl = tf.abs(
+                            y_c0_[:, :, :, z_slice, c-1:c] - y_c0_[:, :, :, z_slice, 0:1]
+                        )
 
             if delta_x0 is not None:
                 delta_x0 = rescale_image_summary(delta_x0, 0, 255)
