@@ -169,8 +169,13 @@ class PairClassification(EvaluateEpochsBaseTF):
                 training_hooks=train_hooks
             )
 
+        eval_metric_ops = {
+            "acc": tf.metrics.mean(acc)
+        }
+
         return tf.estimator.EstimatorSpec(
             mode=mode,
+            eval_metric_ops=eval_metric_ops,
             loss=loss,
             evaluation_hooks=eval_hooks
         )

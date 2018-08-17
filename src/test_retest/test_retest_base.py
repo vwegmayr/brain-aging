@@ -415,7 +415,7 @@ class EvaluateEpochsBaseTF(BaseTF):
                     name="validation"
                 )
                 print(validation)
-                self.metric_logger.add_evaluations("validation", evaluation)
+                self.metric_logger.add_evaluations("validation", validation)
 
             # persist evaluations to json file
             self.metric_logger.dump()
