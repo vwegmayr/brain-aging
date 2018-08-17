@@ -388,6 +388,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         return delta >= self.delta_min and delta <= self.delta_max
 
     def select_file_ids(self, file_ids):
+        file_ids = sorted(file_ids)
         patient_groups = self.make_patient_groups(file_ids)
         keep_fids = []
         for g in patient_groups:
