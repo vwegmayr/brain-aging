@@ -3,6 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+import pandas as pd
 
 
 def extract_tags(tag_string):
@@ -54,7 +55,7 @@ class Record(object):
         else:
             return values
 
-    def get_best_validation_epoch(self, metric="acc"):
+    def get_best_validation_epoch(self, metric="validation_acc"):
         values = self.get_metric_values(metric, epoch=-1)
         return np.argmax(values)
 
@@ -82,7 +83,7 @@ class Record(object):
 
 
 class RecordGroup(object):
-    def __init__(self, records, group_label):
+    def __init__(self, records, group_label, data_path):
         self.group_label = group_label
         # Assign run IDs
         # Sort records based on label
@@ -92,18 +93,23 @@ class RecordGroup(object):
             reverse=False
         )
 
+        for r in self.records:
+            r.load_metrics(data_path)
+
         for i in range(len(records)):
             self.records[i].run_id = i + 1
 
     @staticmethod
     def get_markers():
-        return itertools.cycle(('', '+', '.', 'o', '*')) 
+        return itertools.cycle(('x', '.', 'o', '*')) 
 
     @staticmethod
     def get_colors():
         return iter(plt.cm.tab10(np.linspace(0, 1, 11)))
 
     def plot_group(self, metric, x_label, y_label, legend_loc, type="line"):
+        self.print_epoch_stats(metric)
+
         plt.figure()
         colors = RecordGroup.get_colors()
         markers = RecordGroup.get_markers()
@@ -117,15 +123,17 @@ class RecordGroup(object):
                 linewidth=2,
                 label=label,
                 c=next(colors),
-                marker=next(markers)
+                marker=next(markers),
+                markersize=10,
             )
 
         plt.xlabel(x_label)
         plt.ylabel(y_label)
-
+        plt.title(self.group_label)
         plt.legend(loc=legend_loc, ncol=1)
         plt.grid(True)
         plt.show()
+
 
     def group_stats_per_epoch(self, metric):
         all_values = []
@@ -135,6 +143,98 @@ class RecordGroup(object):
 
         all_values = np.array(all_values)
         return EpochStats(all_values)
+
+    def print_epoch_stats(self, metric):
+        # Per epoch mean
+        stats = self.group_stats_per_epoch(metric)
+        # create table with fromat
+        # epoch | mean | std | median | percentile
+        header = ["epoch", "mean", "std", "median", "5-percentile",
+                  "95-percentile"]
+        table = []
+        n_epochs = stats.n_epochs
+        for i in range(n_epochs):
+            row = [
+                i,
+                stats.get_means()[i],
+                stats.get_stds()[i],
+                stats.get_medians()[i],
+                stats.get_percentile(
+                    percentile=5,
+                    epoch=i
+                ),
+                stats.get_percentile(
+                    percentile=95,
+                    epoch=i
+                ),
+            ]
+
+            table.append(row)
+
+        df = pd.DataFrame(
+            data=np.array(table),
+            columns=header
+        )
+        print(self.group_label)
+        self.print_df(df)
+
+    def print_df(self, df):
+        df = df.round(4)
+        print(df)
+        print(df.to_latex(index=False))
+
+    def print_run_accuracies(self):
+        # Fold accuracy based on best validation epoch
+        header = ["run", "bestValEpoch", "bestValAcc", "testAcc"]
+
+        table = []
+        for record in self.records:
+            run = record.run_id
+            best_ep = record.get_best_validation_epoch(
+                "validation_acc"
+            )
+            best_val_acc = record.get_metric_values(
+                metric="validation_acc",
+                epoch=best_ep
+            )
+            test_acc = record.get_metric_values(
+                metric="test_acc",
+                epoch=best_ep
+            )
+            row = [run, best_ep, best_val_acc, test_acc]
+
+            table.append(row)
+
+        table = np.array(table)
+        test_accs = table[:, -1]
+
+        print(self.group_label)
+        df = pd.DataFrame(
+            data=table,
+            columns=header
+        )
+        self.print_df(df)
+
+        # Overall accuracy
+        self.print_overall_acc(test_accs)
+
+    def print_overall_acc(self, test_accs):
+        header = ["mean", "std", "median", "5-percentile",
+                  "95-percentile"]
+        row = [
+            np.mean(test_accs),
+            np.std(test_accs),
+            np.median(test_accs),
+            np.percentile(test_accs, 5),
+            np.percentile(test_accs, 95)
+        ]
+        table = [row]
+        df = pd.DataFrame(
+            data=np.array(table),
+            columns=header
+        )
+        print(self.group_label + " test accuracy")
+        self.print_df(df)
 
     @staticmethod
     def compare_groups(groups, metric, x_label, y_label):
@@ -147,7 +247,7 @@ class RecordGroup(object):
             x = np.array(list(range(stats.n_epochs))) + 1
             c = next(colors)
             m = next(markers)
-            # mean line
+            # mean line with error bars
             plt.errorbar(
                 x,
                 stats.get_means(),
@@ -155,7 +255,9 @@ class RecordGroup(object):
                 c=c,
                 marker=m,
                 label=group.group_label,
-                linestyle='-.',
+                linestyle='--',
+                elinewidth=1,
+                capsize=10
             )
             # median line
             plt.plot(
@@ -163,8 +265,9 @@ class RecordGroup(object):
                 stats.get_medians(),
                 c=c,
                 marker=m,
-                label=group.group_label,
-                linestyle=':',
+                #label=group.group_label,
+                linewidth=0,
+                markersize=13
             )
 
         plt.xlabel(x_label)
@@ -191,3 +294,7 @@ class EpochStats(object):
 
     def get_medians(self):
         return self.medians
+
+    def get_percentile(self, percentile, epoch):
+        epoch_values = self.values[:, epoch]
+        return np.percentile(epoch_values, percentile)
