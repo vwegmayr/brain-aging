@@ -312,7 +312,7 @@ class vagan:
             self.M = self.get_generator_net()
             if exp_config.use_tanh:
                 self.M = tf.tanh(self.M)
-            self.generated_x_t1 = self.x_c0_wrapper.get_x_t0 + self.M
+            self.generated_x_t1 = self.x_c1_wrapper.get_x_t0 + self.M
         # the generator generates y = x + M(x) directly
         else:
             self.generated_x_t1 = self.get_generator_net()
