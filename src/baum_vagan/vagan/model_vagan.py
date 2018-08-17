@@ -309,10 +309,11 @@ class vagan:
 
         # the generator generates the difference map
         if exp_config.generate_diff_map:
-            self.M = self.get_generator_net()
+            self.M_out = self.get_generator_net()
+            self.generated_x_t1 = self.x_c1_wrapper.get_x_t0() + self.M_out
             if exp_config.use_tanh:
-                self.M = tf.tanh(self.M)
-            self.generated_x_t1 = self.x_c1_wrapper.get_x_t0 + self.M
+                self.generated_x_t1 = tf.tanh(self.generated_x_t1)
+            self.M = self.generated_x_t1 - self.x_c1_wrapper.get_x_t0()
         # the generator generates y = x + M(x) directly
         else:
             self.generated_x_t1 = self.get_generator_net()
@@ -552,7 +553,7 @@ class vagan:
         if not self.exp_config.use_tanh:
             self.l1_map_reg = tf.reduce_mean(tf.abs(self.M))  # Set the term no matter what for TB summaries
         else:
-            self.l1_map_reg = tf.reduce_mean(tf.abs(self.y_c0_ - self.x_c1))
+            self.l1_map_reg = tf.reduce_mean(tf.abs(self.M))
 
         if self.exp_config.l1_map_weight is not None:
             gen_loss += self.l1_map_reg*self.exp_config.l1_map_weight
