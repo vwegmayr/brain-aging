@@ -327,15 +327,18 @@ class FileStream(abc.ABC):
 
     def get_validation_ids(self):
         fids = [fid for g in self.validation_groups for fid in g.file_ids]
-        return set(fids)
+        fids = list(set(fids))
+        return sorted(fids)
 
     def get_train_ids(self):
         fids = [fid for g in self.train_groups for fid in g.file_ids]
-        return set(fids)
+        fids = list(set(fids))
+        return sorted(fids)
 
     def get_test_ids(self):
         fids = [fid for g in self.test_groups for fid in g.file_ids]
-        return set(fids)
+        fids = list(set(fids))
+        return sorted(fids)
 
     def sanity_checks(self):
         """
@@ -347,8 +350,8 @@ class FileStream(abc.ABC):
             assert group.is_train in [True, False]
 
         # Disjoint patients
-        train_ids = self.get_set_file_ids(True)
-        test_ids = self.get_set_file_ids(False)
+        train_ids = set(self.get_train_ids())
+        test_ids = set(self.get_test_ids())
 
         if len(train_ids) == 0:
             ratio = 0
@@ -364,9 +367,9 @@ class FileStream(abc.ABC):
         assert len(train_patients.intersection(test_patients)) == 0
 
     def train_validation_test_checks(self):
-        train_ids = self.get_train_ids()
-        test_ids = self.get_test_ids()
-        validation_ids = self.get_validation_ids()
+        train_ids = set(self.get_train_ids())
+        test_ids = set(self.get_test_ids())
+        validation_ids = set(self.get_validation_ids())
 
         assert len(train_ids.intersection(test_ids)) == 0
         assert len(train_ids.intersection(validation_ids)) == 0
