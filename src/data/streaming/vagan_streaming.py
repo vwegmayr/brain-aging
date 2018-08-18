@@ -129,7 +129,7 @@ class FlexibleBatchProvider(object):
 
 
 class SameDeltaBatchProvider(object):
-    def __init__(self, streamer, samples, label_key, prefetch=100):
+    def __init__(self, streamer, samples, label_key, prefetch=100, seed=11):
         self.samples = samples
 
         assert len(samples) > 0
@@ -137,7 +137,7 @@ class SameDeltaBatchProvider(object):
         self.label_key = label_key
         self.prefetch = prefetch
         self.loaded = []
-        self.np_random = np.random.RandomState(seed=11)
+        self.seed = seed
 
         self.match_delta_to_samples()
 
@@ -148,7 +148,8 @@ class SameDeltaBatchProvider(object):
                 streamer=streamer,
                 samples=self.delta_to_samples[delta],
                 label_key=label_key,
-                prefetch=prefetch
+                prefetch=prefetch,
+                seed=seed
             )
 
     def match_delta_to_samples(self):
@@ -685,6 +686,8 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
 
         self.provider = pydoc.locate(config["batch_provider"])
         self.image_type = MRIImagePairWithDelta
+
+        self.shuffle_real_fake = config["shuffle_real_fake"]
 
         super(AgeFixedDeltaStream, self).__init__(
             stream_config=stream_config
