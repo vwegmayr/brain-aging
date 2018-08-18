@@ -8,6 +8,30 @@ import yaml
 def four_disks(effect_size=50., image_size=100, moving_effect=True,
                big_rad=15, small_rad=9, big=[True, True, True, True],
                center_fixed=True):
+    """
+    Generates an image with background noise containing 4 disks
+    of two differend radii. Arrangment of disks:
+    -------------
+    |  0  |  1  |
+    -------------
+    |  2  |  3  |
+    -------------
+
+    Args:
+        - effect_size: influences the intensity of the generated
+          disks
+        - image_size: width and height of the output image
+        - big_rad: radius in pixels of the large disk
+        - small_rad: radius in pixels of the small disk
+        - big: list of booleans indicating if the i-th disk
+          should be large or small
+        - center_fixed: if True the 4 centers correspond to the
+          corners of a rectangle
+
+    Returns:
+        - img: image with 4 disks without noise
+        - img_with_noise: the above image plus noise
+    """
     stdbckg = 50.  # std deviation of the background
     stdkernel = 2.5  # std deviation of the Gaussian smoothing kernel
     img = np.zeros([image_size, image_size])
@@ -55,8 +79,27 @@ def four_disks(effect_size=50., image_size=100, moving_effect=True,
     return img, img_with_noise
 
 
-def tzero_not_fixed_delta_fixed(np_random, image_size, effect_size=100, delta=5,
-                                big_rads=[10, 12, 15, 17, 20], center_fixed=True):
+def tzero_not_fixed_delta_fixed(
+        np_random, image_size, effect_size=100, delta=5,
+        big_rads=[10, 12, 15, 17, 20], center_fixed=True):
+    """
+    Args:
+        - np_random: numpy RandomState
+        - image_size: width and height of output image
+        - effect_size: influences the intensity of the generated
+          disks
+        - delta: radius difference (in pixels) between the large
+          and the small disks
+        - big_rads: list of radii from which the large radius is
+          sampled
+        - center_fixed: if True the 4 centers correspond to the
+          corners of a rectangle
+
+    Returns:
+        - img_t0: image containing 4 disks with large radius (no noise)
+        - img_t1: image containing 4 disks with small radius (no noise)
+        - smnoise: image containig only noise
+    """
     n = len(big_rads)
     idx = np_random.randint(0, n)
     big_rad = big_rads[idx]
@@ -91,9 +134,15 @@ def tzero_not_fixed_delta_fixed(np_random, image_size, effect_size=100, delta=5,
     return img_t0, img_t1, smnoise
 
 
-def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
-                                    deltas=[0, 3, 6, 8], big_rads=[10, 12, 15, 17, 20],
-                                    center_fixed=True):
+def tzero_not_fixed_delta_not_fixed(
+        np_random, image_size, effect_size=100,
+        deltas=[0, 3, 6, 8], big_rads=[10, 12, 15, 17, 20],
+        center_fixed=True):
+    """
+    Radius difference between large and small disks is sampled as
+    well as the large radius. The radius difference is the same
+    for the four disks.
+    """
     n = len(big_rads)
     idx = np.random.randint(0, n)
     big_rad = big_rads[idx]
@@ -133,6 +182,10 @@ def tzero_not_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
 
 def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
                                 deltas=[5, 10], big_rad=15, center_fixed=True):
+    """
+    The large radius is fixed, only the radius difference
+    between the large and the small disks is sampled.
+    """
     stdbckg = 50.  # std deviation of the background
     stdkernel = 2.5  # std deviation of the Gaussian smoothing kernel
     noise = np_random.normal(
@@ -164,6 +217,14 @@ def tzero_fixed_delta_not_fixed(np_random, image_size, effect_size=100,
     )
 
     return img_t0, img_t1, smnoise, delta
+
+
+"""
+The samplers below generate images of different sorts
+and save them in hdf5 format. In this format, one dataset
+contains the images, one the images without noise and one
+the labels.
+"""
 
 
 class Sampler(object):
@@ -234,14 +295,18 @@ class TZeroNotFixedSampler(object):
 
         for i in range(n_cn):
             labels.append(0)
-            gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(
+                **self.sample_params
+            )
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
             images.append(np.stack((gt_t0 + noise, delta_im), axis=-1))
 
         for i in range(n_ad):
             labels.append(1)
-            gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise = tzero_not_fixed_delta_fixed(
+                **self.sample_params
+            )
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
             images.append(np.stack((gt_t0 + noise, delta_im), axis=-1))
@@ -280,21 +345,29 @@ class TZeroNotFixedDeltaNotFixedSampler(object):
 
         for i in range(n_cn):
             labels.append(0)
-            gt_t0, gt_t1, noise, delta = tzero_not_fixed_delta_not_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise, delta = tzero_not_fixed_delta_not_fixed(
+                **self.sample_params
+            )
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
-            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
+            images.append(
+                np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1)
+            )
 
         for i in range(n_ad):
             labels.append(1)
-            gt_t0, gt_t1, noise, delta = tzero_not_fixed_delta_not_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise, delta = tzero_not_fixed_delta_not_fixed(
+                **self.sample_params
+            )
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
-            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
+            images.append(
+                np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1)
+            )
 
         images = np.array(images)
         labels = np.array(labels)
@@ -334,21 +407,29 @@ class TZeroFixedDeltaNotFixedSampler(object):
 
         for i in range(n_cn):
             labels.append(0)
-            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(
+                **self.sample_params
+            )
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
-            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
+            images.append(
+                np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1)
+            )
 
         for i in range(n_ad):
             labels.append(1)
-            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(**self.sample_params)
+            gt_t0, gt_t1, noise, delta = tzero_fixed_delta_not_fixed(
+                **self.sample_params
+            )
             shape = gt_t0.shape
             delta_img = delta * np.ones(shape)
             delta_im = gt_t1 - gt_t0
             gts.append(gt_t0)
-            images.append(np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1))
+            images.append(
+                np.stack((gt_t0 + noise, delta_img, delta_im), axis=-1)
+            )
 
         images = np.array(images)
         labels = np.array(labels)
