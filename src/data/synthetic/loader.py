@@ -1,3 +1,7 @@
+"""
+Load previously generated synthetic data and
+stream it in batches
+"""
 import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -17,8 +21,23 @@ def prepare_x_t0_delta_x_t0(images):
 
 
 class BatchProvider(object):
+    """
+    Generator providing batches of images
+    and labels.
+    """
     def __init__(self, images, ids, labels, image_shape,
                  add_delta_noise=0):
+        """
+        Args:
+            - images: an iterable of all images
+            - ids: an iterable of indices, only images
+              corresponding to these indices are used
+            - labels: iterable of the images' labels
+            - image_shape: expected output images shape
+            - add_delta_noise: if different from 0, some
+              noise is add to delta representing the time
+              interval of the t0 and t1 image in a sample
+        """
         self.images = images
         self.labels = labels
         self.ids = ids
@@ -73,6 +92,12 @@ class BatchProvider(object):
 class SameDeltaBatchProvider(object):
     def __init__(self, images, ids, labels, image_shape,
                  add_delta_noise=0):
+        """
+        Same as BatchProvider, but makes sure that all
+        samples with the same batch have the same delta.
+        Batches of different deltas are streamed in round
+        robin fashion.
+        """
         self.images = images
         self.labels = labels
         self.ids = ids
@@ -119,11 +144,15 @@ class SameDeltaBatchProvider(object):
 
 class CN_AD_Loader(object):
     def __init__(self, stream_config):
+        # Input file
         self.f = h5py.File(stream_config["data_path"], 'r')
+        # Rescale image intensities to [-1, 1] interval
         self.rescale_to_one = stream_config["rescale_to_one"]
+        # Image shape expected by the model
         self.image_shape = stream_config["image_shape"]
         self.config = stream_config
 
+        # Can be use to build tf datasets
         if "prepare_images" in self.config:
             self.config["prepare_images"] = pydoc.locate(
                 self.config["prepare_images"]
@@ -132,12 +161,15 @@ class CN_AD_Loader(object):
         self.set_up_batches()
 
     def dump_split(self, path):
+        # Compatibility with MRI streamers.
         pass
 
     def dump_normalization(self, path):
+        # Compatibility with MRI streamers.
         pass
 
     def dump_train_val_test_split(self, path):
+        # Compatibility with MRI streamers.
         pass
 
     def add_delta_noise(self):
@@ -159,7 +191,7 @@ class CN_AD_Loader(object):
         def normalize_to_range(a, b, mini, maxi, x):
             return a + (x - mini) / (maxi - mini) * (b - a)
 
-        # normalize delta to [0, 1] scale
+        # normalize delta to [10, 100] scale
         if "normalize_delta" in self.config:
             channel = self.config["normalize_delta"]
             mini = np.inf
@@ -177,6 +209,7 @@ class CN_AD_Loader(object):
                 return normalize_to_range(10, 100, mini, maxi, x)
             self.normalize_delta = normalize_delta
 
+        # rescale image intensities to [-1, 1]
         if self.rescale_to_one:
             for i in range(len(images)):
                 # only map the first channel
@@ -196,6 +229,7 @@ class CN_AD_Loader(object):
                 sample[:, :, t0_idx] = x_t0
                 sample[:, :, delta_t0_idx] = delta_x_t0
 
+        # divide every delta by a constant
         if self.divide_delta() > 1:
             d = self.divide_delta()
             delta_idx = self.config["delta_idx"]
@@ -203,7 +237,7 @@ class CN_AD_Loader(object):
                 images[i, :, :, delta_idx] /= d
 
         # Make train-validation-test split
-        images_train_and_val, images_test, labels_train_and_val, labels_test = \
+        images_train_and_val, images_test, labels_train_and_val, labels_test =\
             train_test_split(
                 images,
                 labels,
@@ -285,6 +319,7 @@ class CN_AD_Loader(object):
 
         self.random_state = 0
 
+        # only used for non-GAN settings
         def gen_input_fn(images):
             x_0, x_1 = self.config["prepare_images"](images)
             self.random_state += 1
@@ -310,6 +345,7 @@ class CN_AD_Loader(object):
             self.test_fn = gen_input_fn(images_test)
 
     def get_input_fn(self, mode):
+        # only used for non-GAN settings
         if mode == "train":
             return self.train_fn
         elif mode == "validation":
