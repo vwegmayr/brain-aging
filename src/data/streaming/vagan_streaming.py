@@ -10,14 +10,14 @@ from src.data.streaming.base import Group
 
 
 class BatchProvider(object):
-    def __init__(self, streamer, file_ids, label_key, prefetch=1000):
+    def __init__(self, streamer, file_ids, label_key, prefetch=1000, seed=11):
         self.file_ids = file_ids
         assert len(file_ids) > 0
         self.streamer = streamer
         self.label_key = label_key
         self.prefetch = prefetch
         self.loaded = []
-        self.np_random = np.random.RandomState(seed=11)
+        self.np_random = np.random.RandomState(seed=seed)
         self.fid_gen = self.next_fid()
         self.img_gen = self.next_image()
 
@@ -66,7 +66,7 @@ class BatchProvider(object):
 
 
 class FlexibleBatchProvider(object):
-    def __init__(self, streamer, samples, label_key, prefetch=100):
+    def __init__(self, streamer, samples, label_key, prefetch=100, seed=11):
         self.samples = samples
         self.indices = list(range(len(samples)))
         assert len(samples) > 0
@@ -74,7 +74,7 @@ class FlexibleBatchProvider(object):
         self.label_key = label_key
         self.prefetch = prefetch
         self.loaded = []
-        self.np_random = np.random.RandomState(seed=11)
+        self.np_random = np.random.RandomState(seed=seed)
         self.idx_gen = self.next_idx()
         self.img_gen = self.next_image()
 
@@ -375,6 +375,8 @@ class AgeFixedDeltaStream(MRISingleStream):
         # Rescaling
         self.rescale_to_one = config["rescale_to_one"]
 
+        self.shuffle_real_fake = config["shuffle_real_fake"]
+
         self.provider = FlexibleBatchProvider
         self.image_type = MRIImagePair
         super(AgeFixedDeltaStream, self).__init__(
@@ -503,17 +505,26 @@ class AgeFixedDeltaStream(MRISingleStream):
         self.n_train_samples = len(train_pairs)
         self.check_pairs(train_pairs)
 
+        if self.shuffle_real_fake:
+            real_seed = 11
+            fake_seed = 43
+        else:
+            real_seed = 11
+            fake_seed = 11
+
         self.trainAD = self.provider(
             streamer=self,
             samples=train_pairs,
             label_key=None,
-            prefetch=self.prefetch
+            prefetch=self.prefetch,
+            seed=fake_seed
         )
         self.trainCN = self.provider(
             streamer=self,
             samples=train_pairs,
             label_key=None,
-            prefetch=self.prefetch
+            prefetch=self.prefetch,
+            seed=real_seed
         )
         self.train_pairs = train_pairs
 
