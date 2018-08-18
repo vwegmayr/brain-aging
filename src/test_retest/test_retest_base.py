@@ -382,7 +382,7 @@ class EvaluateEpochsBaseTF(BaseTF):
         for i in range(n_epochs):
             self.current_epoch = i
             # train
-            self.estimator.train(
+            train_res = self.estimator.train(
                 input_fn=self.gen_input_fn(X, y, "train", self.input_fn_config)
             )
 
@@ -415,7 +415,7 @@ class EvaluateEpochsBaseTF(BaseTF):
                     name="validation"
                 )
                 print(validation)
-                self.metric_logger.add_evaluations("validation", evaluation)
+                self.metric_logger.add_evaluations("validation", validation)
 
             # persist evaluations to json file
             self.metric_logger.dump()

@@ -14,6 +14,14 @@ LOCAL_PATH = "brain_data/ADNI_AIBL/ADNI_AIBL_T1_smoothed/all_images/"
 if not os.path.exists(LOCAL_PATH):
     os.makedirs(LOCAL_PATH)
 
+# Read some preselected image labels
+pre_labels = set([])
+with open("labels_delta_1.csv", 'r') as f:
+    for line in f:
+        labels = line.strip().split(',')
+        for lab in labels:
+            pre_labels.add(lab)
+
 
 def main():
     pwd = sys.argv[1]
@@ -21,10 +29,11 @@ def main():
         reader = csv.DictReader(csvfile)
         c = 0
         for row in reader:
-            c += 1
-            if c < FILE_B:
+            if row["image_label"] not in pre_labels:
                 continue
-            if c > FILE_E:
+
+            c += 1
+            if c > 200:
                 break
 
             file_path = row["image_label"] + "_mni_aligned.nii.gz"

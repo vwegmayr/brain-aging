@@ -136,14 +136,15 @@ class PairClassification(EvaluateEpochsBaseTF):
             namespace="train"
         )
         train_hooks.append(log_hook_train)
-
+        """
         log_hook_test = SumatraLoggingHook(
-            ops=[acc] + all_losses,
+            ops=all_losses,
             names=["acc"] + loss_names,
             logger=self.metric_logger,
             namespace="test"
         )
         eval_hooks.append(log_hook_test)
+        """
 
         if self.current_epoch == self.n_epochs - 1:
             eval_hooks.append(hf.get_file_summarizer_hook(
@@ -161,16 +162,25 @@ class PairClassification(EvaluateEpochsBaseTF):
                     not_reg=not_reg
                 ))
 
+        eval_metric_ops = {
+            "acc": tf.metrics.mean(acc)
+        }
+        for op, l_name in zip(all_losses, loss_names):
+            eval_metric_ops[l_name] = tf.metrics.mean(op)
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             return tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                training_hooks=train_hooks
+                training_hooks=train_hooks,
+                eval_metric_ops=eval_metric_ops,
             )
+
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
+            eval_metric_ops=eval_metric_ops,
             loss=loss,
             evaluation_hooks=eval_hooks
         )

@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from tabulate import tabulate
+from db_utils.models import RecordGroup
 
 
 from db_utils.db_connection import SumatraDB
@@ -11,7 +12,7 @@ import db_utils.compare_config as config
 TABLE_NAME = config.TABLE_NAME
 DB_PATH = config.DB_PATH
 COLUMNS = config.COLUMNS
-#METRICS = config.METRICS
+METRIC = config.METRIC
 DATA_PATH = config.DATA_PATH
 PLOT_TAG_LABEL = config.PLOT_TAG_LABEL
 RECORD_LABEL = config.RECORD_LABEL
@@ -84,77 +85,31 @@ def group_records(records):
 
 
 def plot_groups(groups):
-    # generate color for each group
-    # color = iter(plt.cm.jet(np.linspace(0, 1, len(groups))))
-    color = iter(plt.cm.tab10(np.linspace(0, 1, 11)))
-    plt.figure(figsize=(6, 4))
-
+    labels = []
     for group in groups:
-        for r in group:
-            # Load metrics for records
-            r.load_metrics(DATA_PATH)
-
-    handles = []
-    for group in groups:
-        print("group of size {}".format(len(group)))
-        print(",".join([g.label for g in group]))
         r = group[0]
+        label = ",".join([r.find_tag(x) for x in PLOT_TAG_LABEL])
+        labels.append(label)
 
-        # Extract group label
-        legend_label = ",".join([r.find_tag(x) for x in PLOT_TAG_LABEL])
+    groups = [RecordGroup(g, l, DATA_PATH) for g, l in zip(groups, labels)]
 
-        # Check if metrics were measured for this group
-        measured = True
-        for m in AGG_METRICS:
-            if m not in r.metrics:
-                measured = False
-            else:
-                # Only ticks for x values
-                x = r.metrics[m]["x"]
-                L = len(x)
+    for g in groups:
+        g.plot_group(
+            metric=METRIC,
+            x_label=X_LABEL,
+            y_label=Y_LABEL,
+            legend_loc=LEGEND_LOC
+        )
 
-        if not measured:
-            continue
+    RecordGroup.compare_groups(
+        groups=groups,
+        metric=METRIC,
+        x_label=X_LABEL,
+        y_label=Y_LABEL
+    )
 
-        plt.xticks(x)
-
-        # aggregate metrics (average aggregation)
-        for r in group:
-            r.metrics["agg_metric"] = {}
-            r.metrics["agg_metric"]["y"] = np.zeros(L)
-            for m in AGG_METRICS:
-                vals = np.array(r.metrics[m]["y"])
-                r.metrics["agg_metric"]["y"] += vals / len(AGG_METRICS)
-
-        # average y values
-        ys = []
-        for r in group:
-            ys.append(r.metrics["agg_metric"]["y"])
-
-        ys = np.array(ys)
-        cp = np.copy(ys)
-        cp = np.max(cp, axis=1)  # max for each run
-        cp = np.reshape(cp, (-1, 1))
-        print("max comparison, mean = {}, std = {}".format(np.mean(cp), np.std(cp)))
-        std = np.std(ys, axis=0)
-        mean = np.mean(ys, axis=0)
-        print(mean)
-        print(std)
-        print(tabulate(np.vstack((mean, std)), tablefmt="latex", floatfmt=".4f"))
-
-        c = next(color)
-        line = plt.plot(x, mean, c=c, marker='o', linewidth=2,
-                        label=legend_label)
-        plt.plot(x, mean - std, c=c, linestyle="--", linewidth=0.5)
-        plt.plot(x, mean + std, c=c, linestyle="--", linewidth=0.5)
-        handles.append(line)
-
-    plt.xlabel(X_LABEL)
-    plt.ylabel(Y_LABEL)
-
-    plt.legend(loc=LEGEND_LOC, ncol=1)
-    plt.grid(True)
-    plt.show()
+    for g in groups:
+        g.print_run_accuracies()
 
 
 def main():
