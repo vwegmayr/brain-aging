@@ -261,6 +261,12 @@ class MRISample(object):
 
 class MRIImagePair(MRISample):
     def __init__(self, streamer, fid1, fid2):
+        """
+        Args:
+            - streamer: MRI streamer
+            - fid1: file ID of MRI image
+            - fid2: file ID of MRI image
+        """
         super(MRIImagePair, self).__init__(
             streamer=streamer
         )
@@ -375,7 +381,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         self.use_converting = config["use_converting"]
         # Rescaling
         self.rescale_to_one = config["rescale_to_one"]
-
+        # Different patient order for real and fake samples
         self.shuffle_real_fake = config["shuffle_real_fake"]
 
         self.provider = FlexibleBatchProvider
@@ -684,21 +690,32 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
         # Rescaling
         self.rescale_to_one = config["rescale_to_one"]
 
+        # Batch provider class
         self.provider = pydoc.locate(config["batch_provider"])
         self.image_type = MRIImagePairWithDelta
 
+        # Different patient order for real and fake samples
         self.shuffle_real_fake = config["shuffle_real_fake"]
 
         super(AgeFixedDeltaStream, self).__init__(
             stream_config=stream_config
         )
 
+        # How many images are loaded into memory. If equal
+        # to -1, all images are loaded.
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
         if not self.silent:
             self.print_some_stats()
 
     def get_delta_to_pairs(self, pairs):
+        """
+        Arg:
+            - pairs: a list of image pairs
+        Return:
+            - dictionary mapping deltas to
+              image pairs
+        """
         delta_to_pairs = OrderedDict()
         for pair in pairs:
             delta = pair.get_approx_delta()
@@ -710,6 +727,12 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
         return delta_to_pairs
 
     def _rebalance(self, train_ids, test_ids):
+        """
+        Poor attempt to rebalance samples across
+        train-val-test split with respect to deltas.
+        Pretty slow, does not work really well.
+        Don't use it.
+        """
         self.np_random.shuffle(train_ids)
         self.np_random.shuffle(test_ids)
         train_pairs = self.build_pairs(train_ids)
