@@ -134,7 +134,7 @@ def unet_16_2D_allow_reuse(x, training, scope_name='generator', scope_reuse=True
     return conv8_2
 
 
-def unet_16_2D_bn_iterated(x, training, scope_name='generator', max_iterations=3):
+def unet_16_2D_bn_iterated(x, training, exp_config, scope_name='generator', max_iterations=3):
     """
     Second channel should contain the number of iterations.
     """
@@ -154,65 +154,63 @@ def unet_16_2D_bn_iterated(x, training, scope_name='generator', max_iterations=3
         scope_reuse=False
     )
 
-    def iterate(inp, n_steps):
+    def iterate_gen_x1(inp, n_steps):
         out = inp
+        its = []
         for i in range(n_steps):
+            if exp_config.use_tanh and i > 0:
+                out = tf.tanh(out)
             out = unet_16_2D_bn_allow_reuse(
                 out,
                 training,
                 scope_name=scope_name,
             )
+            its.append(out)  # tanh has not been applied to output
 
-        return out
+        return its
 
-    iterations = [x]
-    for i in range(1, max_iterations + 1):
-        last = iterations[i - 1]
-        iterations.append(iterate(last, 1))
+    def iterate_diff_x0(inp, n_steps):
+        out = inp
+        inputs = []
+        its = []
+        for i in range(n_steps):
+            if i > 0:
+                out = inputs[-1] + out
+
+            if exp_config.use_tanh and i > 0:
+                out = tf.tanh(out)
+
+            inputs.append(out)
+            out = unet_16_2D_bn_allow_reuse(
+                out,
+                training,
+                scope_name=scope_name,
+            )
+            its.append(out)  # tanh has not been applied to output
+
+        return its
+
+    if exp_config.generate_diff_map:
+        iterations = iterate_diff_x0(x, max_iterations)
+    else:
+        iterations = iterate_gen_x1(x, max_iterations)
 
     conditions = [None for i in range(max_iterations)]
     conditions[max_iterations - 1] = tf.cond(
         tf.equal(delta, max_iterations - 1),
-        lambda: iterations[max_iterations - 1],
-        lambda: iterations[max_iterations]
+        lambda: iterations[max_iterations - 2],
+        lambda: iterations[max_iterations - 1]
     )
 
     for i in range(max_iterations - 2, 0, -1):
         cond = tf.cond(
             tf.equal(delta, i),
-            lambda: iterations[i],
+            lambda: iterations[i - 1],
             lambda: conditions[i + 1]
         )
         conditions[i] = cond
 
     res = conditions[1]
-    """
-    cond4 = tf.cond(
-        tf.equal(delta, 4),
-        lambda: iterations[4],
-        lambda: iterations[5]
-    )
-
-    cond3 = tf.cond(
-        tf.equal(delta, 3),
-        lambda: iterations[3],
-        lambda: cond4
-    )
-
-    cond2 = tf.cond(
-        tf.equal(delta, 2),
-        lambda: iterations[2],
-        lambda: cond3
-    )
-
-    res = tf.cond(
-        tf.equal(delta, 1),
-        lambda: iterations[1],
-        lambda: cond2,
-        strict=True,
-        name="output_cond"
-    )
-    """
 
     return res
 

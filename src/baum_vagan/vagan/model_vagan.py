@@ -443,6 +443,7 @@ class vagan:
             return self.generator_net(
                 x=self.gen_x,
                 training=self.training_pl_gen,
+                exp_config=self.exp_config,
                 **self.exp_config.generator_kwargs
             )
         else:
