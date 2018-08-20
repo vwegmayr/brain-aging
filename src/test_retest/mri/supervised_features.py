@@ -8,7 +8,6 @@ from .model_components import MultiLayerPairEncoder, \
 from src.train_hooks import SumatraLoggingHook, HookFactory
 from src.baum_vagan.vagan.network_zoo.nets3D.critics import C3D_fcn_16
 
-
 class PairClassification(EvaluateEpochsBaseTF):
     @abc.abstractmethod
     def get_encodings(self, features, params, mode):
@@ -246,3 +245,74 @@ class UnetPairClassification(PairClassification):
         )
 
         return enc_0, enc_1
+
+
+class SliceClassification(EvaluateEpochsBaseTF):
+    def model_fn(self, features, labels, mode, params):
+        body_net = pydoc.locate(params["body_net"])
+        head_net = pydoc.locate(params["head_net"])
+
+        shape = [-1] + params["input_shape"] + [1]
+        x = tf.reshape(features["X_0"], shape)
+        key = params["target_label_key"]
+        y = tf.reshape(features[key + "_0"], [-1])
+
+        enc = body_net(
+            x=x,
+            training=tf.estimator.ModeKeys.TRAIN == mode,
+            scope_name="clf_body",
+            scope_reuse=False
+        )
+
+        probs, preds, loss, acc = head_net(
+            x=enc,
+            y=y,
+            n_classes=params["n_classes"]
+        )
+
+        # Make predictions
+        predictions = {
+            "encoding": enc,
+            "classes": preds
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                predictions=predictions
+            )
+
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=params["learning_rate"]
+        )
+        train_op = optimizer.minimize(loss, tf.train.get_global_step())
+
+        eval_metric_ops = {
+            "acc": tf.metrics.mean(acc)
+        }
+
+        train_hooks = []
+        log_hook_train = SumatraLoggingHook(
+            ops=[loss, acc],
+            names=["loss", "acc"],
+            logger=self.metric_logger,
+            namespace="train"
+        )
+        train_hooks.append(log_hook_train)
+
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            return tf.estimator.EstimatorSpec(
+                mode=mode,
+                loss=loss,
+                train_op=train_op,
+                training_hooks=train_hooks,
+            )
+
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            eval_metric_ops=eval_metric_ops,
+            loss=loss,
+        )
+
+    def gen_input_fn(self, X, y=None, mode="train", input_fn_config={}):
+        return self.streamer.get_input_fn(mode)

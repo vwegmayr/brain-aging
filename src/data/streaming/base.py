@@ -721,6 +721,7 @@ class FileStream(abc.ABC):
 
                 file_features = self.file_id_to_meta[fid]
                 image = self.load_sample(path).astype(np.float32)
+
                 ret += [image]
 
                 ret += [

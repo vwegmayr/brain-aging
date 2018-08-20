@@ -9,6 +9,7 @@ import copy
 
 from .base import FileStream
 from .base import Group
+from src.baum_vagan.utils import map_image_to_intensity_range
 
 
 def merge_list_of_lists_by_size(l1, l2):
@@ -65,6 +66,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
             **kwargs
         )
         # train-test split is performed by parent
+        self.rescale_to_one = self.config["rescale_to_one"]
         self.normalization_computed = False
         self.normalize_images = self.config["normalize_images"]
         if self.normalize_images:
@@ -120,7 +122,7 @@ class MRISingleStream(FileStream, MRIImageLoader):
         file_ids = sorted(list(file_ids))
         for fid in file_ids:
             p = self.get_file_path(fid)
-            im = self.load_image(p)
+            im = self.load_sample(p)
             if self.do_clip():
                 im = self.clip_image(im)
             std = np.std(im)
@@ -196,6 +198,10 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # im = resize(im, shape, anti_aliasing=False)
             im = self.np_random.rand(*shape)
 
+        if self.load_only_slice():
+            slice_axis, slice_idx = self.get_slice_info()
+            im = np.take(im, slice_idx, axis=slice_axis)
+
         return im
 
     def load_sample(self, file_path):
@@ -206,6 +212,13 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # im = resize(im, shape, anti_aliasing=False)
             im = np.random.rand(*shape)
             return im
+
+        if self.load_only_slice():
+            slice_axis, slice_idx = self.get_slice_info()
+            im = np.take(im, slice_idx, axis=slice_axis)
+
+        if self.rescale_to_one:
+            im = map_image_to_intensity_range(im, -1, 1, 5)
 
         return im
 
