@@ -599,7 +599,7 @@ class FileStream(abc.ABC):
         assert len(self.groups) > 0
         some_id = self.groups[0].file_ids[0]
         path = self.get_file_path(some_id)
-        sample = self.load_raw_sample(path)
+        sample = self.load_sample(path)
 
         self.sample_shape = sample.shape
         return sample.shape

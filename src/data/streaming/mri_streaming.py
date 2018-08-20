@@ -198,10 +198,6 @@ class MRISingleStream(FileStream, MRIImageLoader):
             # im = resize(im, shape, anti_aliasing=False)
             im = self.np_random.rand(*shape)
 
-        if self.load_only_slice():
-            slice_axis, slice_idx = self.get_slice_info()
-            im = np.take(im, slice_idx, axis=slice_axis)
-
         return im
 
     def load_sample(self, file_path):

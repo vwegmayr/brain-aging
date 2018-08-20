@@ -304,7 +304,7 @@ class MRIImagePair(MRISample):
 
     def load_image(self, fid):
         p = self.streamer.get_file_path(fid)
-        im = self.streamer.load_sample(p)
+        im = self.streamer.load_raw_sample(p)
         if self.streamer.normalize_images:
             im = self.streamer.normalize_image(im)
         if self.streamer.rescale_to_one:
