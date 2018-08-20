@@ -186,7 +186,10 @@ def unet_16_2D_bn_iterated(x, training, exp_config, scope_name='generator', max_
                 training,
                 scope_name=scope_name,
             )
-            its.append(out)  # tanh has not been applied to output
+            if i == 0:
+                its.append(out)  # tanh has not been applied to output
+            else:
+                its.append(out + its[-1])
 
         return its
 
