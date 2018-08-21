@@ -7,6 +7,7 @@ import os.path
 import tensorflow as tf
 import shutil
 from collections import OrderedDict
+import time
 
 from src.baum_vagan.grad_accum_optimizers import grad_accum_optimizer_gan
 from src.baum_vagan.tfwrapper import utils as tf_utils
@@ -238,6 +239,8 @@ class vagan:
             - fixed_batch_size: Optionally, a fixed batch size can be
               selected. If None, the batch_size will stay flexible.
         """
+        # generate unique ID to make variable scopes unique across runs
+        self.model_id = exp_config.model_id
 
         self.exp_config = exp_config
         self.data = data
@@ -369,10 +372,16 @@ class vagan:
                 self.y_c0_ = tf.tanh(self.y_c0_)
 
         self.D = self.critic_net(
-            self.critic_real_inp, self.training_pl_cri, scope_reuse=False
+            self.critic_real_inp,
+            self.training_pl_cri,
+            scope_reuse=False,
+            scope_name=self.get_critic_scope_name()
         )
         self.D_ = self.critic_net(
-            self.y_c0_, self.training_pl_cri, scope_reuse=True
+            self.y_c0_,
+            self.training_pl_cri,
+            scope_reuse=True,
+            scope_name=self.get_critic_scope_name()
         )
 
         # Generator and critic losses
@@ -397,9 +406,9 @@ class vagan:
         # Make optimizers
         train_vars = tf.trainable_variables()
         self.gen_vars = [v for v in train_vars 
-                         if v.name.startswith("generator")]
+                         if v.name.startswith(self.get_generator_scope_name())]
         self.cri_vars = [v for v in train_vars
-                         if v.name.startswith("critic")]
+                         if v.name.startswith(self.get_critic_scope_name())]
 
         self.gen_opt = grad_accum_optimizer_gan(
             loss=self.gen_loss,
@@ -426,7 +435,15 @@ class vagan:
         )
 
         # Create a saver for writing training checkpoints.
-        self.saver = tf.train.Saver(keep_checkpoint_every_n_hours=1)
+        saver_vars = [
+            v for v in tf.global_variables()
+            if v.name.startswith(self.get_generator_scope_name())
+            or v.name.startswith(self.get_critic_scope_name())
+        ]
+        self.saver = tf.train.Saver(
+            var_list=saver_vars,
+            keep_checkpoint_every_n_hours=1
+        )
         self.saver_best = tf.train.Saver(max_to_keep=2)
 
         # Settings to optimize GPU memory usage
@@ -438,18 +455,26 @@ class vagan:
         # Create a session for running Ops on the Graph.
         self.sess = tf.Session(config=config)
 
+    def get_generator_scope_name(self):
+        return self.model_id + "_" + "generator"
+
+    def get_critic_scope_name(self):
+        return self.model_id + "_" + "critic"
+
     def get_generator_net(self):
         if hasattr(self.exp_config, 'generator_kwargs'):
             return self.generator_net(
                 x=self.gen_x,
                 training=self.training_pl_gen,
                 exp_config=self.exp_config,
+                scope_name=self.get_generator_scope_name(),
                 **self.exp_config.generator_kwargs
             )
         else:
             return self.generator_net(
                 x=self.gen_x,
-                training=self.training_pl_gen
+                training=self.training_pl_gen,
+                scope_name=self.get_generator_scope_name(),
             )
 
     def critic_loss(self):
@@ -528,7 +553,12 @@ class vagan:
             epsilon = tf.random_uniform(epsilon_shape, 0.0, 1.0)
 
             x_hat = epsilon * self.x_c0 + (1 - epsilon) * self.y_c0_
-            d_hat = critic_net(x_hat, self.training_pl_cri, scope_reuse=True)
+            d_hat = critic_net(
+                x_hat,
+                self.training_pl_cri,
+                scope_reuse=True,
+                scope_name=self.get_critic_scope_name()
+            )
 
             grads = tf.gradients(d_hat, x_hat)[0]
             slopes = tf.sqrt(tf.reduce_sum(tf.square(grads), axis=1))
