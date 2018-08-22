@@ -399,7 +399,7 @@ class AgeFixedDeltaStream(MRISingleStream):
     def select_file_ids(self, file_ids):
         file_ids = sorted(file_ids)
         patient_groups = self.make_patient_groups(file_ids)
-        keep_fids = []
+        keep_fids = set()
         for g in patient_groups:
             # Analyze patient
             # Determine if patient can be used
@@ -448,14 +448,14 @@ class AgeFixedDeltaStream(MRISingleStream):
 
                     if diag_i in self.use_diagnoses and \
                             diag_j in self.use_diagnoses:
-                        keep_fids.append(i_fid)
-                        keep_fids.append(j_fid)
+                        keep_fids.add(i_fid)
+                        keep_fids.add(j_fid)
 
-        return keep_fids
+        return sorted(list(keep_fids))
 
     def build_pairs(self, fids):
         pairs = []
-        #fids = self.select_file_ids(fids)
+        fids = self.select_file_ids(fids)
         patient_groups = self.make_patient_groups(fids)
         for g in patient_groups:
             g_ids = g.file_ids
