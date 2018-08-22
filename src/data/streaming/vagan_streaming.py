@@ -455,7 +455,7 @@ class AgeFixedDeltaStream(MRISingleStream):
 
     def build_pairs(self, fids):
         pairs = []
-        fids = self.select_file_ids(fids)
+        #fids = self.select_file_ids(fids)
         patient_groups = self.make_patient_groups(fids)
         for g in patient_groups:
             g_ids = g.file_ids
