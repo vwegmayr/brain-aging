@@ -10,8 +10,6 @@ class MRIDatasetSplitter(MRISingleStream):
             stream_config=stream_config
         )
 
-        # Some splitter specific configuration
-
     def fit(self, X, y):
         return self
 
@@ -44,6 +42,7 @@ class MRIDatasetSplitter(MRISingleStream):
         pids = []
         labels = []
         pid_to_fids = {}
+        label_counts = {}
         for g in patient_groups:
             fids = g.file_ids
             patient_id = self.get_patient_id(fids[0])
@@ -52,12 +51,22 @@ class MRIDatasetSplitter(MRISingleStream):
             if label is not None:
                 pids.append(patient_id)
                 labels.append(label)
+                if label in label_counts:
+                    label_counts[label] += 1
+                else:
+                    label_counts[label] = 1
+
+        for k, v in label_counts.items():
+            print("{}: {}".format(k, v))
 
         # Make train-test split
+        assert len(pids) == len(labels)
+        train_size = self.get_train_ratio()
         train_val_pids, test_pids, train_val_labels, test_labels = train_test_split(
             pids,
             labels,
-            train_size=self.get_train_ratio(),
+            train_size=train_size,
+            test_size=1 - train_size,
             random_state=self.seed,
             shuffle=True,
             stratify=labels
@@ -65,9 +74,10 @@ class MRIDatasetSplitter(MRISingleStream):
 
         # Make train-val split
         train_pids, val_pids, train_labels, val_labels = train_test_split(
-            pids,
-            labels,
-            train_size=self.get_train_ratio(),
+            train_val_pids,
+            train_val_labels,
+            train_size=train_size,
+            test_size=1 - train_size,
             random_state=self.seed,
             shuffle=True,
             stratify=train_val_labels

@@ -143,7 +143,11 @@ class FileStream(abc.ABC):
             test_set = set(test_ids)
             assert (train_set | val_set | test_set) == set(self.all_file_ids)
         else:
+            print(">>>>>>> Loading split")
             train_ids, validation_ids, test_ids = self.load_split()
+            train_ids = self.select_file_ids(train_ids)
+            validation_ids = self.select_file_ids(validation_ids)
+            test_ids = self.select_file_ids(test_ids)
 
         # Build train and test tuples
         self.groups = self.group_data(train_ids, test_ids)
@@ -585,6 +589,7 @@ class FileStream(abc.ABC):
 
     def get_exact_age(self, file_id):
         record = self.file_id_to_meta[file_id]
+        #print(record)
         return record["age_exact"]
 
     def get_gender(self, file_id):
