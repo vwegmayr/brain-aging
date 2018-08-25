@@ -744,6 +744,25 @@ class vagan:
         )
         return logits
 
+    def iterated_far_prediction(self, img, n_steps):
+        images = []
+        masks = []
+        shape = img.shape
+        if shape[-1] != 1:
+            img = np.reshape(img, tuple(list(shape) + [1]))
+
+        delta_channel = img * 0 + 1.0
+        img = np.concatenate((img, delta_channel, img), axis=-1)
+        img = np.array([img])  # make a batch of size 1
+        for _ in range(n_steps):
+            M = self.predict_mask(img)
+            masks.append(np.squeeze(M))
+            img += M
+            img[:, :, :, 1] = delta_channel[:, :, 0]
+            images.append(np.squeeze(img[:, :, :, 0]))
+
+        return images, masks
+
     def predict_critic_input(self, input_image):
         res = self.sess.run(
             self.critic_real_inp,
