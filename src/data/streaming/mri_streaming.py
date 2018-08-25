@@ -209,12 +209,12 @@ class MRISingleStream(FileStream, MRIImageLoader):
             im = np.random.rand(*shape)
             return im
 
+        if self.rescale_to_one:
+            im = map_image_to_intensity_range(im, -1, 1, 5)
+
         if self.load_only_slice():
             slice_axis, slice_idx = self.get_slice_info()
             im = np.take(im, slice_idx, axis=slice_axis)
-
-        if self.rescale_to_one:
-            im = map_image_to_intensity_range(im, -1, 1, 5)
 
         return im
 
