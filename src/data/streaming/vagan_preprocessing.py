@@ -14,6 +14,7 @@ def load_wrapper(smt_label):
     model_dir = os.path.join("data", smt_label, "logdir")
     with open(config_path, 'r') as f:
         model_config = yaml.load(f)
+    model_config["stream_config"]["silent"] = True
     wrapper = VAGanWrapper(**model_config)
     wrapper.vagan.load_weights(model_dir)
 

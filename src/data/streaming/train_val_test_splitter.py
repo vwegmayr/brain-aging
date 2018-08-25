@@ -139,5 +139,6 @@ class ConversionSplitter(MRIDatasetSplitter):
             + self.get_diagnose(file_ids[-1])
 
         range_id = self.age_to_range(ages[0])
+        gender = self.get_gender(file_ids[0])
 
-        return str(range_id) + "/" + conv
+        return str(range_id) + "_" + str(gender) + "/" + conv
