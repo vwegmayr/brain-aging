@@ -1,5 +1,7 @@
 from sklearn.model_selection import train_test_split
 import os
+from collections import OrderedDict
+import yaml
 
 from .mri_streaming import MRISingleStream
 
@@ -12,6 +14,9 @@ class MRIDatasetSplitter(MRISingleStream):
 
     def fit(self, X, y):
         return self
+
+    def set_save_path(self, save_path):
+        self.save_path = save_path
 
     def get_artifical_label(self, patient_id, file_ids):
         pass
@@ -34,6 +39,24 @@ class MRIDatasetSplitter(MRISingleStream):
         dump("train.txt", train_ids)
         dump("validation.txt", val_ids)
         dump("test.txt", test_ids)
+
+    def dump_label_stats(self, outfolder, train_labels, val_labels, test_labels):
+        def dump(fname, labels):
+            stats = OrderedDict()
+
+            for lab in labels:
+                if lab not in stats:
+                    stats[lab] = 1
+                else:
+                    stats[lab] += 1
+
+            with open(os.path.join(outfolder, fname), 'w') as f:
+                for k, v in stats.items():
+                    f.write("{}: {}\n".format(k, v))
+
+        dump("train_label_stats.txt", train_labels)
+        dump("validation_label_stats.txt", val_labels)
+        dump("test_label_stats.txt", test_labels)
 
     def transform(self, X, y=None):
         # Signature is just for Compatibility purposes
@@ -89,11 +112,22 @@ class MRIDatasetSplitter(MRISingleStream):
 
         # Dump everything to files
         self.dump_train_val_test_split(
-            outfolder=self.get_output_folder(),
+            outfolder=self.save_path,
             train_ids=train_ids,
             val_ids=val_ids,
             test_ids=test_ids
         )
+
+        self.dump_label_stats(
+            outfolder=self.save_path,
+            train_labels=train_labels,
+            val_labels=val_labels,
+            test_labels=test_labels
+        )
+
+        # Dump config
+        with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
+            yaml.dump(self.config, f)
 
 
 class ConversionSplitter(MRIDatasetSplitter):
@@ -133,6 +167,54 @@ class ConversionSplitter(MRIDatasetSplitter):
 
         # Check number of conversions
         if n_changes > 1:
+            return None
+
+        conv = self.get_diagnose(file_ids[0]) + "/" \
+            + self.get_diagnose(file_ids[-1])
+
+        range_id = self.age_to_range(ages[0])
+        gender = self.get_gender(file_ids[0])
+
+        return str(range_id) + "_" + str(gender) + "/" + conv
+
+
+class ClassificationSplitter(MRIDatasetSplitter):
+    def get_min_max_age_gap(self):
+        return self.config["min_max_age_gap"]
+
+    def get_age_ranges(self):
+        return self.config["age_ranges"]
+
+    def age_to_range(self, age):
+        ranges = self.get_age_ranges()
+        for i, r in enumerate(ranges):
+            if r[0] <= age <= r[1]:
+                return i
+
+        raise ValueError("No range found for given age")
+
+    def get_artifical_label(self, patient_id, file_ids):
+        min_max_age_gap = self.get_min_max_age_gap()
+
+        # Sort file IDs by age
+        ages = [self.get_exact_age(fid) for fid in file_ids]
+        ages = sorted(ages)
+        assert all(ages[i] <= ages[i + 1] for i in range(len(ages) - 1))
+        max_age_gap = ages[-1] - ages[0]
+
+        if max_age_gap < min_max_age_gap:
+            return None
+
+        n_changes = 0
+        for i in range(1, len(file_ids)):
+            prev_d = self.get_diagnose(file_ids[i - 1])
+            cur_d = self.get_diagnose(file_ids[i])
+
+            if cur_d is not prev_d:
+                n_changes += 1
+
+        # Check number of conversions
+        if n_changes > 0:
             return None
 
         conv = self.get_diagnose(file_ids[0]) + "/" \
