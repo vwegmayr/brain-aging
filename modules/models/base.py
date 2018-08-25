@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import nibabel as nib
 import numpy as np
+from distutils.dir_util import copy_tree
 
 from sklearn.utils.validation import check_is_fitted
 import abc, six
@@ -129,7 +130,15 @@ class BaseTF(BaseEstimator, TransformerMixin):
 
     def set_save_path(self, save_path):
         self.save_path = save_path
-        if self._restore_path is None:
+        if "load_model" in self.config:
+            copy_tree(
+                self.config["load_model"],
+                save_path
+            )
+
+            del self.config["load_model"]
+
+        if self._restore_path is None and "model_dir":
             self.config["model_dir"] = save_path
 
     def export_estimator(self):

@@ -1314,3 +1314,18 @@ class AnyPairStream(MRISingleStream):
         test_groups = self.produce_groups(test_files, 2, train=False)
 
         return train_groups + test_groups
+
+
+class MRIConversionSingleStream(MRISingleStream):
+    def get_conv_key(self):
+        return self.config["conversion_key"]
+
+    def select_file_ids(self, file_ids):
+        conv_key = self.get_conv_key()
+
+        file_ids = [
+            f for f in file_ids if
+            self.get_meta_info_by_key(f, conv_key) in [0, 1]
+        ]
+
+        return file_ids

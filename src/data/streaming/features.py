@@ -54,6 +54,8 @@ STUDY_ID = adni_aibl.add('study_id', 'study', default=-1)
 STUDY_IMAGE_ID = adni_aibl.add('study_image_id', 'image', default=-1)
 STUDY_PATIENT_ID = adni_aibl.add('study_patient_id', 'patient', default=-1)
 
+CONV_MCI_AD_DELTA_2 = adni_aibl.add("mci_ad_conv_delta_2", default=-1)
+
 MRI_MANUFACTURER = adni_aibl.add(
     'mri_manufacturer', t=tf.string, default='', py_type=str,
     doc='Manufacturer name e.g. SIEMENS',
