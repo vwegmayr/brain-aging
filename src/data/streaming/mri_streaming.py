@@ -1328,4 +1328,12 @@ class MRIConversionSingleStream(MRISingleStream):
             self.get_meta_info_by_key(f, conv_key) in [0, 1]
         ]
 
-        return file_ids
+        # Only keep t0 image
+        patient_groups = self.make_patient_groups(file_ids)
+        to_keep = []
+        for g in patient_groups:
+            fids = g.file_ids
+            fids = sorted(fids, key=lambda x: self.get_exact_age(x))
+            to_keep.append(fids[0])
+
+        return to_keep
