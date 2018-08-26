@@ -2,6 +2,8 @@ from sklearn.model_selection import train_test_split
 import os
 from collections import OrderedDict
 import yaml
+from sklearn.model_selection import StratifiedKFold
+import numpy as np
 
 from .mri_streaming import MRISingleStream
 
@@ -58,7 +60,7 @@ class MRIDatasetSplitter(MRISingleStream):
         dump("validation_label_stats.txt", val_labels)
         dump("test_label_stats.txt", test_labels)
 
-    def transform(self, X, y=None):
+    def one_split(self):
         # Signature is just for Compatibility purposes
         patient_groups = self.make_patient_groups(self.all_file_ids)
 
@@ -128,6 +130,90 @@ class MRIDatasetSplitter(MRISingleStream):
         # Dump config
         with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
             yaml.dump(self.config, f)
+
+    def k_splits(self):
+        # Signature is just for Compatibility purposes
+        patient_groups = self.make_patient_groups(self.all_file_ids)
+
+        pids = []
+        labels = []
+        pid_to_fids = {}
+        label_counts = {}
+        for g in patient_groups:
+            fids = g.file_ids
+            patient_id = self.get_patient_id(fids[0])
+            pid_to_fids[patient_id] = fids
+            label = self.get_artifical_label(patient_id, fids)
+            if label is not None:
+                pids.append(patient_id)
+                labels.append(label)
+                if label in label_counts:
+                    label_counts[label] += 1
+                else:
+                    label_counts[label] = 1
+
+        for k, v in label_counts.items():
+            print("{}: {}".format(k, v))
+
+        k_fold = StratifiedKFold(
+            n_splits=self.config["n_folds"],
+            shuffle=True,
+            random_state=self.seed,
+        )
+
+        pids = np.array(pids)
+        labels = np.array(labels)
+
+        split_id = 0
+        for train_val_ind, test_ind in k_fold.split(pids, labels):
+            train_val_pids = pids[train_val_ind]
+            train_val_labels = labels[train_val_ind]
+            test_pids = pids[test_ind]
+            test_labels = labels[test_ind]
+
+            # Train-val split
+            train_pids, val_pids, train_labels, val_labels = train_test_split(
+                train_val_pids,
+                train_val_labels,
+                train_size=0.8,
+                test_size=0.2,
+                random_state=self.seed,
+                shuffle=True,
+                stratify=train_val_labels
+            )
+
+            train_ids = [fid for pid in train_pids for fid in pid_to_fids[pid]]
+            val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
+            test_ids = [fid for pid in test_pids for fid in pid_to_fids[pid]]
+
+            out_dir = os.path.join(self.save_path, "split_{}".format(split_id))
+            os.makedirs(out_dir)
+            # Dump everything to files
+            self.dump_train_val_test_split(
+                outfolder=out_dir,
+                train_ids=train_ids,
+                val_ids=val_ids,
+                test_ids=test_ids
+            )
+
+            self.dump_label_stats(
+                outfolder=out_dir,
+                train_labels=train_labels,
+                val_labels=val_labels,
+                test_labels=test_labels
+            )
+
+            # Dump config
+            with open(os.path.join(out_dir, "config.yaml"), 'w') as f:
+                yaml.dump(self.config, f)
+
+            split_id += 1
+
+    def transform(self, X, y=None):
+        if self.config["n_folds"] == 1:
+            self.one_split()
+        else:
+            self.k_splits()
 
 
 class ConversionSplitter(MRIDatasetSplitter):
