@@ -349,5 +349,4 @@ class MetaInfoSplitter(MRIDatasetSplitter):
 
         label = "_".join(label_values)
         label = str(range_id) + "_" + str(gender) + "_" + label
-        print(label)
         return label
