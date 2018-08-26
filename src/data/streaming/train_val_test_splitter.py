@@ -224,3 +224,44 @@ class ClassificationSplitter(MRIDatasetSplitter):
         gender = self.get_gender(file_ids[0])
 
         return str(range_id) + "_" + str(gender) + "/" + conv
+
+
+class MetaInfoSplitter(MRIDatasetSplitter):
+    # Split data based on certain allowed values for different
+    # properties
+    def get_property_values(self):
+        return self.config["property_values"]
+
+    def get_age_ranges(self):
+        return self.config["age_ranges"]
+
+    def age_to_range(self, age):
+        ranges = self.get_age_ranges()
+        for i, r in enumerate(ranges):
+            if r[0] <= age <= r[1]:
+                return i
+
+        raise ValueError("No range found for given age")
+
+    def get_artifical_label(self, patient_id, file_ids):
+        property_values = self.get_property_values()
+        keys = sorted(list(property_values.keys()))
+
+        label_values = []
+        for k in keys:
+            allowed = property_values[k]
+            actual = self.get_meta_info_by_key(file_ids[0], k)
+            if actual not in allowed:
+                return None
+
+            label_values.append(str(actual))
+
+        ages = [self.get_exact_age(fid) for fid in file_ids]
+        ages = sorted(ages)
+        range_id = self.age_to_range(ages[0])
+        gender = self.get_gender(file_ids[0])
+
+        label = "_".join(label_values)
+        label = str(range_id) + "_" + str(gender) + "_" + label
+        print(label)
+        return label
