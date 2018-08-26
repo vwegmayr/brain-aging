@@ -1325,7 +1325,8 @@ class MRIConversionSingleStream(MRISingleStream):
 
         file_ids = [
             f for f in file_ids if
-            self.get_meta_info_by_key(f, conv_key) in [0, 1]
+            self.get_meta_info_by_key(f, conv_key) in [0, 1] and
+            self.get_diagnose(f) in self.config["use_diagnoses"]
         ]
 
         # Only keep t0 image
@@ -1337,3 +1338,14 @@ class MRIConversionSingleStream(MRISingleStream):
             to_keep.append(fids[0])
 
         return to_keep
+
+
+class MRIClassifierSingleStream(MRISingleStream):
+    def select_file_ids(self, file_ids):
+        file_ids = [
+            f for f in file_ids if
+            self.get_meta_info_by_key(f, "n_conversions") == 0 and
+            self.get_diagnose(f) in self.config["use_diagnoses"]
+        ]
+
+        return file_ids
