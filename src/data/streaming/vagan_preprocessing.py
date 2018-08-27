@@ -169,3 +169,8 @@ class VaganFarPredictions(MRISingleStream):
         def _input_fn():
             return dataset.make_one_shot_iterator().get_next()
         return _input_fn
+
+
+class VaganConversionFarPredictions(VaganFarPredictions):
+    def select_file_ids(self, file_ids):
+        return self.select_conversion_file_ids(file_ids)

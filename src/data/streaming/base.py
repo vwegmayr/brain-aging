@@ -518,6 +518,28 @@ class FileStream(abc.ABC):
             print("Selected {} out of {}".format(len(selected), len(file_ids)))
         return selected
 
+    def get_conv_key(self):
+        return self.config["conversion_key"]
+
+    def select_conversion_file_ids(self, file_ids):
+        conv_key = self.get_conv_key()
+
+        file_ids = [
+            f for f in file_ids if
+            self.get_meta_info_by_key(f, conv_key) in [0, 1] and
+            self.get_diagnose(f) in self.config["use_diagnoses"]
+        ]
+
+        # Only keep t0 image
+        patient_groups = self.make_patient_groups(file_ids)
+        to_keep = []
+        for g in patient_groups:
+            fids = g.file_ids
+            fids = sorted(fids, key=lambda x: self.get_exact_age(x))
+            to_keep.append(fids[0])
+
+        return to_keep
+
     def rebalance_ids(self, train_ids, validation_ids, test_ids):
         return train_ids, validation_ids, test_ids
 
