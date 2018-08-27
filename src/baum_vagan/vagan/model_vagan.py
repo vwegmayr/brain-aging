@@ -744,7 +744,7 @@ class vagan:
         )
         return logits
 
-    def iterated_far_prediction(self, img, n_steps):
+    def iterated_far_prediction(self, img, n_steps, only_negative=False):
         images = []
         masks = []
         shape = img.shape
@@ -756,6 +756,8 @@ class vagan:
         img = np.array([img])  # make a batch of size 1
         for _ in range(n_steps):
             M = self.predict_mask(img)
+            if only_negative:
+                M[M >= 0] = 0
             masks.append(np.squeeze(M))
             img += M
             img[:, :, :, 1] = delta_channel[:, :, 0]
