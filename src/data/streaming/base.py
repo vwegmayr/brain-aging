@@ -387,6 +387,11 @@ class FileStream(abc.ABC):
         gender_1 = 0
         patient_set = set([])
         image_set = set([])
+
+        extra_counts = OrderedDict()
+        extra_stat_keys = self.get_stat_keys()
+        for k in extra_stat_keys:
+            extra_counts[k] = OrderedDict()
         for group in groups:
             image_set = image_set.union(group.file_ids)
             for fid in group.file_ids:
@@ -405,6 +410,15 @@ class FileStream(abc.ABC):
                 patient = self.get_patient_id(fid)
                 patient_set.add(patient)
 
+                # extra stats
+                for k in extra_stat_keys:
+                    v = self.get_meta_info_by_key(fid, k)
+                    dic = extra_counts[k]
+                    if v not in dic:
+                        dic[v] = 1
+                    else:
+                        dic[v] += 1
+
             if len(group.file_ids) == 1:
                 continue
 
@@ -413,6 +427,7 @@ class FileStream(abc.ABC):
                 age2 = self.get_age(fid)
                 diff = abs(age1 - age2)
                 age_diffs.append(diff)
+
 
         age_diffs = np.array(age_diffs)
         ages = np.array(ages)
@@ -472,10 +487,22 @@ class FileStream(abc.ABC):
             of.write("Gender 0: {} ({})\n".format(gender_0, gender_0 / s))
             of.write("Gender 1: {} ({})\n".format(gender_1, gender_1 / s))
 
+        for k in extra_stat_keys:
+            for key, val in extra_counts[k].items():
+                if of is not None:
+                    of.write("{}, val {}, count {}\n".format(k, key, val))
+                else:
+                    print("{}, val {}, count {}".format(k, key, val))
+
         if of is not None:
             of.close()
         else:
             print(">>>>>>>>>>>>>>>>")
+
+    def get_stat_keys(self):
+        if "stat_keys" not in self.config:
+            return []
+        return self.config["stat_keys"]
 
     def parse_meta_csv(self):
         """

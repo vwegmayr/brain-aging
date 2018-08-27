@@ -381,10 +381,11 @@ class MRISingleStream(FileStream, MRIImageLoader):
                     train_ids += g.file_ids
 
         # Print stats about folds
-        print("###### Folds info #######")
-        for i in range(k):
-            self.print_stats(folds[i])
-        print("#########################")
+        if not self.silent:
+            print("###### Folds info #######")
+            for i in range(k):
+                self.print_stats(folds[i])
+            print("#########################")
 
         # Check that folds are disjoint
         for i in range(k):

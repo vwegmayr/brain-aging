@@ -46,6 +46,8 @@ class VaganFarPredictions(MRISingleStream):
         return self.config["vagan_steps"]
 
     def negative_difference_maps(self):
+        if "negative_diff_maps" not in self.config:
+            return False
         return self.config["negative_diff_maps"]
 
     def preprocess_image(self, fid, im):
