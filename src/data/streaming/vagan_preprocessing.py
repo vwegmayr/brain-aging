@@ -45,6 +45,9 @@ class VaganFarPredictions(MRISingleStream):
     def get_vagan_steps(self):
         return self.config["vagan_steps"]
 
+    def negative_difference_maps(self):
+        return self.config["negative_diff_maps"]
+
     def preprocess_image(self, fid, im):
         if "target_age" in self.config:
             target_age = self.get_target_age()
@@ -54,7 +57,9 @@ class VaganFarPredictions(MRISingleStream):
                 return im
         else:
             n_steps = self.get_vagan_steps()
-        images, masks = self.wrapper.vagan.iterated_far_prediction(im, n_steps)
+        images, masks = self.wrapper.vagan.iterated_far_prediction(
+            im, n_steps, self.negative_difference_maps()
+        )
 
         return np.squeeze(images[-1])
 
