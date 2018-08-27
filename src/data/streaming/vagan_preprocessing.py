@@ -33,17 +33,26 @@ class VaganFarPredictions(MRISingleStream):
         self.wrapper = load_wrapper(smt_label)
         self.cached_computations = {}
 
+        if "target_age" in self.config and "vagan_steps" in self.config:
+            raise ValueError("Specify target_age or vagan_steps")
+
     def cache_preprocessing(self):
         return self.config["cache_preprocessing"]
 
     def get_target_age(self):
         return self.config["target_age"]
 
+    def get_vagan_steps(self):
+        return self.config["vagan_steps"]
+
     def preprocess_image(self, fid, im):
-        target_age = self.get_target_age()
-        cur_age = self.get_exact_age(fid)
-        n_steps = int(target_age - cur_age)
-        assert n_steps > 0
+        if "target_age" in self.config:
+            target_age = self.get_target_age()
+            cur_age = self.get_exact_age(fid)
+            n_steps = int(target_age - cur_age)
+            assert n_steps > 0
+        else:
+            n_steps = self.get_vagan_steps()
         images, masks = self.wrapper.vagan.iterated_far_prediction(im, n_steps)
 
         return np.squeeze(images[-1])
