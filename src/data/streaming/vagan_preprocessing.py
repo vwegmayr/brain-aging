@@ -50,7 +50,8 @@ class VaganFarPredictions(MRISingleStream):
             target_age = self.get_target_age()
             cur_age = self.get_exact_age(fid)
             n_steps = int(target_age - cur_age)
-            assert n_steps > 0
+            if n_steps < 1:
+                return im
         else:
             n_steps = self.get_vagan_steps()
         images, masks = self.wrapper.vagan.iterated_far_prediction(im, n_steps)
