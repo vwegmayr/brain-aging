@@ -288,7 +288,15 @@ class SliceClassification(EvaluateEpochsBaseTF):
         train_op = optimizer.minimize(loss, tf.train.get_global_step())
 
         eval_metric_ops = {
-            "acc": tf.metrics.mean(acc)
+            "acc": tf.metrics.mean(acc),
+            "recall": tf.metrics.recall(
+                labels=y,
+                predictions=preds
+            ),
+            "precision": tf.metrics.precision(
+                labels=y,
+                predictions=preds
+            )
         }
 
         train_hooks = []
