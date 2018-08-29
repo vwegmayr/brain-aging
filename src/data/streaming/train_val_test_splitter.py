@@ -60,6 +60,25 @@ class MRIDatasetSplitter(MRISingleStream):
         dump("validation_label_stats.txt", val_labels)
         dump("test_label_stats.txt", test_labels)
 
+    def sanity_checks(self, train_ids, val_ids, test_ids):
+        train_set = set(train_ids)
+        test_set = set(test_ids)
+        val_set = set(val_ids)
+
+        train_patients = set([self.get_patient_id(fid) for fid in train_set])
+        val_patients = set([self.get_patient_id(fid) for fid in val_set])
+        test_patients = set([self.get_patient_id(fid) for fid in test_set])
+
+        # IDs sets are disjoint
+        assert train_set.isdisjoint(val_set)
+        assert train_set.isdisjoint(test_set)
+        assert test_set.isdisjoint(val_set)
+
+        # patient sets are disjoint
+        assert train_patients.isdisjoint(test_patients)
+        assert train_patients.isdisjoint(val_patients)
+        assert test_patients.isdisjoint(val_patients)
+
     def one_split(self):
         # Signature is just for Compatibility purposes
         patient_groups = self.make_patient_groups(self.all_file_ids)
@@ -111,6 +130,8 @@ class MRIDatasetSplitter(MRISingleStream):
         train_ids = [fid for pid in train_pids for fid in pid_to_fids[pid]]
         val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
         test_ids = [fid for pid in test_pids for fid in pid_to_fids[pid]]
+
+        self.sanity_checks(train_ids, val_ids, test_ids)
 
         # Dump everything to files
         self.dump_train_val_test_split(
@@ -185,6 +206,8 @@ class MRIDatasetSplitter(MRISingleStream):
             train_ids = [fid for pid in train_pids for fid in pid_to_fids[pid]]
             val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
             test_ids = [fid for pid in test_pids for fid in pid_to_fids[pid]]
+
+            self.sanity_checks(train_ids, val_ids, test_ids)
 
             out_dir = os.path.join(self.save_path, "split_{}".format(split_id))
             os.makedirs(out_dir)
