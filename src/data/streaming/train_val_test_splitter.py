@@ -60,7 +60,7 @@ class MRIDatasetSplitter(MRISingleStream):
         dump("validation_label_stats.txt", val_labels)
         dump("test_label_stats.txt", test_labels)
 
-    def sanity_checks(self, train_ids, val_ids, test_ids):
+    def split_checks(self, train_ids, val_ids, test_ids):
         train_set = set(train_ids)
         test_set = set(test_ids)
         val_set = set(val_ids)
@@ -131,7 +131,7 @@ class MRIDatasetSplitter(MRISingleStream):
         val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
         test_ids = [fid for pid in test_pids for fid in pid_to_fids[pid]]
 
-        self.sanity_checks(train_ids, val_ids, test_ids)
+        self.split_checks(train_ids, val_ids, test_ids)
 
         # Dump everything to files
         self.dump_train_val_test_split(
@@ -207,7 +207,7 @@ class MRIDatasetSplitter(MRISingleStream):
             val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
             test_ids = [fid for pid in test_pids for fid in pid_to_fids[pid]]
 
-            self.sanity_checks(train_ids, val_ids, test_ids)
+            self.split_checks(train_ids, val_ids, test_ids)
 
             out_dir = os.path.join(self.save_path, "split_{}".format(split_id))
             os.makedirs(out_dir)
