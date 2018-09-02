@@ -61,7 +61,6 @@ class MRIDatasetSplitter(MRISingleStream):
         dump("test_label_stats.txt", test_labels)
 
     def one_split(self):
-        # Signature is just for Compatibility purposes
         patient_groups = self.make_patient_groups(self.all_file_ids)
 
         pids = []
@@ -132,7 +131,6 @@ class MRIDatasetSplitter(MRISingleStream):
             yaml.dump(self.config, f)
 
     def k_splits(self):
-        # Signature is just for Compatibility purposes
         patient_groups = self.make_patient_groups(self.all_file_ids)
 
         pids = []

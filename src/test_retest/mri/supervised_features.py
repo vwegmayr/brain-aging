@@ -6,7 +6,7 @@ from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
 from .model_components import MultiLayerPairEncoder, \
     PairClassificationHead, Conv3DEncoder
 from src.train_hooks import SumatraLoggingHook, HookFactory
-from src.baum_vagan.vagan.network_zoo.nets3D.critics import C3D_fcn_16
+
 
 class PairClassification(EvaluateEpochsBaseTF):
     @abc.abstractmethod
@@ -21,7 +21,6 @@ class PairClassification(EvaluateEpochsBaseTF):
             params=params,
             encodings=[enc_0, enc_1]
         )
-
 
         preds_0, preds_1 = clf.get_predictions()
 
@@ -175,7 +174,6 @@ class PairClassification(EvaluateEpochsBaseTF):
                 training_hooks=train_hooks,
                 eval_metric_ops=eval_metric_ops,
             )
-
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
