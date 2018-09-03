@@ -271,7 +271,8 @@ class SliceClassification(EvaluateEpochsBaseTF):
         # Make predictions
         predictions = {
             "encoding": enc,
-            "classes": preds
+            "classes": preds,
+            "image_label": features["image_label_0"],
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:

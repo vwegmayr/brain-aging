@@ -42,6 +42,9 @@ class VaganFarPredictions(MRISingleStream):
     def get_target_age(self):
         return self.config["target_age"]
 
+    def get_granularity(self):
+        return self.config["granularity"]
+
     def get_vagan_steps(self):
         return self.config["vagan_steps"]
 
@@ -52,9 +55,10 @@ class VaganFarPredictions(MRISingleStream):
 
     def preprocess_image(self, fid, im):
         if "target_age" in self.config:
+            gran = self.get_granularity()
             target_age = self.get_target_age()
             cur_age = self.get_exact_age(fid)
-            n_steps = int(target_age - cur_age)
+            n_steps = int((target_age - cur_age) / gran)
             if n_steps < 1:
                 return im
         else:

@@ -548,6 +548,9 @@ class FileStream(abc.ABC):
     def get_conv_key(self):
         return self.config["conversion_key"]
 
+    def get_conversion_delta(self):
+        return self.config["conversion_delta"]
+
     def select_conversion_file_ids(self, file_ids):
         conv_key = self.get_conv_key()
 
@@ -559,11 +562,25 @@ class FileStream(abc.ABC):
 
         # Only keep t0 image
         patient_groups = self.make_patient_groups(file_ids)
+        delta = self.get_conversion_delta()
         to_keep = []
+        self.t0_fids = []
+        self.t1_fids = []  # t1 = t0 + Delta
         for g in patient_groups:
             fids = g.file_ids
             fids = sorted(fids, key=lambda x: self.get_exact_age(x))
             to_keep.append(fids[0])
+            self.t0_fids.append(fids[0])
+            # get t1 image
+            t0 = self.get_exact_age(fids[0])
+            t1_fid = fids[-1]
+            for fid in fids[1:]:
+                t1 = self.get_exact_age(fid)
+                if t1 - t0 >= delta:
+                    t1_fid = fid
+                    break
+
+            self.t1_fids.append(t1_fid)
 
         return to_keep
 
@@ -752,6 +769,117 @@ class FileStream(abc.ABC):
     def get_input_fn(self, mode):
         batches = self.get_batches(mode)
         groups = [group for batch in batches for group in batch]
+        group_size = len(groups[0].file_ids)
+        files = [group.file_ids for group in groups]
+
+        # get feature names present in csv file (e.g. patient_label)
+        # and added during preprocessing (e.g. file_name)
+        feature_keys = self.file_id_to_meta[
+            self.all_file_paths[0]
+        ].keys()
+
+        port_features = [
+            k
+            for k in feature_keys
+            if (k != _features.MRI) and (k in self.feature_desc)
+        ]
+
+        def _read_files(file_ids, label):
+            file_ids = [fid.decode('utf-8') for fid in file_ids]
+            ret = []
+            for fid in file_ids:
+                path = self.get_file_path(fid)
+
+                file_features = self.file_id_to_meta[fid]
+                image = self.load_sample(path).astype(np.float32)
+
+                ret += [image]
+
+                ret += [
+                    file_features[pf]
+                    for pf in port_features
+                ]
+            # print("_read_files {}".format(ret[0] is None))
+            return ret  # return list of features
+
+        def _parser(*to_parse):
+            if self.sample_shape is None:
+                sample_shape = self.get_sample_shape()
+            else:
+                sample_shape = self.sample_shape
+            el_n_features = 1 + len(port_features)  # sample + csv features
+            all_features = OrderedDict()
+
+            # parse features for every sample in group
+            for i in range(group_size):
+                self.feature_desc[_features.MRI]["shape"] = sample_shape
+                mri_idx = i * el_n_features
+                _mri = to_parse[mri_idx]
+                ft = {
+                    _features.MRI: tf.reshape(_mri, sample_shape),
+                }
+
+                ft.update({
+                    port_features[i]: to_parse[mri_idx + i + 1]
+                    for i in range(0, el_n_features - 1)
+                })
+                ft.update({
+                    ft_name: d['default']
+                    for ft_name, d in self.feature_desc.items()
+                    if ft_name not in ft
+                })
+                el_features = {
+                    ft_name + "_" + str(i): tf.reshape(
+                        ft_tensor,
+                        self.feature_desc[ft_name]['shape']
+                    )
+                    for ft_name, ft_tensor in ft.items()
+                }  # return dictionary of features, should be tensors
+                # rename mri_i to X_i
+                el_features["X_" + str(i)] = el_features.pop(
+                    _features.MRI + "_" + str(i)
+                )
+                all_features.update(el_features)
+
+            return all_features
+
+        labels = len(files) * [0]  # currently not used
+        dataset = tf.data.Dataset.from_tensor_slices(
+            tuple([files, labels])
+        )
+
+        # mri + other features
+        read_types = group_size * ([tf.float32] + [
+            self.feature_desc[fname]["type"]
+            for fname in port_features
+        ])
+
+        num_calls = 4
+        if "parallel_readers" in self.config:
+            num_calls = self.config["parallel_readers"]
+        dataset = dataset.map(
+            lambda file_ids, label: tuple(tf.py_func(
+                _read_files,
+                [file_ids, label],
+                read_types,
+                stateful=False,
+                name="read_files"
+            )),
+            num_parallel_calls=num_calls
+        )
+
+        prefetch = 4
+        if "prefetch" in self.config:
+            prefetch = self.config["prefetch"]
+        dataset = dataset.map(_parser)
+        dataset = dataset.prefetch(prefetch * self.config["batch_size"])
+        dataset = dataset.batch(batch_size=self.config["batch_size"])
+
+        def _input_fn():
+            return dataset.make_one_shot_iterator().get_next()
+        return _input_fn
+
+    def get_input_fn_for_groups(self, groups):
         group_size = len(groups[0].file_ids)
         files = [group.file_ids for group in groups]
 
