@@ -20,10 +20,12 @@ AGG_METRICS = config.AGG_METRICS
 X_LABEL = config.X_LABEL
 Y_LABEL = config.Y_LABEL
 ID_TAGS = config.ID_TAGS
+REPORT_METRICS = config.REPORT_METRICS
 
 FILTERS = config.FILTERS
 LEGEND_LOC = config.LEGEND_LOC
 REASON = config.REASON
+
 
 def filter_record_by_tag(rec, f):
     if "tags" not in f:
@@ -53,11 +55,11 @@ def filter_record_by_tag(rec, f):
 
 def fits_group(rec, group):
     g = group[0]
-    
+
     for t in ID_TAGS:
         if g.find_tag(t) != rec.find_tag(t):
             return False
-        
+
     return True
 
     # return (rec.version == g.version) and (rec.config == g.config)
@@ -109,7 +111,7 @@ def plot_groups(groups):
     )
 
     for g in groups:
-        g.print_run_accuracies()
+        g.print_run_accuracies(REPORT_METRICS)
 
 
 def main():
