@@ -16,6 +16,7 @@ from os.path import normpath
 from inspect import getargspec
 from shutil import rmtree
 from traceback import print_tb
+import yaml
 
 
 def get_loader_from_extension(file_path):
@@ -202,6 +203,9 @@ class ConfigAction(Action):
 
         if hasattr(model, "set_save_path"):
             model.set_save_path(self.save_path)
+            # Dump conifg
+            with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
+                yaml.dump(self.raw_config, f)
 
         return model
 
