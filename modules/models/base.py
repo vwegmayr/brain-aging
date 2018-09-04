@@ -138,7 +138,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
 
             del self.config["load_model"]
 
-        if self._restore_path is None and "model_dir":
+        if self._restore_path is None:
             self.config["model_dir"] = save_path
 
     def export_estimator(self):
