@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import pandas as pd
+from collections import OrderedDict
 
 
 def extract_tags(tag_string):
@@ -12,6 +13,10 @@ def extract_tags(tag_string):
     """
     tags = tag_string.strip().split(",")
     return set(tags)
+
+
+def toCamelCase(word):
+    return ''.join(x.capitalize() or '_' for x in word.split('_'))
 
 
 class Record(object):
@@ -134,7 +139,6 @@ class RecordGroup(object):
         plt.grid(True)
         plt.show()
 
-
     def group_stats_per_epoch(self, metric):
         all_values = []
         for record in self.records:
@@ -183,9 +187,14 @@ class RecordGroup(object):
         print(df)
         print(df.to_latex(index=False))
 
-    def print_run_accuracies(self):
+    def print_run_accuracies(self, metrics):
         # Fold accuracy based on best validation epoch
-        header = ["run", "bestValEpoch", "bestValAcc", "testAcc"]
+        header = ["run", "bestValEpoch", "bestValAcc"]
+
+        metric_to_values = OrderedDict()
+        for m in metrics:
+            header.append(toCamelCase(m))
+            metric_to_values[m] = []
 
         table = []
         for record in self.records:
@@ -197,16 +206,25 @@ class RecordGroup(object):
                 metric="validation_acc",
                 epoch=best_ep
             )
+            """
             test_acc = record.get_metric_values(
                 metric="test_acc",
                 epoch=best_ep
             )
-            row = [run, best_ep, best_val_acc, test_acc]
+            """
+            row = [run, best_ep, best_val_acc]
+
+            for m in metrics:
+                val = record.get_metric_values(
+                    metric=m,
+                    epoch=best_ep
+                )
+                row.append(val)
+                metric_to_values[m].append(val)
 
             table.append(row)
 
         table = np.array(table)
-        test_accs = table[:, -1]
 
         print(self.group_label)
         df = pd.DataFrame(
@@ -216,24 +234,30 @@ class RecordGroup(object):
         self.print_df(df)
 
         # Overall accuracy
-        self.print_overall_acc(test_accs)
+        self.print_overall_metric(metric_to_values)
 
-    def print_overall_acc(self, test_accs):
-        header = ["mean", "std", "median", "5-percentile",
+    def print_overall_metric(self, metric_to_values):
+        header = ["metricName", "mean", "std", "median", "5-percentile",
                   "95-percentile"]
-        row = [
-            np.mean(test_accs),
-            np.std(test_accs),
-            np.median(test_accs),
-            np.percentile(test_accs, 5),
-            np.percentile(test_accs, 95)
-        ]
-        table = [row]
+
+        table = []
+        prec = 4
+        for k, values in metric_to_values.items():
+            row = [
+                toCamelCase(k),
+                round(np.mean(values), prec),
+                round(np.std(values), prec),
+                round(np.median(values), prec),
+                round(np.percentile(values, 5), prec),
+                round(np.percentile(values, 95), prec)
+            ]
+            table.append(row)
+
         df = pd.DataFrame(
             data=np.array(table),
             columns=header
         )
-        print(self.group_label + " test accuracy")
+        # print(self.group_label + " " + metric_name)
         self.print_df(df)
 
     @staticmethod
