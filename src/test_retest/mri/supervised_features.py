@@ -254,6 +254,7 @@ class SliceClassification(EvaluateEpochsBaseTF):
         x = tf.reshape(features["X_0"], shape)
         key = params["target_label_key"]
         y = tf.reshape(features[key + "_0"], [-1])
+        class_weights = params["class_weights"]
 
         enc = body_net(
             x=x,
@@ -265,6 +266,7 @@ class SliceClassification(EvaluateEpochsBaseTF):
         probs, preds, loss, acc = head_net(
             x=enc,
             y=y,
+            class_weights=class_weights,
             n_classes=params["n_classes"]
         )
 

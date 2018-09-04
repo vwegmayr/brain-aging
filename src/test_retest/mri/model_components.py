@@ -732,7 +732,7 @@ class Conv3DDecoder(Head):
         return [self.y]
 
 
-def single_classification_head(x, y, n_classes, scope_name="clf_head", scope_reuse=False):
+def single_classification_head(x, y, class_weights, n_classes, scope_name="clf_head", scope_reuse=False):
     with tf.variable_scope(scope_name) as scope:
         if scope_reuse:
             scope.reuse_variables()
@@ -743,9 +743,14 @@ def single_classification_head(x, y, n_classes, scope_name="clf_head", scope_reu
         probs = tf.nn.softmax(logits)
         preds = tf.argmax(input=logits, axis=1)
 
+        class_0_w = class_weights[0]
+        class_1_w = class_weights[1]
+        weights = class_1_w * tf.cast(y, tf.float32) + class_0_w * (1 - tf.cast(y, tf.float32)) 
+
         loss = tf.losses.sparse_softmax_cross_entropy(
             labels=y,
-            logits=logits
+            logits=logits,
+            weights=weights
         )
 
         acc = tf.reduce_mean(
