@@ -230,7 +230,9 @@ class RecordGroup(object):
             test_accs = record.get_metric_values(
                 metric="test_acc"
             )
+            row.append(np.max(test_accs))
             metric_to_values["maxTestAcc"].append(np.max(test_accs))
+            row.append(test_accs[-1])
             metric_to_values["lastEpAcc"].append(test_accs[-1])
 
             table.append(row)
