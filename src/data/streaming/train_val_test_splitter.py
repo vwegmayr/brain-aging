@@ -412,6 +412,11 @@ class SpecialConversionSplitter(MetaInfoSplitter):
         for g in patient_groups:
             fids = g.file_ids
             pid = self.get_patient_id(fids[0])
+            label = self.get_artifical_label(pid, g.file_ids)
+
+            if label is None:
+                continue
+
             pid_to_fids[pid] = fids
             conv_val = self.get_meta_info_by_key(
                 fids[0],
@@ -422,7 +427,6 @@ class SpecialConversionSplitter(MetaInfoSplitter):
                 delta_patients.append(pid)
             else:
                 train_val_patients.append(pid)
-                label = self.get_artifical_label(pid, g.file_ids)
                 train_val_labels.append(label)
 
         # Train-val split
