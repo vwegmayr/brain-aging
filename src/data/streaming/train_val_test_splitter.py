@@ -4,6 +4,7 @@ from collections import OrderedDict
 import yaml
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
+import warnings
 
 from .mri_streaming import MRISingleStream
 
@@ -404,10 +405,11 @@ class SpecialConversionSplitter(MetaInfoSplitter):
         conv_key = self.get_conversion_key()
 
         delta_patients = []
-        train_val_patients = []
-        train_val_labels = []
+        train_patients = []
+        train_labels = []
         pid_to_fids = {}
         train_size = self.get_train_ratio()
+        stats = OrderedDict()
         # get all Delta-(non-converters)
         for g in patient_groups:
             fids = g.file_ids
@@ -426,18 +428,29 @@ class SpecialConversionSplitter(MetaInfoSplitter):
             if conv_val in [0, 1]:
                 delta_patients.append(pid)
             else:
-                train_val_patients.append(pid)
-                train_val_labels.append(label)
+                train_patients.append(pid)
+                train_labels.append(label)
 
-        stats = OrderedDict()
-        for lab in train_val_labels:
-            if lab not in stats:
-                stats[lab] = 1
-            else:
-                stats[lab] += 1
+                if label not in stats:
+                    stats[label] = 1
+                else:
+                    stats[label] += 1
 
         for k, v in stats.items():
             print("{}: {}".format(k, v))
+
+        dropped = 0
+        train_val_patients = []
+        train_val_labels = []
+        for patient, lab in zip(train_patients, train_labels):
+            if stats[lab] < 2:
+                dropped += 1
+            else:
+                train_val_patients.append(patient)
+                train_val_labels.append(lab)
+
+        if dropped > 0:
+            warnings.warn("dropping {} patients".format(dropped))
 
         # Train-val split
         train_pids, val_pids, train_labels, val_labels = train_test_split(
