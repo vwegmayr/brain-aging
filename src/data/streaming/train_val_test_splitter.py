@@ -79,7 +79,7 @@ class MRIDatasetSplitter(MRISingleStream):
         assert train_patients.isdisjoint(val_patients)
         assert test_patients.isdisjoint(val_patients)
 
-    def one_split(self):
+    def one_split(self, file_ids):
         patient_groups = self.make_patient_groups(self.all_file_ids)
 
         pids = []
@@ -151,8 +151,8 @@ class MRIDatasetSplitter(MRISingleStream):
         with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
             yaml.dump(self.config, f)
 
-    def k_splits(self):
-        patient_groups = self.make_patient_groups(self.all_file_ids)
+    def k_splits(self, file_ids):
+        patient_groups = self.make_patient_groups(file_ids)
 
         pids = []
         labels = []
@@ -231,10 +231,23 @@ class MRIDatasetSplitter(MRISingleStream):
             split_id += 1
 
     def transform(self, X, y=None):
+        fids = self.all_file_ids
+
+        if "use_fold" in self.config:
+            fold_name = self.config["use_fold"]
+            if fold_name == "train":
+                fids = self.get_train_ids()
+            elif fold_name == "validation":
+                fids = self.get_validation_ids()
+            elif fold_name == "test":
+                fids = self.get_test_ids()
+            else:
+                raise ValueError("Invalid fold name")
+
         if self.config["n_folds"] == 1:
-            self.one_split()
+            self.one_split(fids)
         else:
-            self.k_splits()
+            self.k_splits(fids)
 
 
 class ConversionSplitter(MRIDatasetSplitter):
@@ -371,3 +384,79 @@ class MetaInfoSplitter(MRIDatasetSplitter):
         label = "_".join(label_values)
         label = str(range_id) + "_" + str(gender) + "_" + label
         return label
+
+
+class SpecialConversionSplitter(MetaInfoSplitter):
+    """
+    Put all Delta-(non-)converters into the test split.
+    """
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X, y=None):
+        self.split()
+
+    def get_conversion_key(self):
+        return self.config["conversion_key"]
+
+    def split(self):
+        patient_groups = self.make_patient_groups(self.all_file_ids)
+        conv_key = self.get_conversion_key()
+
+        delta_patients = []
+        train_val_patients = []
+        train_val_labels = []
+        pid_to_fids = {}
+        train_size = self.get_train_ratio()
+        # get all Delta-(non-converters)
+        for g in patient_groups:
+            fids = g.file_ids
+            pid = self.get_patient_id(fids[0])
+            pid_to_fids[pid] = fids
+            conv_val = self.get_meta_info_by_key(
+                fids[0],
+                conv_key
+            )
+
+            if conv_val in [0, 1]:
+                delta_patients.append(pid)
+            else:
+                train_val_patients.append(pid)
+                label = self.get_artifical_label(pid, g.file_ids)
+                train_val_labels.append(label)
+
+        # Train-val split
+        train_pids, val_pids, train_labels, val_labels = train_test_split(
+            train_val_patients,
+            train_val_labels,
+            train_size=train_size,
+            test_size=1 - train_size,
+            random_state=self.seed,
+            shuffle=True,
+            stratify=train_val_labels
+        )
+
+        train_ids = [fid for pid in train_pids for fid in pid_to_fids[pid]]
+        val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
+        test_ids = [fid for pid in delta_patients for fid in pid_to_fids[pid]]
+
+        # Dump everything to files
+        self.dump_train_val_test_split(
+            outfolder=self.save_path,
+            train_ids=train_ids,
+            val_ids=val_ids,
+            test_ids=test_ids
+        )
+
+        self.dump_label_stats(
+            outfolder=self.save_path,
+            train_labels=train_labels,
+            val_labels=val_labels,
+            test_labels=[]
+        )
+
+        # Dump config
+        with open(os.path.join(self.save_path, "config.yaml"), 'w') as f:
+            yaml.dump(self.config, f)
+
+
