@@ -429,6 +429,16 @@ class SpecialConversionSplitter(MetaInfoSplitter):
                 train_val_patients.append(pid)
                 train_val_labels.append(label)
 
+        stats = OrderedDict()
+        for lab in train_val_labels:
+            if lab not in stats:
+                stats[lab] = 1
+            else:
+                stats[lab] += 1
+
+        for k, v in stats.items():
+            print("{}: {}".format(k, v))
+
         # Train-val split
         train_pids, val_pids, train_labels, val_labels = train_test_split(
             train_val_patients,
@@ -443,6 +453,8 @@ class SpecialConversionSplitter(MetaInfoSplitter):
         train_ids = [fid for pid in train_pids for fid in pid_to_fids[pid]]
         val_ids = [fid for pid in val_pids for fid in pid_to_fids[pid]]
         test_ids = [fid for pid in delta_patients for fid in pid_to_fids[pid]]
+
+        self.split_checks(train_ids, val_ids, test_ids)
 
         # Dump everything to files
         self.dump_train_val_test_split(
