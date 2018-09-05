@@ -274,6 +274,7 @@ class SliceClassification(EvaluateEpochsBaseTF):
         predictions = {
             "encoding": enc,
             "classes": preds,
+            "probs": probs,
             "image_label": features["image_label_0"],
         }
 
