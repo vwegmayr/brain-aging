@@ -391,6 +391,8 @@ class AgeFixedDeltaStream(MRISingleStream):
             stream_config=stream_config
         )
 
+        self.load_test_pairs = "load_test_pairs" in self.config \
+            and self.config["load_test_pairs"]
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
 
@@ -561,7 +563,7 @@ class AgeFixedDeltaStream(MRISingleStream):
         test_pairs = self.build_pairs(test_ids)
         self.n_test_samples = len(test_pairs)
         self.check_pairs(test_pairs)
-        if "load_test_pairs" in self.config and self.config["load_test_pairs"]:
+        if self.load_test_pairs:
             self.testAD = self.provider(
                 streamer=self,
                 samples=test_pairs,
@@ -704,6 +706,8 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
             stream_config=stream_config
         )
 
+        self.load_test_pairs = "load_test_pairs" in self.config \
+            and self.config["load_test_pairs"]
         # How many images are loaded into memory. If equal
         # to -1, all images are loaded.
         self.prefetch = self.config["prefetch"]
@@ -820,8 +824,9 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
         print_provider(self.trainAD)
         print("Validation samples")
         print_provider(self.validationAD)
-        print("Test samples")
-        print_provider(self.testAD)
+        if self.load_test_pairs:
+            print("Test samples")
+            print_provider(self.testAD)
 
     def is_valid_delta(self, delta):
         for delta_range in self.delta_ranges.values():
