@@ -281,6 +281,7 @@ class MRIImagePair(MRISample):
             self.slice = True
             self.slice_axis, self.slice_idx = self.streamer.get_slice_info()
 
+        self.cache_images = self.streamer.do_cache_images()
         self.raw_data = None
 
     def set_approx_delta(self, delta):
@@ -315,17 +316,17 @@ class MRIImagePair(MRISample):
         return im
 
     def load(self):
-        if not self.slice or self.raw_data is None:
+        if self.raw_data is None:
             im1 = self.load_image(self.fid1)
             im2 = self.load_image(self.fid2)
 
             delta_im = im2 - im1
             im = np.concatenate((im1, delta_im), axis=-1)
 
-            if self.slice:
+            if self.slice or self.cache_images:
                 self.raw_data = im
 
-        elif self.slice and self.raw_data is not None:
+        elif self.raw_data is not None:
             im = self.raw_data
 
         return im
@@ -348,7 +349,7 @@ class MRIImagePairWithDelta(MRIImagePair):
         self.set_approx_delta(approx_delta)
 
     def load(self):
-        if not self.slice or self.raw_data is None:
+        if self.raw_data is None:
             im1 = self.load_image(self.fid1)
             im2 = self.load_image(self.fid2)
             delta_im = im2 - im1
@@ -356,10 +357,10 @@ class MRIImagePairWithDelta(MRIImagePair):
             delta_channel = 0 * im1 + delta
             im = np.concatenate((im1, delta_channel, delta_im), axis=-1)
 
-            if self.slice:
+            if self.slice or self.cache_images:
                 self.raw_data = im
 
-        elif self.slice and self.raw_data is not None:
+        elif self.raw_data is not None:
             im = self.raw_data
 
         return im
@@ -560,18 +561,19 @@ class AgeFixedDeltaStream(MRISingleStream):
         test_pairs = self.build_pairs(test_ids)
         self.n_test_samples = len(test_pairs)
         self.check_pairs(test_pairs)
-        self.testAD = self.provider(
-            streamer=self,
-            samples=test_pairs,
-            label_key=None,
-            prefetch=10
-        )
-        self.testCN = self.provider(
-            streamer=self,
-            samples=test_pairs,
-            label_key=None,
-            prefetch=10
-        )
+        if "load_test_pairs" in self.config and self.config["load_test_pairs"]:
+            self.testAD = self.provider(
+                streamer=self,
+                samples=test_pairs,
+                label_key=None,
+                prefetch=10
+            )
+            self.testCN = self.provider(
+                streamer=self,
+                samples=test_pairs,
+                label_key=None,
+                prefetch=10
+            )
         self.test_pairs = test_pairs
 
     def get_all_pairs(self):
