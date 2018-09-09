@@ -3,6 +3,7 @@ import copy
 import pydoc
 from collections import OrderedDict
 import itertools
+import sys
 
 from src.data.streaming.mri_streaming import MRISingleStream
 from src.baum_vagan.utils import map_image_to_intensity_range
@@ -827,6 +828,8 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
         if self.load_test_pairs:
             print("Test samples")
             print_provider(self.testAD)
+
+        sys.stdout.flush()
 
     def is_valid_delta(self, delta):
         for delta_range in self.delta_ranges.values():
