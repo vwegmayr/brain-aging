@@ -166,6 +166,7 @@ class SameDeltaBatchProvider(object):
     def round_robin_gen(self):
         while (1):
             delta = next(self.delta_gen)
+
             yield self.delta_to_provider[delta]
 
     def proportional_sampling_gen(self):
@@ -181,7 +182,6 @@ class SameDeltaBatchProvider(object):
                 a=deltas,
                 p=delta_weights
             )
-            print(delta)
 
             yield self.delta_to_provider[delta]
 
