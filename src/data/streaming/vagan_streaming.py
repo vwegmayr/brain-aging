@@ -9,6 +9,10 @@ from src.baum_vagan.utils import map_image_to_intensity_range
 from src.data.streaming.base import Group
 
 
+ROUND_ROBIN = "round-robin"
+PROPORTIONAL_SAMPLING = "proportional-sampling"
+
+
 class BatchProvider(object):
     def __init__(self, streamer, file_ids, label_key, prefetch=1000, seed=11):
         self.file_ids = file_ids
@@ -138,7 +142,7 @@ class SameDeltaBatchProvider(object):
         self.prefetch = prefetch
         self.loaded = []
         self.seed = seed
-
+        self.np_random = np.random.RandomState(seed=seed)
         self.match_delta_to_samples()
 
         # one provider for each delta
@@ -151,6 +155,40 @@ class SameDeltaBatchProvider(object):
                 prefetch=prefetch,
                 seed=seed
             )
+
+        batcher_order = self.get_batch_order()
+        if batcher_order == ROUND_ROBIN:
+            self.provider_gen = self.round_robin_gen()
+        elif batcher_order == PROPORTIONAL_SAMPLING:
+            self.provider_gen = self.proportional_sampling_gen()
+
+    def round_robin_gen(self):
+        while (1):
+            delta = next(self.delta_gen)
+            yield self.delta_to_provider[delta]
+
+    def proportional_sampling_gen(self):
+        deltas = [k for k in self.delta_to_samples.keys()]
+        delta_weights = [
+            len(self.delta_to_samples[d]) for d in deltas
+        ]
+        delta_weights = np.array(delta_weights)
+        delta_weights = delta_weights / np.sum(delta_weights)
+
+        while (1):
+            delta = self.np_random.choice(
+                a=deltas,
+                p=delta_weights
+            )
+            print(delta)
+
+            yield self.delta_to_provider[delta]
+
+    def get_batch_order(self):
+        if "batch_order" not in self.streamer.config:
+            return ROUND_ROBIN
+        else:
+            return self.streamer.config["batch_order"]
 
     def match_delta_to_samples(self):
         self.delta_to_samples = OrderedDict()
@@ -165,8 +203,7 @@ class SameDeltaBatchProvider(object):
         self.delta_gen = itertools.cycle(self.deltas)
 
     def next_batch(self, batch_size):
-        delta = next(self.delta_gen)
-        provider = self.delta_to_provider[delta]
+        provider = next(self.provider_gen)
 
         X_batch, y_batch = provider.next_batch(batch_size)
         return X_batch, y_batch
