@@ -12,6 +12,7 @@ from src.data.streaming.base import Group
 
 ROUND_ROBIN = "round-robin"
 PROPORTIONAL_SAMPLING = "proportional-sampling"
+PROPORTIONAL_DETERMINISTIC = "proportional-deterministic"
 
 
 class BatchProvider(object):
@@ -162,6 +163,10 @@ class SameDeltaBatchProvider(object):
             self.provider_gen = self.round_robin_gen()
         elif batcher_order == PROPORTIONAL_SAMPLING:
             self.provider_gen = self.proportional_sampling_gen()
+        elif batcher_order == PROPORTIONAL_DETERMINISTIC:
+            self.provider_gen = self.proportional_deterministic_gen()
+        else:
+            raise ValueError("Unknown batch order: {}".format(batcher_order))
 
     def round_robin_gen(self):
         while (1):
@@ -184,6 +189,25 @@ class SameDeltaBatchProvider(object):
             )
 
             yield self.delta_to_provider[delta]
+
+    def proportional_deterministic_gen(self):
+        deltas = [k for k in self.delta_to_samples.keys()]
+        delta_weights = [
+            len(self.delta_to_samples[d]) for d in deltas
+        ]
+        delta_weights = np.array(delta_weights)
+        delta_weights = delta_weights / np.sum(delta_weights)
+
+        a = []
+        for delta, weight in zip(deltas, delta_weights):
+            n = int(weight * 100)
+            for _ in range(n):
+                a.append(delta)
+
+        while (1):
+            self.np_random.shuffle(a)
+            for delta in a:
+                yield self.delta_to_provider[delta]
 
     def get_batch_order(self):
         if "batch_order" not in self.streamer.config:
