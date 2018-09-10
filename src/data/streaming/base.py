@@ -238,6 +238,9 @@ class FileStream(abc.ABC):
     def load_sample(self, file_path):
         pass
 
+    def do_cache_images(self):
+        return "cache_images" in self.config and self.config["cache_images"]
+
     def do_load_split(self):
         if "load_split" in self.config:
             return True

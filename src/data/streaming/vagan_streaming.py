@@ -3,6 +3,7 @@ import copy
 import pydoc
 from collections import OrderedDict
 import itertools
+import sys
 
 from src.data.streaming.mri_streaming import MRISingleStream
 from src.baum_vagan.utils import map_image_to_intensity_range
@@ -318,6 +319,7 @@ class MRIImagePair(MRISample):
             self.slice = True
             self.slice_axis, self.slice_idx = self.streamer.get_slice_info()
 
+        self.cache_images = self.streamer.do_cache_images()
         self.raw_data = None
 
     def set_approx_delta(self, delta):
@@ -352,17 +354,17 @@ class MRIImagePair(MRISample):
         return im
 
     def load(self):
-        if not self.slice or self.raw_data is None:
+        if self.raw_data is None:
             im1 = self.load_image(self.fid1)
             im2 = self.load_image(self.fid2)
 
             delta_im = im2 - im1
             im = np.concatenate((im1, delta_im), axis=-1)
 
-            if self.slice:
+            if self.slice or self.cache_images:
                 self.raw_data = im
 
-        elif self.slice and self.raw_data is not None:
+        elif self.raw_data is not None:
             im = self.raw_data
 
         return im
@@ -385,7 +387,7 @@ class MRIImagePairWithDelta(MRIImagePair):
         self.set_approx_delta(approx_delta)
 
     def load(self):
-        if not self.slice or self.raw_data is None:
+        if self.raw_data is None:
             im1 = self.load_image(self.fid1)
             im2 = self.load_image(self.fid2)
             delta_im = im2 - im1
@@ -393,10 +395,10 @@ class MRIImagePairWithDelta(MRIImagePair):
             delta_channel = 0 * im1 + delta
             im = np.concatenate((im1, delta_channel, delta_im), axis=-1)
 
-            if self.slice:
+            if self.slice or self.cache_images:
                 self.raw_data = im
 
-        elif self.slice and self.raw_data is not None:
+        elif self.raw_data is not None:
             im = self.raw_data
 
         return im
@@ -427,6 +429,8 @@ class AgeFixedDeltaStream(MRISingleStream):
             stream_config=stream_config
         )
 
+        self.load_test_pairs = "load_test_pairs" in self.config \
+            and self.config["load_test_pairs"]
         self.prefetch = self.config["prefetch"]
         self.set_up_batches()
 
@@ -597,18 +601,19 @@ class AgeFixedDeltaStream(MRISingleStream):
         test_pairs = self.build_pairs(test_ids)
         self.n_test_samples = len(test_pairs)
         self.check_pairs(test_pairs)
-        self.testAD = self.provider(
-            streamer=self,
-            samples=test_pairs,
-            label_key=None,
-            prefetch=10
-        )
-        self.testCN = self.provider(
-            streamer=self,
-            samples=test_pairs,
-            label_key=None,
-            prefetch=10
-        )
+        if self.load_test_pairs:
+            self.testAD = self.provider(
+                streamer=self,
+                samples=test_pairs,
+                label_key=None,
+                prefetch=10
+            )
+            self.testCN = self.provider(
+                streamer=self,
+                samples=test_pairs,
+                label_key=None,
+                prefetch=10
+            )
         self.test_pairs = test_pairs
 
     def get_all_pairs(self):
@@ -739,6 +744,8 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
             stream_config=stream_config
         )
 
+        self.load_test_pairs = "load_test_pairs" in self.config \
+            and self.config["load_test_pairs"]
         # How many images are loaded into memory. If equal
         # to -1, all images are loaded.
         self.prefetch = self.config["prefetch"]
@@ -855,8 +862,11 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
         print_provider(self.trainAD)
         print("Validation samples")
         print_provider(self.validationAD)
-        print("Test samples")
-        print_provider(self.testAD)
+        if self.load_test_pairs:
+            print("Test samples")
+            print_provider(self.testAD)
+
+        sys.stdout.flush()
 
     def is_valid_delta(self, delta):
         for delta_range in self.delta_ranges.values():

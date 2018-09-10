@@ -291,6 +291,10 @@ class SliceClassification(EvaluateEpochsBaseTF):
 
         eval_metric_ops = {
             "acc": tf.metrics.mean(acc),
+            "tf_metrics_acc": tf.metrics.accuracy(
+                labels=y,
+                predictions=preds
+            ),
             "recall": tf.metrics.recall(
                 labels=y,
                 predictions=preds
