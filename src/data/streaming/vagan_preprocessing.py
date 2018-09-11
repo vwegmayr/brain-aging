@@ -48,6 +48,9 @@ class VaganFarPredictions(MRISingleStream):
     def get_vagan_steps(self):
         return self.config["vagan_steps"]
 
+    def set_vagan_steps(self, n_steps):
+        self.config["vagan_steps"] = n_steps
+
     def negative_difference_maps(self):
         if "negative_diff_maps" not in self.config:
             return False
@@ -191,7 +194,10 @@ class VaganFarPredictions(MRISingleStream):
             return dataset.make_one_shot_iterator().get_next()
         return _input_fn
 
-    def get_input_fn_for_groups(self, groups):
+    def get_input_fn_for_groups(self, groups, vagan_steps=None):
+        if vagan_steps is not None:
+            self.set_vagan_steps(vagan_steps)
+
         group_size = len(groups[0].file_ids)
         files = [group.file_ids for group in groups]
 
