@@ -745,6 +745,14 @@ class vagan:
         return logits
 
     def iterated_far_prediction(self, img, n_steps, only_negative=False):
+        if self.exp_config.n_channels == 2:
+            return self.iterate_2_channels(img, n_steps, only_negative)
+        elif self.exp_config.n_channels == 3:
+            return self.iterate_3_channels(img, n_steps, only_negative)
+        else:
+            raise ValueError("Invalid number of channels")
+
+    def iterate_3_channels(self, img, n_steps, only_negative=False):
         images = []
         masks = []
         shape = img.shape
@@ -762,6 +770,28 @@ class vagan:
             img += M
             img[:, :, :, 1] = delta_channel[:, :, 0]
             images.append(np.squeeze(img[:, :, :, 0]))
+
+        return images, masks
+
+    def iterate_2_channels(self, img, n_steps, only_negative=False):
+        images = []
+        masks = []
+        shape = img.shape
+
+        if shape[-1] != 1:
+            img = np.reshape(img, tuple(list(shape) + [1]))
+
+        img = np.concatenate((img, img), axis=-1)
+        img = np.array([img])  # make a batch of size 1
+        for _ in range(n_steps):
+            M = self.predict_mask(img)
+            if only_negative:
+                M[M >= 0] = 0
+            masks.append(np.squeeze(M))
+            img += M
+            images.append(np.squeeze(img[:, :, :, 0]))
+            # placeholder needs a second channel not used by generator
+            # img = np.concatenate((img, img), axis=-1)
 
         return images, masks
 
