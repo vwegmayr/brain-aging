@@ -6,6 +6,7 @@ import matplotlib
 matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
 import pandas as pd
+from collections import OrderedDict
 
 
 from modules.models.data_transform import DataTransformer
@@ -328,6 +329,37 @@ class RobustnessMeasureComputation(DataTransformer):
                 index=False
             )
 
+    def aggregate_features(self, comp_dic):
+        feature_names = list(comp_dic.keys())
+        score_names = list(comp_dic[feature_names[0]].keys())
+
+        agg_scores = OrderedDict()
+        for sc_name in score_names:
+            aggs = OrderedDict()
+            # score values
+            values = [comp_dic[f][sc_name] for f in feature_names]
+            aggs["mean"] = float(np.mean(values))
+            aggs["std"] = float(np.std(values))
+            aggs["median"] = float(np.median(values))
+            aggs["5-perc"] = float(np.percentile(values, 5))
+            aggs["95-perc"] = float(np.percentile(values, 95))
+
+            agg_scores[sc_name] = aggs
+
+        return agg_scores
+
+    def feature_aggregation_score(self, streamer_to_comp, out_folder):
+        streamer_to_scores = {}
+        for streamer, comp in streamer_to_comp.items():
+            scores = self.aggregate_feature(comp)
+            streamer_to_scores[streamer.name] = scores
+
+        with open(
+                os.path.join(out_folder, "feature_aggregation.json"),
+                'w',
+                encoding="utf-8") as f:
+            json.dump(streamer_to_scores, f, indent=2, ensure_ascii=False)
+
     def transform(self, X, y=None):
         """
         X and y are None. Data that is read is specified
@@ -387,6 +419,8 @@ class RobustnessMeasureComputation(DataTransformer):
         # Compute predictive power of features
         self.robustness_ratio(streamer_to_comp, True)
         self.robustness_ratio(streamer_to_comp, False)
+
+        self.feature_aggregation_score(streamer_to_comp, out_path)
 
         # Make pickable
         self.streamers = None
