@@ -67,7 +67,7 @@ class RobustnessMeasureComputation(DataTransformer):
 
     def process_stream(self, streamer):
         # Steam batches (only one batch expected)
-        batches = streamer.get_batches()
+        batches = streamer.get_batches("train")
         assert len(batches) == 1
         batch = batches[0]
 
