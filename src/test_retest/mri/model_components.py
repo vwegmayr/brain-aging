@@ -732,6 +732,182 @@ class Conv3DDecoder(Head):
         return [self.y]
 
 
+class Conv3DUnetEncoder(Body):
+    def __init__(self, input_key, *args, **kwargs):
+        self.input_key = input_key
+        super(Conv3DUnetEncoder, self).__init__(
+            *args,
+            **kwargs
+        )
+
+    def get_encoding_dim(self):
+        return self.params["hidden_dim"]
+
+    def get_pooling_size(self, i):
+        return self.params["pooling_sizes"][i]
+
+    def use_pooling(self):
+        return "pooling_sizes" in self.params
+
+    def construct_graph(self):
+        features = self.features
+        params = self.params
+
+        x = features[self.input_key]
+        n_filters = params["n_filters"]
+        filter_sizes = params["filter_sizes"]
+
+        if params["normalize_images"]:
+            x = self.normalize_voxels(x)
+
+        input_shape = params["input_shape"]
+        # Reshape to have one explicit channel
+        x = tf.reshape(
+            x,
+            [-1, input_shape[0], input_shape[1], input_shape[2], 1]
+        )
+
+        self.x = x
+        current_input = x
+
+        n_ch_0 = 16
+        conv1_1 = layers.conv3D_layer(x, 'conv1_1', num_filters=n_ch_0)
+        conv1_2 = layers.conv3D_layer(conv1_1, 'conv1_2', num_filters=n_ch_0)
+        pool1 = layers.maxpool3D_layer(conv1_2)
+
+        conv2_1 = layers.conv3D_layer(pool1, 'conv2_1', num_filters=n_ch_0*2)
+        conv2_2 = layers.conv3D_layer(conv2_1, 'conv2_2', num_filters=n_ch_0*2)
+        pool2 = layers.maxpool3D_layer(conv2_2)
+
+        conv3_1 = layers.conv3D_layer(pool2, 'conv3_1', num_filters=n_ch_0*4)
+        conv3_2 = layers.conv3D_layer(conv3_1, 'conv3_2', num_filters=n_ch_0*4)
+        pool3 = layers.maxpool3D_layer(conv3_2)
+
+        conv4_1 = layers.conv3D_layer(pool3, 'conv4_1', num_filters=n_ch_0*8)
+        conv4_2 = layers.conv3D_layer(conv4_1, 'conv4_2', num_filters=n_ch_0*8)
+
+        self.z = tf.contrib.layers.flatten(conv4_2)
+        current_input = self.z
+
+        dim_list = current_input.get_shape().as_list()[1:]
+        cur_dim = reduce(lambda x, y: x * y, dim_list)
+        self.linear_trafo = False
+        if cur_dim > self.get_encoding_dim():
+            print("Non conv layer needed")
+            self.linear_trafo = True
+            self.dim_before_linear_trafo = cur_dim
+            self.dim_list = dim_list
+            current_input = tf.contrib.layers.flatten(current_input)
+            W = tf.get_variable(
+                "non_conv_w",
+                shape=[cur_dim, self.get_encoding_dim()],
+                initializer=tf.contrib.layers.xavier_initializer(seed=40)
+            )
+            b = tf.get_variable(
+                "non_conv_b",
+                shape=[1, self.get_encoding_dim()],
+                initializer=tf.initializers.zeros
+            )
+
+            self.linear_w = W
+
+            current_input = tf.add(
+                tf.nn.relu(tf.matmul(current_input, W)),
+                b
+            )
+
+            self.z = current_input
+
+        self.conv1_1 = conv1_1
+        self.conv1_2 = conv1_2
+        self.pool1 = pool1
+        self.conv2_1 = conv2_1
+        self.conv2_2 = conv2_2
+        self.pool2 = pool2
+        self.conv3_1 = conv3_1
+        self.conv3_2 = conv3_2
+        self.pool3 = pool3
+        self.conv4_1 = conv4_1
+        self.conv4_2 = conv4_2
+
+    def get_encoding(self):
+        return self.z
+
+    def get_reconstruction_target(self):
+        return self.x
+
+    def get_nodes(self):
+        return self.x, self.z
+
+
+class Conv3DUnetDecoder(Head):
+    def __init__(self, features, params, encoder, target):
+        self.features = features
+        self.params = params
+        self.encoder = encoder
+        self.target = target
+
+        self.construct_graph()
+
+    def construct_graph(self):
+        x = self.target
+
+        n_ch_0 = 16
+        conv4_2 = self.encoder.conv4_2
+        conv3_2 = self.encoder.conv3_2
+        conv2_2 = self.encoder.conv2_2
+        conv1_2 = self.encoder.conv1_2
+
+        current_input = conv4_2
+        if self.encoder.linear_trafo:
+            dim = self.encoder.dim_before_linear_trafo
+
+            W = self.encoder.linear_w
+
+            b = tf.get_variable(
+                "non_conv_b_dec",
+                shape=[1, dim],
+                initializer=tf.initializers.zeros
+            )
+
+            current_input = tf.add(
+                tf.nn.relu(tf.matmul(self.encoder.z, tf.transpose(W))),
+                b
+            )
+            current_input = tf.reshape(current_input, [-1] + conv4_2.get_shape().as_list()[1:])
+
+        upconv3 = layers.deconv3D_layer(current_input, name='upconv3', num_filters=n_ch_0)
+        concat3 = layers.crop_and_concat_layer_fixed([upconv3, conv3_2], axis=-1)
+
+        conv5_1 = layers.conv3D_layer(concat3, 'conv5_1', num_filters=n_ch_0*4)
+
+        conv5_2 = layers.conv3D_layer(conv5_1, 'conv5_2', num_filters=n_ch_0*4)
+
+        upconv2 = layers.deconv3D_layer(conv5_2, name='upconv2', num_filters=n_ch_0)
+        concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_2], axis=-1)
+
+        conv6_1 = layers.conv3D_layer(concat2, 'conv6_1', num_filters=n_ch_0*2)
+        conv6_2 = layers.conv3D_layer(conv6_1, 'conv6_2', num_filters=n_ch_0*2)
+
+        upconv1 = layers.deconv3D_layer(conv6_2, name='upconv1', num_filters=n_ch_0)
+        concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_2], axis=-1)
+
+        conv8_1 = layers.conv3D_layer(concat1, 'conv8_1', num_filters=n_ch_0)
+        conv8_2 = layers.conv3D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)
+
+        self.y = conv8_2
+        self.reconstruction_loss = tf.losses.mean_squared_error(x, self.y)
+
+    def get_reconstruction_loss(self):
+        return self.reconstruction_loss
+
+    def get_reconstruction(self):
+        return self.y
+
+    def get_nodes(self):
+        return [self.y] 
+
+
 def single_classification_head(x, y, class_weights, n_classes, scope_name="clf_head", scope_reuse=False):
     with tf.variable_scope(scope_name) as scope:
         if scope_reuse:

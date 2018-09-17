@@ -10,6 +10,7 @@ from subprocess import call, Popen
 import math
 from sklearn.decomposition import IncrementalPCA
 from functools import reduce
+import pydoc
 
 from modules.models.data_transform import DataTransformer
 from src.test_retest.test_retest_base import EvaluateEpochsBaseTF
@@ -500,15 +501,18 @@ class Conv3DAutoEncoder(EvaluateEpochsBaseTF):
 
 class Conv3DTupleAE(EvaluateEpochsBaseTF):
     def model_fn(self, features, labels, mode, params):
+        encoder_class = params["encoder_class"]
+        decoder_class = params["decoder_class"]
+
         with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
-            encoder_0 = Conv3DEncoder(
+            encoder_0 = encoder_class(
                 input_key="X_0",
                 features=features,
                 params=params,
                 streamer=self.streamer
             )
         with tf.variable_scope("conv_3d_encoder", reuse=tf.AUTO_REUSE):
-            encoder_1 = Conv3DEncoder(
+            encoder_1 = encoder_class(
                 input_key="X_1",
                 features=features,
                 params=params,
@@ -522,10 +526,10 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
             target_1 = encoder_0.get_reconstruction_target()
 
         with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
-            decoder_0 = Conv3DDecoder(features, params, encoder_0, target_0)
+            decoder_0 = decoder_class(features, params, encoder_0, target_0)
 
         with tf.variable_scope("conv_3d_decoder", reuse=tf.AUTO_REUSE):
-            decoder_1 = Conv3DDecoder(features, params, encoder_1, target_1)
+            decoder_1 = decoder_class(features, params, encoder_1, target_1)
 
         z_0 = encoder_0.get_encoding()
         y_0 = decoder_0.get_reconstruction()
@@ -543,6 +547,7 @@ class Conv3DTupleAE(EvaluateEpochsBaseTF):
         flattened_z_0 = tf.contrib.layers.flatten(z_0)
         flattened_z_1 = tf.contrib.layers.flatten(z_1)
         dim = flattened_z_0.get_shape().as_list()[-1]
+
         assert dim == encoder_0.get_encoding_dim()
 
         predictions = {
