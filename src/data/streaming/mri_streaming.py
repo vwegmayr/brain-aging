@@ -823,7 +823,7 @@ class MRIDifferentPatientPairStream(MRISingleStream):
         return groups
 
 
-class MRIDiagnosePairStream(MRISingleStream):
+class MRIDiagnosePairStreamDeprecated(MRISingleStream):
     """
     Allows for more exact sampling wrt. diagnoses. A diagnosis
     pairs is expected in the config file under 'diagnoses'. For
@@ -969,6 +969,147 @@ class MRIDiagnosePairStream(MRISingleStream):
             if pair is None:
                 break
             sampled.add(pair)
+
+        if len(sampled) < n_pairs:
+            warnings.warn("{} sampled only {} pairs!!!".format(self.__class__.__name__, len(sampled)))
+
+        sampled = sorted(list(sampled))
+        for i, s in enumerate(sampled):
+            lll = s
+            id1 = lll[0]
+            id2 = lll[1]
+            groups.append(Group([id1, id2]))
+            groups[-1].is_train = lll[2]
+            if self.config["same_diagnosis"]:
+                assert self.get_diagnose(id1) == self.get_diagnose(id2)
+            else:
+                assert self.get_diagnose(id1) != self.get_diagnose(id2)
+
+            assert (self.get_patient_id(id1) == self.get_patient_id(id2)) == \
+                self.config["same_patient"]
+
+        return groups
+
+
+class MRIDiagnosePairStream(MRISingleStream):
+    """
+    Allows for more exact sampling wrt. diagnoses. A diagnosis
+    pairs is expected in the config file under 'diagnoses'. For
+    every sampled pair, there is one image for each of diagnoses
+    specified. One can also specify if both images should belong
+    to the same patient or not.
+    """
+    def get_diagnoses(self):
+        return self.config["diagnoses"]
+
+    def distinct_pairs(self, a, b):
+        for p in itertools.product(a, b):
+            if p[0] != p[1]:
+                yield p
+
+    def same_patient_gen(self, file_ids):
+        # patient to pair gen
+        diagnoses = self.get_diagnoses()
+
+        patient_groups = self.make_patient_groups(file_ids)
+        patient_to_gen = {}
+        pids = []
+        for g in patient_groups:
+            pid = self.get_patient_id(g.file_ids[0])
+            pids.append(pid)
+            # first images
+            first = [fid for fid in g.file_ids
+                     if self.get_diagnose(fid) == diagnoses[0]]
+            # second images
+            second = [fid for fid in g.file_ids
+                      if self.get_diagnose(fid) == diagnoses[1]]
+
+            self.np_random.shuffle(first)
+            self.np_random.shuffle(second)
+
+            patient_to_gen[pid] = self.distinct_pairs(first, second)
+
+        done = False
+        while not done:
+            self.np_random.shuffle(pids)
+            done = True
+            for pid in pids:
+                gen = patient_to_gen[pid]
+                pair = next(gen)
+                if pair is not None:
+                    done = False
+                    yield pair
+
+    def different_patient_gen(self, file_ids):
+        # patient to pair gen
+        diagnoses = self.get_diagnoses()
+
+        patient_groups = self.make_patient_groups(file_ids)
+        pids = []
+        pid_to_fids = {}
+        for g in patient_groups:
+            pid = self.get_patient_id(g.file_ids[0])
+            pids.append(pid)
+            pid_to_fids[pid] = g.file_ids
+
+        patient_pairs = list(itertools.combinations(pids, 2))
+
+        pair_to_gen = {}
+        for pid1, pid2 in patient_pairs:
+            first = [fid for fid in pid_to_fids[pid1]
+                     if self.get_diagnose(fid) == diagnoses[0]]
+            # second images
+            second = [fid for fid in pid_to_fids[pid2]
+                      if self.get_diagnose(fid) == diagnoses[1]]
+
+            self.np_random.shuffle(first)
+            self.np_random.shuffle(second)
+
+            p = tuple([pid1, pid2])
+            pair_to_gen[p] = iter(list(itertools.product(first, second)))
+
+        done = False
+        while not done:
+            self.np_random.shuffle(patient_pairs)
+            done = True
+            for pid1, pid2 in patient_pairs:
+                p = tuple([pid1, pid2])
+                pair = next(pair_to_gen[p])
+                if pair is not None:
+                    done = False
+                    yield pair
+
+    def get_pair_gen(self, file_ids):
+        if self.config["same_patient"]:
+            return self.same_patient_gen(file_ids)
+        else:
+            return self.different_patient_gen(file_ids)
+
+    def group_data(self, train_ids, test_ids):
+        self.start_time = process_time()
+        n_pairs = self.config["n_pairs"]
+        n_train_pairs = int(self.config["train_ratio"] * n_pairs)
+
+        # Collect train and test patients
+
+        # Make arbitrary test 
+        groups = []
+        test_groups = self.produce_groups(test_ids, 2, train=False)
+        groups += test_groups
+
+        diagnoses_to_sample = self.config["diagnoses"]
+        assert len(diagnoses_to_sample) == 2
+        self.config["same_diagnosis"] = \
+            (diagnoses_to_sample[0] == diagnoses_to_sample[1])
+
+        pair_gen = self.get_pair_gen(train_ids)
+        sampled = []
+
+        for pair in pair_gen:
+            sampled.append(pair)
+
+            if len(sampled) >= n_train_pairs:
+                break
 
         if len(sampled) < n_pairs:
             warnings.warn("{} sampled only {} pairs!!!".format(self.__class__.__name__, len(sampled)))
