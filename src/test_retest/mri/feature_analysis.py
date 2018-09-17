@@ -351,7 +351,7 @@ class RobustnessMeasureComputation(DataTransformer):
     def feature_aggregation_score(self, streamer_to_comp, out_folder):
         streamer_to_scores = {}
         for streamer, comp in streamer_to_comp.items():
-            scores = self.aggregate_feature(comp)
+            scores = self.aggregate_features(comp)
             streamer_to_scores[streamer.name] = scores
 
         with open(
