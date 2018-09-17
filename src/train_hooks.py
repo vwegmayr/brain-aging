@@ -448,6 +448,7 @@ class RobustnessComputationHook(tf.train.SessionRunHook):
             "src.test_retest.numpy_utils.ICC_A1",
             "src.test_retest.numpy_utils.pearsonr",
             "src.test_retest.numpy_utils.linccc",
+            "src.test_retest.numpy_utils.pearsonr_pvalue"
         ]
 
         rs = self.robustness_streamer_config
