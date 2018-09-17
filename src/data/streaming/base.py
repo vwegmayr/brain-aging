@@ -544,6 +544,28 @@ class FileStream(abc.ABC):
         diagnoses = self.config["use_diagnoses"]
         selected = [fid for fid in file_ids
                     if self.get_diagnose(fid) in diagnoses]
+
+        # For debugging purposes
+        if "select_max" in self.config:
+            maxi = self.config["select_max"]
+            diag_to_pids = {}
+            for d in diagnoses:
+                diag_to_pids[d] = set()
+
+            for fid in selected:
+                pid = self.get_patient_id(fid)
+                diag = self.get_diagnose(fid)
+                pids = diag_to_pids[diag]
+                if len(pids) < maxi:
+                    pids.add(pid)
+
+            selected_patients = set()
+            for d in diagnoses:
+                selected_patients = selected_patients.union(diag_to_pids[d])
+
+            selected = [fid for fid in selected
+                        if self.get_patient_id(fid) in selected_patients]
+
         if not self.silent:
             print("Selected {} out of {}".format(len(selected), len(file_ids)))
         return selected
