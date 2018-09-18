@@ -1273,21 +1273,24 @@ class Patient(object):
     def get_next_image(self):
         return next(self.fid_cycle)
 
-    def find_similar(self):
+    def find_similar(self, same_patient=False):
         """
         Returns true iff a matching patient was found.
         """
         candidates = self.diag_to_patients[self.diagnosis]
         best_cand = None
         best_size = -1
-        for cand in candidates:
-            if cand.patient_id == self.patient_id:
-                continue
-            # allow some size tolerance
-            if cand.patient_id not in self.similar:
-                if (best_cand is None) or (len(cand.similar) < best_size):
-                    best_size = len(cand.similar)
-                    best_cand = cand
+        if same_patient:
+            best_cand = self
+        else:
+            for cand in candidates:
+                if cand.patient_id == self.patient_id:
+                    continue
+                # allow some size tolerance
+                if cand.patient_id not in self.similar:
+                    if (best_cand is None) or (len(cand.similar) < best_size):
+                        best_size = len(cand.similar)
+                        best_cand = cand
 
         # Found match
         if best_cand is not None:
@@ -1387,7 +1390,7 @@ class MixedPairStream(MRISingleStream):
                 self.np_random.shuffle(patients)
                 for pat in patients:
                     if len(pat.similar) == i:
-                        assert pat.find_similar()
+                        assert pat.find_similar(self.config["same_patient"])
 
         # Dissimilar pairs
         assert len(diagnoses) == 2
