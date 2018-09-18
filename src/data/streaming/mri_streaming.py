@@ -1027,18 +1027,30 @@ class MRIDiagnosePairStream(MRISingleStream):
             self.np_random.shuffle(first)
             self.np_random.shuffle(second)
 
-            patient_to_gen[pid] = self.distinct_pairs(first, second)
+            if len(first) == 0 or len(second) == 0:
+                continue
+
+            if diagnoses[0] != diagnoses[1]:
+                patient_to_gen[pid] = self.distinct_pairs(first, second)
+            else:
+                combos = list(itertools.combinations(first, 2))
+                self.np_random.shuffle(combos)
+                patient_to_gen[pid] = iter(combos)
 
         done = False
+        pids = list(patient_to_gen.keys())
         while not done:
             self.np_random.shuffle(pids)
             done = True
             for pid in pids:
                 gen = patient_to_gen[pid]
-                pair = next(gen)
-                if pair is not None:
-                    done = False
-                    yield pair
+                try:
+                    pair = next(gen)
+                    if pair is not None:
+                        done = False
+                        yield pair
+                except StopIteration:
+                    continue
 
     def different_patient_gen(self, file_ids):
         # patient to pair gen
@@ -1049,10 +1061,14 @@ class MRIDiagnosePairStream(MRISingleStream):
         pid_to_fids = {}
         for g in patient_groups:
             pid = self.get_patient_id(g.file_ids[0])
+            # print("{} has {} images".format(pid, len(g.file_ids)))
             pids.append(pid)
             pid_to_fids[pid] = g.file_ids
 
-        patient_pairs = list(itertools.combinations(pids, 2))
+        if diagnoses[0] == diagnoses[1]:
+            patient_pairs = list(itertools.combinations(pids, 2))
+        else:
+            patient_pairs = list(self.distinct_pairs(pids, pids))
 
         pair_to_gen = {}
         for pid1, pid2 in patient_pairs:
@@ -1062,22 +1078,30 @@ class MRIDiagnosePairStream(MRISingleStream):
             second = [fid for fid in pid_to_fids[pid2]
                       if self.get_diagnose(fid) == diagnoses[1]]
 
+            # print("{} has {} images with diag {}".format(pid1, len(first), diagnoses[0]))
+            # print("{} has {} images with diag {}".format(pid2, len(second), diagnoses[1]))
             self.np_random.shuffle(first)
             self.np_random.shuffle(second)
 
             p = tuple([pid1, pid2])
-            pair_to_gen[p] = iter(list(itertools.product(first, second)))
+            combos = list(itertools.product(first, second))
+            self.np_random.shuffle(combos)
+            if len(combos) > 0:
+                pair_to_gen[p] = iter(combos)
 
         done = False
+        patient_pairs = list(pair_to_gen.keys())
         while not done:
             self.np_random.shuffle(patient_pairs)
             done = True
             for pid1, pid2 in patient_pairs:
                 p = tuple([pid1, pid2])
-                pair = next(pair_to_gen[p])
-                if pair is not None:
+                try:
+                    pair = next(pair_to_gen[p])
                     done = False
                     yield pair
+                except StopIteration:
+                    continue
 
     def get_pair_gen(self, file_ids):
         if self.config["same_patient"]:
@@ -1111,7 +1135,7 @@ class MRIDiagnosePairStream(MRISingleStream):
             if len(sampled) >= n_train_pairs:
                 break
 
-        if len(sampled) < n_pairs:
+        if len(sampled) < n_train_pairs:
             warnings.warn("{} sampled only {} pairs!!!".format(self.__class__.__name__, len(sampled)))
 
         sampled = sorted(list(sampled))
@@ -1120,7 +1144,7 @@ class MRIDiagnosePairStream(MRISingleStream):
             id1 = lll[0]
             id2 = lll[1]
             groups.append(Group([id1, id2]))
-            groups[-1].is_train = lll[2]
+            groups[-1].is_train = True
             if self.config["same_diagnosis"]:
                 assert self.get_diagnose(id1) == self.get_diagnose(id2)
             else:
