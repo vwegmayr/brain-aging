@@ -620,8 +620,8 @@ class EvaluateEpochsBaseTF(BaseTF):
 
         # log embedding loss
         log_hook_train = SumatraLoggingHook(
-            ops=[reg_loss, rec_loss],
-            names=["hidden_reg_loss", "reconstruction_loss"],
+            ops=[reg_loss + rec_loss, reg_loss, rec_loss],
+            names=["loss", "hidden_reg_loss", "reconstruction_loss"],
             logger=self.metric_logger,
             namespace="train"
         )
