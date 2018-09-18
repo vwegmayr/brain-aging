@@ -781,12 +781,12 @@ class Conv3DUnetEncoder(Body):
 
         conv3_1 = layers.conv3D_layer(pool2, 'conv3_1', num_filters=n_ch_0*4)
         conv3_2 = layers.conv3D_layer(conv3_1, 'conv3_2', num_filters=n_ch_0*4)
-        pool3 = layers.maxpool3D_layer(conv3_2)
+        # pool3 = layers.maxpool3D_layer(conv3_2)
 
-        conv4_1 = layers.conv3D_layer(pool3, 'conv4_1', num_filters=n_ch_0*8)
-        conv4_2 = layers.conv3D_layer(conv4_1, 'conv4_2', num_filters=n_ch_0*8)
+        # conv4_1 = layers.conv3D_layer(pool3, 'conv4_1', num_filters=n_ch_0*8)
+        # conv4_2 = layers.conv3D_layer(conv4_1, 'conv4_2', num_filters=n_ch_0*8)
 
-        self.z = tf.contrib.layers.flatten(conv4_2)
+        self.z = tf.contrib.layers.flatten(conv3_2)
         current_input = self.z
 
         dim_list = current_input.get_shape().as_list()[1:]
@@ -826,9 +826,9 @@ class Conv3DUnetEncoder(Body):
         self.pool2 = pool2
         self.conv3_1 = conv3_1
         self.conv3_2 = conv3_2
-        self.pool3 = pool3
-        self.conv4_1 = conv4_1
-        self.conv4_2 = conv4_2
+        # self.pool3 = pool3
+        # self.conv4_1 = conv4_1
+        # self.conv4_2 = conv4_2
 
     def get_encoding(self):
         return self.z
@@ -853,12 +853,12 @@ class Conv3DUnetDecoder(Head):
         x = self.target
 
         n_ch_0 = 16
-        conv4_2 = self.encoder.conv4_2
+        # conv4_2 = self.encoder.conv4_2
         conv3_2 = self.encoder.conv3_2
         conv2_2 = self.encoder.conv2_2
         conv1_2 = self.encoder.conv1_2
 
-        current_input = conv4_2
+        current_input = conv3_2
         if self.encoder.linear_trafo:
             dim = self.encoder.dim_before_linear_trafo
 
@@ -874,16 +874,18 @@ class Conv3DUnetDecoder(Head):
                 tf.nn.relu(tf.matmul(self.encoder.z, tf.transpose(W))),
                 b
             )
-            current_input = tf.reshape(current_input, [-1] + conv4_2.get_shape().as_list()[1:])
+            current_input = tf.reshape(current_input, [-1] + conv3_2.get_shape().as_list()[1:])
 
+        """
         upconv3 = layers.deconv3D_layer(current_input, name='upconv3', num_filters=n_ch_0)
         concat3 = layers.crop_and_concat_layer_fixed([upconv3, conv3_2], axis=-1)
 
         conv5_1 = layers.conv3D_layer(concat3, 'conv5_1', num_filters=n_ch_0*4)
 
         conv5_2 = layers.conv3D_layer(conv5_1, 'conv5_2', num_filters=n_ch_0*4)
+        """
 
-        upconv2 = layers.deconv3D_layer(conv5_2, name='upconv2', num_filters=n_ch_0)
+        upconv2 = layers.deconv3D_layer(current_input, name='upconv2', num_filters=n_ch_0)
         concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_2], axis=-1)
 
         conv6_1 = layers.conv3D_layer(concat2, 'conv6_1', num_filters=n_ch_0*2)
