@@ -440,7 +440,10 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.metric_logger.dump()
             sys.stdout.flush()
 
-        self.compress_data()
+        if "keep_embeddings" in self.data_params:
+            self.compress_data(True)
+        else:
+            self.compress_data(False)
         if "keep_checkpoint" in self.data_params:
             if not self.data_params["keep_checkpoint"]:
                 self.remove_checkpoints()
@@ -472,11 +475,12 @@ class EvaluateEpochsBaseTF(BaseTF):
         reg = re.compile(".*tfevents.*")
         self.remove_files(reg, folder)
 
-    def compress_data(self):
+    def compress_data(self, keep):
         smt_label = os.path.split(self.save_path)[-1]
         # Compress dumped embeddings
         compression_utils.compress_embedding_folders(
-            os.path.join(self.data_params["dump_out_dir"], smt_label)
+            os.path.join(self.data_params["dump_out_dir"], smt_label),
+            keep
         )
 
     def get_hooks(self, preds_test, preds_retest, features_test,
