@@ -72,6 +72,7 @@ class BaseTF(BaseEstimator, TransformerMixin):
                     config["model_dir"],
                     "inst-" + str(self.instance_id))
 
+        self.est_config = config
         self.estimator = tf.estimator.Estimator(
             model_fn=self.model_fn,
             params=self.params,
