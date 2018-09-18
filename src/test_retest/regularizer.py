@@ -3,6 +3,7 @@ import tensorflow as tf
 
 # Labels for regularizers
 JS_DIVERGENCE_LABEL = "js_divergence"
+JS_DIVERGENCE_SUM_LABEL = "js_divergence_sum"
 L2_SQUARED_LABEL = "l2_sq"
 COSINE_SIMILARITY = "cosine_sim"
 L1_MEAN = "l1_mean"

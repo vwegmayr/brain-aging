@@ -30,7 +30,19 @@ def name_to_hidden_regularization(layer_id, reg_name, activations_test,
             regularizer.js_divergence
         )
         return tf.losses.compute_weighted_loss(batch_div, weights)
-
+    elif reg_name == regularizer.JS_DIVERGENCE_SUM_LABEL:
+        s_test = activations_test + 0.00001
+        s_retest = activations_retest + 0.0001
+        s_test = s_test / tf.reshape(tf.reduce_sum(s_test, axis=1), [-1, 1])
+        s_retest = s_retest / tf.reshape(tf.reduce_sum(s_retest, axis=1), [-1, 1])
+        n = activations_test.get_shape().as_list()[1]
+        batch_div = regularizer.batch_divergence(
+            s_test,
+            s_retest,
+            n,
+            regularizer.js_divergence
+        )
+        return tf.losses.compute_weighted_loss(batch_div, weights)
     elif reg_name == regularizer.L2_SQUARED_LABEL:
         return tf.losses.mean_squared_error(
                     activations_test, activations_retest,
