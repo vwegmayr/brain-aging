@@ -14,6 +14,7 @@ matplotlib.use('Agg')  # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
 import re
 import types
+import shutil
 
 from src.test_retest import numpy_utils
 from src.test_retest.metrics import specificity_score
@@ -378,6 +379,9 @@ class BatchDumpHook(tf.train.SessionRunHook):
         self.out_dir = os.path.join(out_dir, label, sub)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
+        else:
+            shutil.rmtree(self.out_dir)
+            os.makedirs(self.out_dir)
 
     def get_feature_folder_path(self):
         return self.out_dir
@@ -565,6 +569,9 @@ class PredictionHook(tf.train.SessionRunHook):
         )
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
+        else:
+            shutil.rmtree(self.out_dir)
+            os.makedirs(self.out_dir)
 
         self.streamer = streamer
         self.target_label = target_label
@@ -743,6 +750,9 @@ class PredictionRobustnessHook(tf.train.SessionRunHook):
         )
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
+        else:
+            shutil.rmtree(self.out_dir)
+            os.makedirs(self.out_dir)
 
         self.streamer = streamer
         self.logger = logger
@@ -873,6 +883,9 @@ class TensorPredictionRobustnessHook(tf.train.SessionRunHook):
             name + "_robustness_" + str(epoch)
         )
         if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+        else:
+            shutil.rmtree(self.out_dir)
             os.makedirs(self.out_dir)
 
         self.train = train

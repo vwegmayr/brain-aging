@@ -386,22 +386,6 @@ class EvaluateEpochsBaseTF(BaseTF):
                 input_fn=self.gen_input_fn(X, y, "train", self.input_fn_config)
             )
 
-            # evaluate
-            # evaluation on test set
-            if "no_test" not in self.sumatra_params:
-                evaluation_fn = self.gen_input_fn(
-                    X, y, "test", self.input_fn_config
-                )
-                if evaluation_fn is None:
-                    custom_print("No evaluation - skipping evaluation.")
-                    return
-                evaluation = self.estimator.evaluate(
-                    input_fn=evaluation_fn,
-                    name="test"
-                )
-                print(evaluation)
-                self.metric_logger.add_evaluations("test", evaluation)
-
             # validation
             if "do_validation" in self.sumatra_params and \
                     self.sumatra_params["do_validation"]:
@@ -417,6 +401,22 @@ class EvaluateEpochsBaseTF(BaseTF):
                 )
                 print(validation)
                 self.metric_logger.add_evaluations("validation", validation)
+
+            # evaluate
+            # evaluation on test set
+            if "no_test" not in self.sumatra_params:
+                evaluation_fn = self.gen_input_fn(
+                    X, y, "test", self.input_fn_config
+                )
+                if evaluation_fn is None:
+                    custom_print("No evaluation - skipping evaluation.")
+                    return
+                evaluation = self.estimator.evaluate(
+                    input_fn=evaluation_fn,
+                    name="test"
+                )
+                print(evaluation)
+                self.metric_logger.add_evaluations("test", evaluation)
 
             # persist evaluations to json file
             self.metric_logger.dump()
