@@ -239,14 +239,16 @@ class UnetPairClassification(PairClassification):
             x=x_0,
             training=tf.estimator.ModeKeys.TRAIN == mode,
             scope_name="unet",
-            scope_reuse=False
+            scope_reuse=False,
+            params=params,
         )
 
         enc_1 = architecture(
             x=x_1,
             training=tf.estimator.ModeKeys.TRAIN == mode,
             scope_name="unet",
-            scope_reuse=True
+            scope_reuse=True,
+            params=params
         )
 
         return enc_0, enc_1

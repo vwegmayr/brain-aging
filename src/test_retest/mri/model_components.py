@@ -939,7 +939,7 @@ def single_classification_head(x, y, class_weights, n_classes, scope_name="clf_h
         return probs, preds, loss, acc
 
 
-def C3D_fcn_16_body(x, training, scope_name='classifier', scope_reuse=False):
+def C3D_fcn_16_body(x, training, scope_name='classifier', scope_reuse=False, **kwargs):
     with tf.variable_scope(scope_name) as scope:
         if scope_reuse:
             scope.reuse_variables()
@@ -965,14 +965,18 @@ def C3D_fcn_16_body(x, training, scope_name='classifier', scope_reuse=False):
         conv5_1 = layers.conv3D_layer(pool4, 'conv5_1', num_filters=256)
         conv5_2 = layers.conv3D_layer(conv5_1, 'conv5_2', num_filters=256)
 
-        convD_1 = layers.conv3D_layer(conv5_2, 'convD_1', num_filters=256)
+        n_channels = 256
+        if "params" in kwargs:
+            if "hidden_dim" in kwargs["params"]:
+                n_channels = kwargs["params"]["hidden_dim"]
+        convD_1 = layers.conv3D_layer(conv5_2, 'convD_1', num_filters=n_channels)
 
         logits = tf.reduce_mean(convD_1, axis=(1, 2, 3))
 
     return logits
 
 
-def C3D_fcn_16_bn_body(x, training, scope_name='classifier', scope_reuse=False):
+def C3D_fcn_16_bn_body(x, training, scope_name='classifier', scope_reuse=False, **kwargs):
     with tf.variable_scope(scope_name) as scope:
         if scope_reuse:
             scope.reuse_variables()
@@ -998,7 +1002,11 @@ def C3D_fcn_16_bn_body(x, training, scope_name='classifier', scope_reuse=False):
         conv5_1 = layers.conv3D_layer_bn(pool4, 'conv5_1', training, num_filters=256)
         conv5_2 = layers.conv3D_layer_bn(conv5_1, 'conv5_2', training, num_filters=256)
 
-        convD_1 = layers.conv3D_layer_bn(conv5_2, 'convD_1', training, num_filters=256)
+        n_channels = 256
+        if "params" in kwargs:
+            if "hidden_dim" in kwargs["params"]:
+                n_channels = kwargs["params"]["hidden_dim"]
+        convD_1 = layers.conv3D_layer_bn(conv5_2, 'convD_1', training, num_filters=n_channels)
 
         logits = tf.reduce_mean(convD_1, axis=(1, 2, 3))
 
