@@ -770,7 +770,7 @@ class Conv3DUnetEncoder(Body):
         self.x = x
         current_input = x
 
-        n_ch_0 = 16
+        n_ch_0 = 8
         conv1_1 = layers.conv3D_layer(x, 'conv1_1', num_filters=n_ch_0)
         conv1_2 = layers.conv3D_layer(conv1_1, 'conv1_2', num_filters=n_ch_0)
         pool1 = layers.maxpool3D_layer(conv1_2)
