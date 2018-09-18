@@ -175,8 +175,9 @@ class MRIDatasetSplitter(MRISingleStream):
         for k, v in label_counts.items():
             print("{}: {}".format(k, v))
 
+        n_folds = self.config["n_folds"]
         k_fold = StratifiedKFold(
-            n_splits=self.config["n_folds"],
+            n_splits=n_folds,
             shuffle=True,
             random_state=self.seed,
         )
@@ -195,8 +196,8 @@ class MRIDatasetSplitter(MRISingleStream):
             train_pids, val_pids, train_labels, val_labels = train_test_split(
                 train_val_pids,
                 train_val_labels,
-                train_size=0.8,
-                test_size=0.2,
+                train_size=1 - 1 / n_folds,
+                test_size=1 / n_folds,
                 random_state=self.seed,
                 shuffle=True,
                 stratify=train_val_labels
