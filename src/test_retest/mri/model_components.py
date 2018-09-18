@@ -890,13 +890,13 @@ class Conv3DUnetDecoder(Head):
         concat2 = layers.crop_and_concat_layer_fixed([upconv2, conv2_1], axis=-1)
 
         conv6_1 = layers.conv3D_layer(concat2, 'conv6_1', num_filters=n_ch_0*2)
-        conv6_2 = layers.conv3D_layer(conv6_1, 'conv6_2', num_filters=n_ch_0*2)
+        # conv6_2 = layers.conv3D_layer(conv6_1, 'conv6_2', num_filters=n_ch_0*2)
 
-        upconv1 = layers.deconv3D_layer(conv6_2, name='upconv1', num_filters=n_ch_0)
+        upconv1 = layers.deconv3D_layer(conv6_1, name='upconv1', num_filters=n_ch_0)
         concat1 = layers.crop_and_concat_layer_fixed([upconv1, conv1_1], axis=-1)
 
-        conv8_1 = layers.conv3D_layer(concat1, 'conv8_1', num_filters=n_ch_0)
-        conv8_2 = layers.conv3D_layer(conv8_1, 'conv8_2', num_filters=1, activation=tf.identity)
+        # conv8_1 = layers.conv3D_layer(concat1, 'conv8_1', num_filters=n_ch_0)
+        conv8_2 = layers.conv3D_layer(concat1, 'conv8_2', num_filters=1, activation=tf.identity)
 
         self.y = conv8_2
         self.reconstruction_loss = tf.losses.mean_squared_error(x, self.y)

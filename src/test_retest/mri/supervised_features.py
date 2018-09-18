@@ -47,6 +47,13 @@ class PairClassification(EvaluateEpochsBaseTF):
         train_hooks = []
         eval_hooks = []
 
+        if params["validation"]:
+            eval_name = "validation"
+            validation = True
+        else:
+            eval_name = "test"
+            validation = False
+
         train_hook_names = params["train_hooks"]
         eval_hook_names = params["eval_hooks"]
 
@@ -58,7 +65,7 @@ class PairClassification(EvaluateEpochsBaseTF):
             epoch=self.current_epoch
         )
 
-        if "embeddings" in train_hook_names:
+        if "embeddings" in train_hook_names and not validation:
             enc_0_hook_train, enc_0_hook_test = \
                 hf.get_batch_dump_hook(enc_0, features["file_name_0"])
             train_hooks.append(enc_0_hook_train)
@@ -72,7 +79,7 @@ class PairClassification(EvaluateEpochsBaseTF):
             train_feature_folder = enc_0_hook_train.get_feature_folder_path()
             test_feature_folder = enc_0_hook_test.get_feature_folder_path()
 
-        if "robustness" in train_hook_names:
+        if "robustness" in train_hook_names and not validation:
             robustness_hook_train = self.get_robusntess_analysis_hook(
                 feature_folder=train_feature_folder,
                 train=True
@@ -103,7 +110,7 @@ class PairClassification(EvaluateEpochsBaseTF):
             )
             eval_hooks.append(hook)
 
-        if "predictions" in eval_hook_names:
+        if "predictions" in eval_hook_names and not validation:
             prediction_hook = hf.get_prediction_hook(
                 train_feature_folder=train_feature_folder,
                 test_feature_folder=test_feature_folder,
@@ -144,7 +151,7 @@ class PairClassification(EvaluateEpochsBaseTF):
         eval_hooks.append(log_hook_test)
         """
 
-        if self.current_epoch == self.n_epochs - 1:
+        if self.current_epoch == self.n_epochs - 1 and not validation:
             eval_hooks.append(hf.get_file_summarizer_hook(
                 ["prediction_robustness", "predictions",
                  "head_prediction"]
