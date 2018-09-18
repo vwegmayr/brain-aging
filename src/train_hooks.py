@@ -58,7 +58,7 @@ class HookFactory(object):
             model_save_path=self.model_save_path,
             out_dir=self.out_dir,
             epoch=self.epoch,
-            train=True
+            train=True,
         )
         test_hook = BatchDumpHook(
             tensor_batch=tensor_val,
@@ -78,7 +78,7 @@ class HookFactory(object):
             epoch=self.epoch,
             train=train,
             feature_folder=feature_folder,
-            robustness_streamer_config=streamer_config
+            robustness_streamer_config=streamer_config,
         )
 
         return hook

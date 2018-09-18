@@ -382,11 +382,23 @@ class EvaluateEpochsBaseTF(BaseTF):
         for i in range(n_epochs):
             self.current_epoch = i
             # train
+            self.params["validation"] = False
+            self.estimator = tf.estimator.Estimator(
+                model_fn=self.model_fn,
+                params=self.params,
+                config=tf.estimator.RunConfig(**self.est_config)
+            )
             self.estimator.train(
                 input_fn=self.gen_input_fn(X, y, "train", self.input_fn_config)
             )
 
             # validation
+            self.params["validation"] = True
+            self.estimator = tf.estimator.Estimator(
+                model_fn=self.model_fn,
+                params=self.params,
+                config=tf.estimator.RunConfig(**self.est_config)
+            )
             if "do_validation" in self.sumatra_params and \
                     self.sumatra_params["do_validation"]:
                 validation_fn = self.gen_input_fn(
@@ -404,6 +416,12 @@ class EvaluateEpochsBaseTF(BaseTF):
 
             # evaluate
             # evaluation on test set
+            self.params["validation"] = False
+            self.estimator = tf.estimator.Estimator(
+                model_fn=self.model_fn,
+                params=self.params,
+                config=tf.estimator.RunConfig(**self.est_config)
+            )
             if "no_test" not in self.sumatra_params:
                 evaluation_fn = self.gen_input_fn(
                     X, y, "test", self.input_fn_config
@@ -529,6 +547,13 @@ class EvaluateEpochsBaseTF(BaseTF):
         train_hooks = []
         eval_hooks = []
 
+        if params["validation"]:
+            eval_name = "validation"
+            validation = True
+        else:
+            eval_name = "test"
+            validation = False
+
         train_hook_names = params["train_hooks"]
         eval_hook_names = params["eval_hooks"]
 
@@ -540,7 +565,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             epoch=self.current_epoch
         )
 
-        if "embeddings" in train_hook_names:
+        if "embeddings" in train_hook_names and not validation:
             hidden_0_hook_train, hidden_0_hook_test = \
                 hook_factory.get_batch_dump_hook(
                     enc_0, features["file_name_0"]
@@ -560,7 +585,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             test_feature_folder = \
                 hidden_0_hook_test.get_feature_folder_path()
 
-        if "robustness" in train_hook_names:
+        if "robustness" in train_hook_names and not validation:
             robustness_hook_train = self.get_robusntess_analysis_hook(
                 feature_folder=train_feature_folder,
                 train=True
@@ -572,7 +597,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             train_hooks.append(robustness_hook_train)
             eval_hooks.append(robustness_hook_test)
 
-        if "predictions" in eval_hook_names:
+        if "predictions" in eval_hook_names and not validation:
             prediction_hook = hook_factory.get_prediction_hook(
                 train_feature_folder=train_feature_folder,
                 test_feature_folder=test_feature_folder,
@@ -606,11 +631,11 @@ class EvaluateEpochsBaseTF(BaseTF):
             ops=[reg_loss, rec_loss],
             names=["hidden_reg_loss", "reconstruction_loss"],
             logger=self.metric_logger,
-            namespace="test"
+            namespace=eval_name
         )
         eval_hooks.append(log_hook_test)
 
-        if self.current_epoch == self.n_epochs - 1:
+        if self.current_epoch == self.n_epochs - 1 and not validation:
             eval_hooks.append(hook_factory.get_file_summarizer_hook(
                 ["prediction_robustness", "predictions"]
             ))
