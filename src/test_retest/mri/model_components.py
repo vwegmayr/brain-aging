@@ -771,6 +771,7 @@ class Conv3DUnetEncoder(Body):
         current_input = x
 
         n_ch_0 = 8
+        self.n_ch_0 = n_ch_0
         conv1_1 = layers.conv3D_layer(x, 'conv1_1', num_filters=n_ch_0)
         conv1_2 = layers.conv3D_layer(conv1_1, 'conv1_2', num_filters=n_ch_0)
         pool1 = layers.maxpool3D_layer(conv1_2)
@@ -852,7 +853,7 @@ class Conv3DUnetDecoder(Head):
     def construct_graph(self):
         x = self.target
 
-        n_ch_0 = 16
+        n_ch_0 = self.encoder.n_ch_0
         # conv4_2 = self.encoder.conv4_2
         conv3_2 = self.encoder.conv3_2
         conv2_2 = self.encoder.conv2_2
