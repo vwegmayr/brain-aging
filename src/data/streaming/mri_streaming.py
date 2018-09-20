@@ -1254,8 +1254,8 @@ class Patient(object):
     def __init__(self, file_ids, patient_id):
         self.file_ids = file_ids
         self.patient_id = patient_id
-        self.similar = set([])
-        self.dissimilar = set([])
+        self.similar = []
+        self.dissimilar = []
 
         r = np.random.RandomState(11)
         r.shuffle(self.file_ids)
