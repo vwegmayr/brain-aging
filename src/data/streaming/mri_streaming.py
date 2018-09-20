@@ -1254,8 +1254,10 @@ class Patient(object):
     def __init__(self, file_ids, patient_id):
         self.file_ids = file_ids
         self.patient_id = patient_id
-        self.similar = []
-        self.dissimilar = []
+        self.similar = set([])
+        self.dissimilar = set([])
+        self.sim_count = 0
+        self.dissim_count = 0
 
         r = np.random.RandomState(11)
         r.shuffle(self.file_ids)
@@ -1295,7 +1297,10 @@ class Patient(object):
         # Found match
         if best_cand is not None:
             self.similar.add(best_cand.patient_id)
-            best_cand.similar.add(self.patient_id)
+            self.sim_count += 1
+            if self != best_cand:
+                best_cand.similar.add(self.patient_id)
+                best_cand.sim_count += 1
             return True
 
         for c in candidates:
@@ -1407,7 +1412,7 @@ class MixedPairStream(MRISingleStream):
         for pat in all_patients:
             # allow some tolerance in case patients cannot match up
             # perfectly (dependent on the desired number of pairs)
-            assert len(pat.similar) >= n_pairs_per_patient
+            assert pat.sim_count >= n_pairs_per_patient
             assert len(pat.dissimilar) >= n_pairs_per_patient
 
         if not self.silent:
@@ -1452,8 +1457,13 @@ class MixedPairStream(MRISingleStream):
             # Given pair of patient ids, we need to sample images
             pat1 = patient_id_to_obj[tup[0]]
             pat2 = patient_id_to_obj[tup[1]]
-            g = Group([pat1.get_next_image(), pat2.get_next_image()], True)
-            train_groups.append(g)
+            if self.config["same_patient"] and pat1 == pat2:
+                for i in range(pat1.sim_count):
+                    g = Group([pat1.get_next_image(), pat2.get_next_image()], True)
+                    train_groups.append(g)
+            else:
+                g = Group([pat1.get_next_image(), pat2.get_next_image()], True)
+                train_groups.append(g)
         test_groups = self.produce_groups(test_ids, 2, train=False)
 
         # Make sure all patients are used
