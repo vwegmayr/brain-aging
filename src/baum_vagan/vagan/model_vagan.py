@@ -456,10 +456,16 @@ class vagan:
         self.sess = tf.Session(config=config)
 
     def get_generator_scope_name(self):
-        return self.model_id + "_" + "generator"
+        if self.model_id == "":
+            return "generator"
+        else:
+            return self.model_id + "_" + "generator"
 
     def get_critic_scope_name(self):
-        return self.model_id + "_" + "critic"
+        if self.model_id == "":
+            return "critic"
+        else:
+            return self.model_id + "_" + "critic"
 
     def get_generator_net(self):
         if hasattr(self.exp_config, 'generator_kwargs'):
