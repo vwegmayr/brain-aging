@@ -200,7 +200,7 @@ def pearsonr(Y):
 def pearsonr_pvalue(Y):
     # special case
     if np.array_equal(Y[:, 0], Y[:, 1]):
-        return 1
+        return 0
 
     r, p = sp_pearson(Y[:, 0], Y[:, 1])
     return wrap_nan(p)
