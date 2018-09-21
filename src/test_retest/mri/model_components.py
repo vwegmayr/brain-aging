@@ -522,6 +522,9 @@ class PairClassificationHead(Head):
     def get_predictions(self):
         return self.preds_0, self.preds_1
 
+    def get_labels(self):
+        return self.labels_0, self.labels_1
+
     def get_nodes(self):
         return self.get_predictions(), self.get_total_loss()
 

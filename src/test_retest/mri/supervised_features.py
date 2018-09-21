@@ -23,6 +23,9 @@ class PairClassification(EvaluateEpochsBaseTF):
         )
 
         preds_0, preds_1 = clf.get_predictions()
+        labels_0, labels_1 = clf.get_labels()
+        all_preds = tf.concat([preds_0, preds_1], axis=0)
+        all_labels = tf.concat([labels_0, labels_1], axis=0)
 
         # Make predictions
         predictions = {
@@ -168,7 +171,15 @@ class PairClassification(EvaluateEpochsBaseTF):
                 ))
 
         eval_metric_ops = {
-            "acc": tf.metrics.mean(acc)
+            "acc": tf.metrics.mean(acc),
+            "recall": tf.metrics.recall(
+                labels=all_labels,
+                predictions=all_preds
+            ),
+            "specificity": tf.metrics.recall(
+                labels=1 - all_labels,
+                predictions=1 - all_preds
+            )
         }
         for op, l_name in zip(all_losses, loss_names):
             eval_metric_ops[l_name] = tf.metrics.mean(op)
