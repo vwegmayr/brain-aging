@@ -79,16 +79,18 @@ def summary_table(records):
     
     keys = records[0].value_table.keys()
     # collect
-    means = []
+    means = ["mean"]
+    medians = ["median"]
     for k in keys:
         vals = []
         for r in records:
             vals.append(r.value_table[k])
         means.append(np.mean(vals))
+        medians.append(np.median(vals))
                      
     df = pd.DataFrame(
-        data=np.array([means]),
-        columns=list(keys)
+        data=np.array([means, medians]),
+        columns=["agg"] + list(keys)
     )
     
     df = df.round(4)
