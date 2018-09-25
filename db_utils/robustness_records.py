@@ -84,6 +84,16 @@ class Record(object):
             # check if file contains per feature computations
             if fname.endswith('computations.json'):
                 summ = self.reg_vs_not_reg_file(os.path.join(path, fname))
+
+                for reg in summ.keys():
+                    for m in summ[reg].keys():
+                        values = summ[reg][m]
+                        summ[reg][m] = {
+                            "mean": np.mean(values),
+                            "std": np.std(values),
+                            "median": np.median(values)
+                        }
+
                 k = "_".join(fname.split("_")[:-1])
                 all_summs[k] = summ
 
