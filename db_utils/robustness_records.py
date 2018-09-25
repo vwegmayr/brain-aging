@@ -43,7 +43,7 @@ class Record(object):
             self.sumatra_outcome = json.load(f)
 
     def get_sumatra_values(self, metric_name):
-        return self.sumatra_outcome["numeric_outcome"]["metric_name"]["y"]
+        return self.sumatra_outcome["numeric_outcome"][metric_name]["y"]
 
     def is_regularized(self, feature):
         feature = int(feature)
@@ -164,6 +164,8 @@ class Record(object):
         print("best agreement of {} in epoch {} with test acc {}".format(
             agreements[best_ep], best_ep, test_accs[best_ep]
         ))
+        
+        return best_ep, agreements[best_ep], test_accs[best_ep]
 
 
 def per_run_table(records):
@@ -221,6 +223,14 @@ def reg_vs_not_reg(records):
 
 def best_agreement(records):
     records = sorted(records, key=lambda x: x.split_id)
-
+    rows = []
     for r in records:
-        r.find_best_agreement_epoch()
+        rows.append(r.find_best_agreement_epoch())
+        
+    df = pd.DataFrame(
+        data=np.array(rows),
+        columns=["Epoch", "Agreement Indicator", "Test Accuracy"],
+    )
+    df = df.round(4)
+    print(df.to_latex(index=False))
+
