@@ -128,11 +128,12 @@ class Record(object):
                 continue
             ss = shorten_pair_type(pair_type)
             for reg in all_summs[pair_type].keys():
-                for m, v in all_summs[pair_type][reg].items():
+                for m, m_dic in all_summs[pair_type][reg].items():
                     if m not in METRICS:
                         continue
-                    score_id = "||".join(ss, reg, m)
-                    value_table[score_id] = m
+                    for k, v in m_dic.items():
+                        score_id = "||".join([ss, reg, m, k])
+                        value_table[score_id] = v
         
         return value_table
 
@@ -236,6 +237,7 @@ def summary_table(records):
 
 
 def reg_vs_not_reg(records):
+    print(">>>>> reg vs no reg")
     records = sorted(records, key=lambda x: x.split_id)
 
     values = {}
@@ -244,24 +246,36 @@ def reg_vs_not_reg(records):
         dic = r.reg_vs_not_reg_epoch(r.best_val_ep)
         dics.append(dic)
 
-    keys = dics[0].keys()
-    for dic in dics:
+    def print_table(regb=True):
+        keys = dics[0].keys()
+        for dic in dics:
+            for k in keys:
+                if k not in values:
+                    values[k] = []
+                values[k].append(dic[k])
+
+        columns = []
+        used_keys = []
         for k in keys:
-            if k not in values:
-                values[k] = []
-            values[k].append(dic[k])
+            if regb:
+                if not ("not" in k):
+                    columns.append(values[k])
+                    used_keys.append(k)
+            else:
+                if "not" in k:
+                    columns.append(values[k])
+                    used_keys.append(k)
 
-    columns = []
-    for k in keys:
-        columns.append(values[k])
+        df = pd.DataFrame(
+            data=np.array(columns).T,
+            columns=list(used_keys)
+        )
 
-    df = pd.DataFrame(
-        data=np.array(columns).T,
-        columns=list(keys)
-    )
-
-    df = df.round(4)
-    print(df.to_latex(index=False))
+        df = df.round(4)
+        print(df.to_latex(index=False))
+        
+    print_table(True)
+    print_table(False)
 
 
 def best_agreement(records):

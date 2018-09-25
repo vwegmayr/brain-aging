@@ -32,5 +32,5 @@ RECORDS = [
 if __name__ == "__main__":
     per_run_table(RECORDS)
     summary_table(RECORDS)
-    # reg_vs_not_reg(RECORDS)
+    reg_vs_not_reg(RECORDS)
     best_agreement(RECORDS)
