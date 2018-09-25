@@ -2,6 +2,7 @@ import json
 import os
 import numpy as np
 import pandas as pd
+import yaml
 
 
 DATA_FOLDER = "produced_data"
@@ -15,6 +16,26 @@ class Record(object):
         self.smt_label = smt_label
         self.best_val_ep = best_val_ep
         self.collect_test_aggregated_robustness()
+
+        # Read diag dim
+        config_path = os.path.join(
+            "data",
+            smt_label,
+            "config.yaml"
+        )
+
+        with open(config_path, 'r') as f:
+            config = yaml.load(f)
+
+        self.diag_dim = config["params"]["params"]["diagnose_dim"]
+        self.hidden_dim = config["params"]["params"]["hidden_dim"]
+
+    def is_regularized(self, feature):
+        feature = int(feature)
+        if feature >= self.hidden_dim - self.diag_dim:
+            return True
+        else:
+            return False
 
     def collect_test_aggregated_robustness(self):
         path = os.path.join(
@@ -36,7 +57,7 @@ class Record(object):
             for metric, values in metric_dics.items():
                 if metric not in METRICS:
                     continue
-                
+
                 ss = ""
                 for i, c in enumerate(pair_type):
                     if i == 0 or (i > 0 and pair_type[i - 1] == "_"):
@@ -50,6 +71,46 @@ class Record(object):
                 self.split_stats[score_id + "_" + "mean"] = values["mean"]
                 self.split_stats[score_id + "_" + "std"] = values["std"]
 
+    def reg_vs_not_reg_epoch(self, epoch):
+        path = os.path.join(
+            DATA_FOLDER,
+            self.smt_label,
+            "{}_test_{}".format(ROBUSTNESS_FOLDER, self.best_val_ep),
+            "robustness_measures"
+        )
+
+        all_summs = {}
+        for fname in os.listdir(path):
+            # check if file contains per feature computations
+            if fname.endswith('computations.json'):
+                summ = self.reg_vs_not_reg_file(os.path.join(path, fname))
+                k = "_".join(fname.split("_")[:-1])
+                all_summs[k] = summ
+
+        print(all_summs) 
+
+    def reg_vs_not_reg_file(self, file_path):
+        with open(file_path, 'r') as f:
+            dic = json.load(f)
+
+        features = list(dic.keys())
+        summ = {
+            "reg": {},
+            "not_reg": {}
+        }
+        for f in features:
+            metric_dic = dic[f]
+            if self.is_regularized(f):
+                summ_dic = summ["reg"]
+            else:
+                summ_dic = summ["not_reg"]
+
+            for m, val in metric_dic.items():
+                if m not in summ_dic:
+                    summ_dic[m] = []
+                summ_dic[m].append(val)
+        
+        return summ
 
 def per_run_table(records):
     # sort records by split id
@@ -95,3 +156,10 @@ def summary_table(records):
     
     df = df.round(4)
     print(df.to_latex(index=False))
+
+
+def reg_vs_not_reg(records):
+    records = sorted(records, key=lambda x: x.split_id)
+
+    for r in records:
+        r.reg_vs_not_reg_epoch(r.best_val_ep)    
