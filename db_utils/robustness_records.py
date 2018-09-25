@@ -30,6 +30,20 @@ class Record(object):
 
         self.diag_dim = config["params"]["params"]["diagnose_dim"]
         self.hidden_dim = config["params"]["params"]["hidden_dim"]
+        self.n_epochs = config["params"]["input_fn_config"]["num_epochs"]
+
+        # load sumatra scores
+        sum_path = os.path.join(
+            "data",
+            smt_label,
+            "sumatra_outcome.json"
+        )
+
+        with open(sum_path) as f:
+            self.sumatra_outcome = json.load(f)
+
+    def get_sumatra_values(self, metric_name):
+        return self.sumatra_outcome["numeric_outcome"]["metric_name"]["y"]
 
     def is_regularized(self, feature):
         feature = int(feature)
@@ -124,6 +138,34 @@ class Record(object):
         
         return summ
 
+    def find_best_agreement_epoch(self):
+        agreements = []
+        for i in range(self.n_epochs):
+            path = os.path.join(
+                DATA_FOLDER,
+                self.smt_label,
+                "{}_test_{}".format(ROBUSTNESS_FOLDER, i),
+                "robustness_measures",
+                "feature_aggregation.json"
+            )
+
+            with open(path, 'r') as f:
+                dic = json.load(f)
+
+            agreement_score = 0.5 * dic["same_patient_healthy__healthy"]["ICC_A1"]["median"] +\
+                0.5 * dic["same_patient_health_ad__health_ad"]["ICC_A1"]["median"]
+
+            agreements.append(agreement_score)
+
+        best_ep = np.argmax(agreements)
+        # get test accuracy
+        test_accs = self.get_sumatra_values("test_acc")
+
+        print("best agreement of {} in epoch {} with test acc {}".format(
+            agreements[best_ep], best_ep, test_accs[best_ep]
+        ))
+
+
 def per_run_table(records):
     # sort records by split id
     records = sorted(records, key=lambda x: x.split_id)
@@ -174,4 +216,11 @@ def reg_vs_not_reg(records):
     records = sorted(records, key=lambda x: x.split_id)
 
     for r in records:
-        r.reg_vs_not_reg_epoch(r.best_val_ep)    
+        r.reg_vs_not_reg_epoch(r.best_val_ep)
+
+
+def best_agreement(records):
+    records = sorted(records, key=lambda x: x.split_id)
+
+    for r in records:
+        r.find_best_agreement_epoch()

@@ -1,5 +1,5 @@
 from db_utils.robustness_records import per_run_table, summary_table, Record,\
-    reg_vs_not_reg
+    reg_vs_not_reg, best_agreement
 
 
 RECORDS = [
@@ -32,4 +32,5 @@ RECORDS = [
 if __name__ == "__main__":
     per_run_table(RECORDS)
     summary_table(RECORDS)
-    reg_vs_not_reg(RECORDS)
+    # reg_vs_not_reg(RECORDS)
+    best_agreement(RECORDS)
