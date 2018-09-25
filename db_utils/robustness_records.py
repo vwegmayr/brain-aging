@@ -11,6 +11,14 @@ ROBUSTNESS_FOLDER = "robustness"
 METRICS = ["ICC_A1"]#, "pearsonr", "pearsonr_pvalue"]
 
 
+def shorten_pair_type(pair_type):
+    ss = ""
+    for i, c in enumerate(pair_type):
+        if i == 0 or (i > 0 and pair_type[i - 1] == "_"):
+            ss += c
+    return ss
+
+
 class Record(object):
     def __init__(self, split_id, smt_label, best_val_ep):
         self.split_id = split_id
@@ -112,8 +120,21 @@ class Record(object):
                 k = "_".join(fname.split("_")[:-1])
                 all_summs[k] = summ
 
-        pp = pprint.PrettyPrinter(indent=2)
-        pp.pprint(all_summs) 
+        # pp = pprint.PrettyPrinter(indent=2)
+        # pp.pprint(all_summs)
+        value_table = {}
+        for pair_type in all_summs.keys():
+            if not pair_type.startswith("same"):
+                continue
+            ss = shorten_pair_type(pair_type)
+            for reg in all_summs[pair_type].keys():
+                for m, v in all_summs[pair_type][reg].items():
+                    if m not in METRICS:
+                        continue
+                    score_id = "||".join(ss, reg, m)
+                    value_table[score_id] = m
+        
+        return value_table
 
     def reg_vs_not_reg_file(self, file_path):
         with open(file_path, 'r') as f:
@@ -189,11 +210,11 @@ def per_run_table(records):
 
     df = df.round(4)
     print(df.to_latex(index=False))
-    
-    
+
+
 def summary_table(records):
     records = sorted(records, key=lambda x: x.split_id)
-    
+
     keys = records[0].value_table.keys()
     # collect
     means = ["mean"]
@@ -204,12 +225,12 @@ def summary_table(records):
             vals.append(r.value_table[k])
         means.append(np.mean(vals))
         medians.append(np.median(vals))
-                     
+
     df = pd.DataFrame(
         data=np.array([means, medians]),
         columns=["agg"] + list(keys)
     )
-    
+
     df = df.round(4)
     print(df.to_latex(index=False))
 
@@ -217,8 +238,30 @@ def summary_table(records):
 def reg_vs_not_reg(records):
     records = sorted(records, key=lambda x: x.split_id)
 
+    values = {}
+    dics = []
     for r in records:
-        r.reg_vs_not_reg_epoch(r.best_val_ep)
+        dic = r.reg_vs_not_reg_epoch(r.best_val_ep)
+        dics.append(dic)
+
+    keys = dics[0].keys()
+    for dic in dics:
+        for k in keys:
+            if k not in values:
+                values[k] = []
+            values[k].append(dic[k])
+
+    columns = []
+    for k in keys:
+        columns.append(values[k])
+
+    df = pd.DataFrame(
+        data=np.array(columns).T,
+        columns=list(keys)
+    )
+
+    df = df.round(4)
+    print(df.to_latex(index=False))
 
 
 def best_agreement(records):
