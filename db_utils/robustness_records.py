@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import yaml
+import pprint
 
 
 DATA_FOLDER = "produced_data"
@@ -97,7 +98,8 @@ class Record(object):
                 k = "_".join(fname.split("_")[:-1])
                 all_summs[k] = summ
 
-        print(all_summs) 
+        pp = pprint.PrettyPrinter(indent=2)
+        pp.pprint(all_summs) 
 
     def reg_vs_not_reg_file(self, file_path):
         with open(file_path, 'r') as f:
