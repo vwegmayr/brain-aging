@@ -126,7 +126,7 @@ def threshold_vagan_prob(labels, vagan_probs, eps=None):
 
 
 class TwoStepConversion(object):
-    def __init__(self, vagan_label, clf_label, split_paths, conversion_delta):
+    def __init__(self, vagan_label, clf_label, split_paths, conversion_delta, vagan_rescale):
         """
         Args:
             - vagan_label: sumatra label for VAGAN record
@@ -138,8 +138,18 @@ class TwoStepConversion(object):
         self.clf_label = clf_label
         self.split_paths = split_paths
         self.conversion_delta = conversion_delta
+        self.vagan_rescale = vagan_rescale
 
         self.load_models()
+        
+    def get_config(self):
+        return {
+            "vagan_label": self.vagan_label,
+            "clf_label": self.clf_label,
+            "split_path": self.split_paths,
+            "conversion_delta": self.conversion_delta,
+            "vagan_rescale": self.vagan_rescale
+        }
 
     def load_models(self):
         # Load config file
@@ -193,6 +203,8 @@ class TwoStepConversion(object):
             False
         clf_vagan_config["params"]["streamer"]["params"]["stream_config"]["use_diagnoses"] = \
             ["health_mci", "health_ad"]
+        clf_vagan_config["params"]["streamer"]["params"]["stream_config"]["vagan_rescale"] = \
+            self.vagan_rescale
 
         self.clf_vagan_obj = SliceClassification(**clf_vagan_config["params"])
         self.clf_vagan_est = tf.estimator.Estimator(
@@ -215,6 +227,8 @@ class TwoStepConversion(object):
                 for k, v in scores[strat].items():
                     all_scores[strat][k].append(v)
 
+        print("++++++++++++++++++++")
+        print(self.get_config())
         for strat, agg in all_scores.items():
             print(strat)
             for k, values in agg.items():
@@ -224,6 +238,7 @@ class TwoStepConversion(object):
                     np.std(values),
                     np.median(values)
                 ))
+        print("++++++++++++++++++++")
 
     def load_split(self, split_path):
         folder = split_path
@@ -257,8 +272,10 @@ class TwoStepConversion(object):
             assert a1 - a0 >= self.conversion_delta
 
     def get_labels(self, t0_fids):
-        return [self.clf_only_obj.streamer.get_meta_info_by_key(fid, self.conversion_key)
-                for fid in t0_fids]
+        return np.array(
+            [self.clf_only_obj.streamer.get_meta_info_by_key(fid, self.conversion_key)
+             for fid in t0_fids]
+        )
 
     def compute_probs(self, t0_ids, t1_ids):
         t0_batches = [Group([fid]) for fid in t0_ids]
@@ -280,6 +297,10 @@ class TwoStepConversion(object):
             predict_probabilities(self.clf_vagan_est, vagan_input_fn)
         ]
 
+    def print_label_stats(self, labels):
+        print("number samples: {}".format(len(labels)))
+        print("class 0: {}".format(np.mean((labels == 0).astype(np.int32))))
+
     def fit_split(self, split_path):
         train_ids, val_ids, test_ids = self.load_split(split_path)
         train_ids = train_ids + val_ids
@@ -297,7 +318,13 @@ class TwoStepConversion(object):
 
         # Get labels
         train_labels = self.get_labels(t0_train_ids)
-        test_labels = self.get_labels(t1_test_ids)
+        test_labels = self.get_labels(t0_test_ids)
+        
+        print("++++++ Train stats:")
+        self.print_label_stats(train_labels)
+        
+        print("++++++ Test stats:")
+        self.print_label_stats(test_labels)
 
         # Compute probabilities
         t0_train_probs, t1_train_probs, vagan_train_probs = self.compute_probs(

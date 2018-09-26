@@ -79,7 +79,7 @@ class VaganFarPredictions(MRISingleStream):
 
         last_image = np.squeeze(images[-1])
         if self.do_vagan_rescaling():
-            last_image = map_image_to_intensity_range(image, -1, 1, 5)
+            last_image = map_image_to_intensity_range(last_image, -1, 1, 5)
 
         return last_image
 
