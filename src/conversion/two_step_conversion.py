@@ -80,12 +80,12 @@ def threshold_diff(labels, t0_probs, vagan_probs, eps=None):
                 best_eps[name] = eps
 
     print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
-    for k, v in best_score.items():
-        print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
-        print(v)
+    #for k, v in best_score.items():
+     #   print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
+      #  print(v)
 
-    print("AUC score")
-    print(roc_auc_score(labels, diffs))
+    #print("AUC score")
+    #print(roc_auc_score(labels, diffs))
     return all_eps[np.argmax(accs)], np.max(accs)
 
 
@@ -116,12 +116,12 @@ def threshold_vagan_prob(labels, vagan_probs, eps=None):
                 best_eps[name] = eps
 
     print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
-    for k, v in best_score.items():
-        print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
-        print(v)
+    #for k, v in best_score.items():
+     #   print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
+      #  print(v)
 
-    print("AUC score")
-    print(roc_auc_score(labels, vagan_probs))
+    #print("AUC score")
+    #print(roc_auc_score(labels, vagan_probs))
     return all_eps[np.argmax(accs)], np.max(accs)
 
 
@@ -205,19 +205,21 @@ class TwoStepConversion(object):
         all_scores = {}
         for split_path in self.split_paths:
             scores = self.fit_split(split_path)
+
             for strat in scores.keys():
                 if strat not in all_scores:
                     all_scores[strat] = {}
                     for k in scores[strat].keys():
                         all_scores[strat][k] = []
 
-                for k, v in all_scores[strat].items():
+                for k, v in scores[strat].items():
                     all_scores[strat][k].append(v)
 
         for strat, agg in all_scores.items():
             print(strat)
             for k, values in agg.items():
                 print("{}: mean={}, std={}, median={}".format(
+                    k,
                     np.mean(values),
                     np.std(values),
                     np.median(values)
@@ -250,8 +252,8 @@ class TwoStepConversion(object):
             p1 = self.get_patient_id(t1)
             assert p0 == p1
 
-            a0 = self.get_exact_age(p0)
-            a1 = self.get_exact_age(p1)
+            a0 = self.get_exact_age(t0)
+            a1 = self.get_exact_age(t1)
             assert a1 - a0 >= self.conversion_delta
 
     def get_labels(self, t0_fids):
@@ -284,10 +286,10 @@ class TwoStepConversion(object):
 
         # Get t0 and t1 file IDs
         t0_train_ids = self.clf_only_obj.streamer.select_file_ids(train_ids)
-        t1_train_ids = self.clf_only_obj.streamer.t1_fis[:]
+        t1_train_ids = self.clf_only_obj.streamer.t1_fids[:]
 
         t0_test_ids = self.clf_only_obj.streamer.select_file_ids(test_ids)
-        t1_test_ids = self.clf_only_obj.streamer.t1_fis[:]
+        t1_test_ids = self.clf_only_obj.streamer.t1_fids[:]
 
         # Check pair ordering
         self.check_t0_t1_ordering(t0_train_ids, t1_train_ids)
@@ -338,7 +340,7 @@ class TwoStepConversion(object):
 
         # GT
         best_eps, test_acc = threshold_diff(
-            test_labels, t0_train_probs, t1_train_probs
+            test_labels, t0_test_probs, t1_test_probs
         )
 
         scores["thresh_diff_gt"] = {
