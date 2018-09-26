@@ -6,6 +6,7 @@ import tensorflow as tf
 
 from .mri_streaming import MRISingleStream
 from src.baum_vagan.vagan.model_wrapper import VAGanWrapper
+from src.baum_vagan.utils import map_image_to_intensity_range
 from . import features as _features
 
 
@@ -48,6 +49,12 @@ class VaganFarPredictions(MRISingleStream):
     def get_vagan_steps(self):
         return self.config["vagan_steps"]
 
+    def do_vagan_rescaling(self):
+        if "vagan_rescale" in self.config and self.config["vagan_rescale"]:
+            return True
+        else:
+            return False
+
     def set_vagan_steps(self, n_steps):
         self.config["vagan_steps"] = n_steps
 
@@ -70,7 +77,11 @@ class VaganFarPredictions(MRISingleStream):
             im, n_steps, self.negative_difference_maps()
         )
 
-        return np.squeeze(images[-1])
+        last_image = np.squeeze(images[-1])
+        if self.do_vagan_rescaling():
+            last_image = map_image_to_intensity_range(image, -1, 1, 5)
+
+        return last_image
 
     def get_input_fn(self, mode):
         batches = self.get_batches(mode)
