@@ -1509,3 +1509,13 @@ class MRIClassifierSingleStream(MRISingleStream):
         ]
 
         return file_ids
+
+
+class MRISplitInfoPrinter(MRISingleStream):
+    def __init__(self, *args, **kwargs):
+        super(MRISplitInfoPrinter, self).__init__(
+            *args,
+            **kwargs
+        )
+
+        exit()
