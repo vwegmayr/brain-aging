@@ -276,13 +276,14 @@ class TwoStepConversion(object):
                     np.std(values),
                     np.median(values)
                 ))
+                kk = strat + "_" + k
                 logger.add_evaluations(
                     namespace=None,
                     evaluation_dic={
-                        k + "_mean": np.mean(values),
-                        k + "_std": np.std(values),
-                        k + "_var": np.var(values),
-                        k + "_median": np.median(values),
+                        kk + "_mean": np.mean(values),
+                        kk + "_std": np.std(values),
+                        kk + "_var": np.var(values),
+                        kk + "_median": np.median(values),
                     }
                 )
         print("++++++++++++++++++++")
