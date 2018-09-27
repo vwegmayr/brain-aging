@@ -18,7 +18,10 @@ class MetricLogger(object):
             if k == exclude:
                 continue
 
-            self.add_metric(namespace + "_" + k, evaluation_dic[k])
+            if namespace is not None:
+                self.add_metric(namespace + "_" + k, evaluation_dic[k])
+            else:
+                self.add_metric(k, evaluation_dic[k])
 
     def dump(self):
         metrics = {}

@@ -9,6 +9,7 @@ from sklearn.metrics import recall_score, precision_score, \
 
 from src.test_retest.mri.supervised_features import SliceClassification
 from src.data.streaming.base import Group
+from src.logging import MetricLogger
 
 
 def predict_probabilities(est, input_fn):
@@ -89,6 +90,38 @@ def threshold_diff(labels, t0_probs, vagan_probs, eps=None):
     return all_eps[np.argmax(accs)], np.max(accs)
 
 
+def threshold_log_ratio(labels, t0_probs, vagan_probs, eps=None):
+
+    expected = np.array(labels)
+    ratios = np.log(vagan_probs / t0_probs)
+    accs = []
+    all_scores = []
+    best_score = {}
+    best_eps = {}
+    if eps is None:
+        all_eps = ratios
+    else:
+        all_eps = [eps]
+    for eps in all_eps:
+        predicted_conv = (ratios > eps).astype(np.float32)
+
+        acc = np.mean(predicted_conv == expected)
+        accs.append(acc)
+
+        score_names, scores = compute_scores(labels, predicted_conv)
+        for name in score_names:
+            if name not in best_score:
+                best_score[name] = scores
+                best_eps[name] = eps
+            elif scores[name] > best_score[name][name]:
+                best_score[name] = scores
+                best_eps[name] = eps
+
+    print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
+
+    return all_eps[np.argmax(accs)], np.max(accs)
+
+
 def threshold_vagan_prob(labels, vagan_probs, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
@@ -141,7 +174,10 @@ class TwoStepConversion(object):
         self.vagan_rescale = vagan_rescale
 
         self.load_models()
-        
+
+    def set_save_path(self, save_path):
+        self.save_path = save_path
+
     def get_config(self):
         return {
             "vagan_label": self.vagan_label,
@@ -215,6 +251,8 @@ class TwoStepConversion(object):
 
     def fit(self, X, y=None):
         all_scores = {}
+        logger = MetricLogger(self.save_path)
+
         for split_path in self.split_paths:
             scores = self.fit_split(split_path)
 
@@ -238,7 +276,17 @@ class TwoStepConversion(object):
                     np.std(values),
                     np.median(values)
                 ))
+                logger.add_evaluations(
+                    namespace=None,
+                    evaluation_dic={
+                        k + "_mean": np.mean(values),
+                        k + "_std": np.std(values),
+                        k + "_var": np.var(values),
+                        k + "_median": np.median(values),
+                    }
+                )
         print("++++++++++++++++++++")
+        logger.dump()
 
     def load_split(self, split_path):
         folder = split_path
@@ -350,6 +398,21 @@ class TwoStepConversion(object):
             "test_acc": test_acc
         }
 
+        # Threshold log ratio
+        scores = {}
+        best_eps, train_acc = threshold_log_ratio(
+            train_labels, t0_train_probs, vagan_train_probs
+        )
+        _, test_acc = threshold_log_ratio(
+            test_labels, t0_test_probs, vagan_test_probs, eps=best_eps
+        )
+
+        scores["thresh_log_ratio"] = {
+            "best_train_eps": best_eps,
+            "train_acc": train_acc,
+            "test_acc": test_acc
+        }
+
         # Threshold t1
         best_eps, train_acc = threshold_vagan_prob(
             train_labels, vagan_train_probs
@@ -371,6 +434,15 @@ class TwoStepConversion(object):
         )
 
         scores["thresh_diff_gt"] = {
+            "best_test_eps": best_eps,
+            "test_acc": test_acc
+        }
+
+        best_eps, test_acc = threshold_log_ratio(
+            test_labels, t0_test_probs, t1_test_probs
+        )
+
+        scores["thresh_log_ratio_gt"] = {
             "best_test_eps": best_eps,
             "test_acc": test_acc
         }

@@ -1,0 +1,7 @@
+class: src.conversion.two_step_conversion.TwoStepConversion
+params:
+  vagan_label: 20180926-103515
+  clf_label: 20180926-122729
+  split_paths:
+  - 'data/20180926-102931/split_0'
+  conversion_delta: 4
