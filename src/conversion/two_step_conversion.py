@@ -21,7 +21,7 @@ def predict_probabilities(est, input_fn):
     return np.array(res)
 
 
-def specificity_score(y_true, y_pred):
+def specificity_score_deprecated(y_true, y_pred):
     """
     Compute true negative rate.
     TN / (TN + FP)
@@ -39,6 +39,10 @@ def specificity_score(y_true, y_pred):
     return TN / (TN + FP)
 
 
+def specificity_score(y_true, y_pred):
+    return recall_score(1 - y_true, 1 - y_pred)
+
+
 def compute_scores(y_true, y_pred):
     funcs = [accuracy_score, recall_score, precision_score,
              specificity_score, f1_score]
@@ -53,7 +57,21 @@ def compute_scores(y_true, y_pred):
     return names, scores
 
 
-def threshold_diff(labels, t0_probs, vagan_probs, eps=None):
+def threshold_probs(labels, probs, target_metric, all_eps):
+    target_scores = []
+    all_scores = []
+    for eps in all_eps:
+        preds = (probs > eps).astype(np.float32)
+
+        score_names, scores = compute_scores(labels, preds)
+        target_scores.append(scores[target_metric])
+        all_scores.append(scores)
+
+    i = np.argmax(target_scores)
+    return all_eps[i], all_scores[i]
+
+
+def threshold_diff(labels, t0_probs, vagan_probs, target_metric, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
     else:
@@ -61,105 +79,52 @@ def threshold_diff(labels, t0_probs, vagan_probs, eps=None):
 
     expected = np.array(labels)
     diffs = vagan_probs - t0_probs
-    accs = []
-    all_scores = []
-    best_score = {}
-    best_eps = {}
-    for eps in all_eps:
-        predicted_conv = (diffs > eps).astype(np.float32)
 
-        acc = np.mean(predicted_conv == expected)
-        accs.append(acc)
-
-        score_names, scores = compute_scores(labels, predicted_conv)
-        for name in score_names:
-            if name not in best_score:
-                best_score[name] = scores
-                best_eps[name] = eps
-            elif scores[name] > best_score[name][name]:
-                best_score[name] = scores
-                best_eps[name] = eps
-
-    print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
-    #for k, v in best_score.items():
-     #   print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
-      #  print(v)
-
-    #print("AUC score")
-    #print(roc_auc_score(labels, diffs))
-    return all_eps[np.argmax(accs)], np.max(accs)
+    return threshold_probs(
+        labels=expected,
+        probs=diffs,
+        target_metric=target_metric,
+        all_eps=all_eps
+    )
 
 
-def threshold_log_ratio(labels, t0_probs, vagan_probs, eps=None):
+def threshold_log_ratio(labels, t0_probs, vagan_probs, target_metric, eps=None):
 
     expected = np.array(labels)
     ratios = np.log(vagan_probs / t0_probs)
-    accs = []
-    all_scores = []
-    best_score = {}
-    best_eps = {}
+
     if eps is None:
         all_eps = ratios
     else:
         all_eps = [eps]
-    for eps in all_eps:
-        predicted_conv = (ratios > eps).astype(np.float32)
 
-        acc = np.mean(predicted_conv == expected)
-        accs.append(acc)
-
-        score_names, scores = compute_scores(labels, predicted_conv)
-        for name in score_names:
-            if name not in best_score:
-                best_score[name] = scores
-                best_eps[name] = eps
-            elif scores[name] > best_score[name][name]:
-                best_score[name] = scores
-                best_eps[name] = eps
-
-    print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
-
-    return all_eps[np.argmax(accs)], np.max(accs)
+    return threshold_probs(
+        labels=expected,
+        probs=ratios,
+        target_metric=target_metric,
+        all_eps=all_eps
+    )
 
 
-def threshold_vagan_prob(labels, vagan_probs, eps=None):
+def threshold_t1_probs(labels, t1_probs, target_metric, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
     else:
         all_eps = [eps]
 
     expected = np.array(labels)
-    accs = []
-    all_scores = []
-    best_score = {}
-    best_eps = {}
-    for eps in all_eps:
-        predicted_conv = (vagan_probs > eps).astype(np.float32)
 
-        acc = np.mean(predicted_conv == expected)
-        accs.append(acc)
-
-        score_names, scores = compute_scores(labels, predicted_conv)
-        for name in score_names:
-            if name not in best_score:
-                best_score[name] = scores
-                best_eps[name] = eps
-            elif scores[name] > best_score[name][name]:
-                best_score[name] = scores
-                best_eps[name] = eps
-
-    print("Max acc {} for eps {}".format(np.max(accs), all_eps[np.argmax(accs)]))
-    #for k, v in best_score.items():
-     #   print("scores for best {} (eps={})".format(k, round(best_eps[k], 3)))
-      #  print(v)
-
-    #print("AUC score")
-    #print(roc_auc_score(labels, vagan_probs))
-    return all_eps[np.argmax(accs)], np.max(accs)
+    return threshold_probs(
+        labels=expected,
+        probs=t1_probs,
+        target_metric=target_metric,
+        all_eps=all_eps
+    )
 
 
 class TwoStepConversion(object):
-    def __init__(self, vagan_label, clf_label, split_paths, conversion_delta, vagan_rescale):
+    def __init__(self, vagan_label, clf_label, split_paths, conversion_delta,
+                 vagan_rescale, target_metric):
         """
         Args:
             - vagan_label: sumatra label for VAGAN record
@@ -172,6 +137,7 @@ class TwoStepConversion(object):
         self.split_paths = split_paths
         self.conversion_delta = conversion_delta
         self.vagan_rescale = vagan_rescale
+        self.target_metric = target_metric
 
         self.load_models()
 
@@ -184,7 +150,8 @@ class TwoStepConversion(object):
             "clf_label": self.clf_label,
             "split_path": self.split_paths,
             "conversion_delta": self.conversion_delta,
-            "vagan_rescale": self.vagan_rescale
+            "vagan_rescale": self.vagan_rescale,
+            "target_metric": self.target_metric
         }
 
     def load_models(self):
@@ -350,6 +317,10 @@ class TwoStepConversion(object):
         print("number samples: {}".format(len(labels)))
         print("class 0: {}".format(np.mean((labels == 0).astype(np.int32))))
 
+    def add_scores(self, src, dest, namespace):
+        for k, v in src.items():
+            dest[namespace + "_" + k] = v
+
     def fit_split(self, split_path):
         train_ids, val_ids, test_ids = self.load_split(split_path)
         train_ids = train_ids + val_ids
@@ -368,10 +339,10 @@ class TwoStepConversion(object):
         # Get labels
         train_labels = self.get_labels(t0_train_ids)
         test_labels = self.get_labels(t0_test_ids)
-        
+
         print("++++++ Train stats:")
         self.print_label_stats(train_labels)
-        
+
         print("++++++ Test stats:")
         self.print_label_stats(test_labels)
 
@@ -386,75 +357,113 @@ class TwoStepConversion(object):
         # Compute scores
         # Threshold diff
         scores = {}
-        best_eps, train_acc = threshold_diff(
-            train_labels, t0_train_probs, vagan_train_probs
+        best_eps, train_scores = threshold_diff(
+            train_labels, t0_train_probs, vagan_train_probs, self.target_metric
         )
-        _, test_acc = threshold_diff(
-            test_labels, t0_test_probs, vagan_test_probs, eps=best_eps
+        _, test_scores = threshold_diff(
+            test_labels, t0_test_probs, vagan_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_diff"] = {
             "best_train_eps": best_eps,
-            "train_acc": train_acc,
-            "test_acc": test_acc
         }
+        self.add_scores(
+            dest=scores["thresh_diff"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_diff"],
+            src=test_scores,
+            namespace="test"
+        )
 
         # Threshold log ratio
         scores = {}
-        best_eps, train_acc = threshold_log_ratio(
-            train_labels, t0_train_probs, vagan_train_probs
+        best_eps, train_scores = threshold_log_ratio(
+            train_labels, t0_train_probs, vagan_train_probs, self.target_metric
         )
-        _, test_acc = threshold_log_ratio(
-            test_labels, t0_test_probs, vagan_test_probs, eps=best_eps
+        _, test_scores = threshold_log_ratio(
+            test_labels, t0_test_probs, vagan_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_log_ratio"] = {
             "best_train_eps": best_eps,
-            "train_acc": train_acc,
-            "test_acc": test_acc
         }
-
-        # Threshold t1
-        best_eps, train_acc = threshold_vagan_prob(
-            train_labels, vagan_train_probs
+        self.add_scores(
+            dest=scores["thresh_log_ratio"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_log_ratio"],
+            src=test_scores,
+            namespace="test"
         )
 
-        _, test_acc = threshold_vagan_prob(
-            test_labels, vagan_test_probs, eps=best_eps
+        # Threshold t1
+        best_eps, train_scores = threshold_t1_probs(
+            train_labels, vagan_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_t1_probs(
+            test_labels, vagan_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_t1"] = {
             "best_train_eps": best_eps,
-            "train_acc": train_acc,
-            "test_acc": test_acc
         }
 
+        self.add_scores(
+            dest=scores["thresh_t1"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_t1"],
+            src=test_scores,
+            namespace="test"
+        )
+
         # GT
-        best_eps, test_acc = threshold_diff(
-            test_labels, t0_test_probs, t1_test_probs
+        best_eps, test_scores = threshold_diff(
+            test_labels, t0_test_probs, t1_test_probs, self.target_metric
         )
 
         scores["thresh_diff_gt"] = {
-            "best_test_eps": best_eps,
-            "test_acc": test_acc
+            "best_test_eps": best_eps
         }
+        self.add_scores(
+            dest=scores["thresh_diff_gt"],
+            src=test_scores,
+            namespace="test"
+        )
 
-        best_eps, test_acc = threshold_log_ratio(
-            test_labels, t0_test_probs, t1_test_probs
+        best_eps, test_scores = threshold_log_ratio(
+            test_labels, t0_test_probs, t1_test_probs, self.target_metric
         )
 
         scores["thresh_log_ratio_gt"] = {
-            "best_test_eps": best_eps,
-            "test_acc": test_acc
+            "best_test_eps": best_eps
         }
+        self.add_scores(
+            dest=scores["thresh_log_ratio_gt"],
+            src=test_scores,
+            namespace="test"
+        )
 
-        best_eps, test_acc = threshold_vagan_prob(
-            test_labels, t1_test_probs
+        best_eps, test_scores = threshold_t1_probs(
+            test_labels, t1_test_probs, self.target_metric
         )
 
         scores["thresh_t1_gt"] = {
-            "best_test_eps": best_eps,
-            "test_acc": test_acc
+            "best_test_eps": best_eps
         }
+
+        self.add_scores(
+            dest=scores["thresh_t1_gt"],
+            src=test_scores,
+            namespace="test"
+        )
 
         return scores
