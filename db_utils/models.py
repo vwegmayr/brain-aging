@@ -187,15 +187,15 @@ class RecordGroup(object):
         print(df)
         print(df.to_latex(index=False))
 
-    def print_run_accuracies(self, metrics):
+    def print_run_accuracies(self, metrics, validation_metric):
         # Fold accuracy based on best validation epoch
-        header = ["run", "bestValEpoch", "bestValAcc"]
+        header = ["run", "bestValEpoch", "bestValScore"]
 
         metric_to_values = OrderedDict()
         for m in metrics:
             header.append(toCamelCase(m))
             metric_to_values[m] = []
-        
+    
         metric_to_values["maxTestAcc"] = []
         header.append("maxTestAcc")
         metric_to_values["lastEpAcc"] = []
@@ -205,10 +205,10 @@ class RecordGroup(object):
         for record in self.records:
             run = record.run_id
             best_ep = record.get_best_validation_epoch(
-                "validation_acc"
+                validation_metric
             )
-            best_val_acc = record.get_metric_values(
-                metric="validation_acc",
+            best_val_score = record.get_metric_values(
+                metric=validation_metric,
                 epoch=best_ep
             )
             """
@@ -217,7 +217,7 @@ class RecordGroup(object):
                 epoch=best_ep
             )
             """
-            row = [run, best_ep, best_val_acc]
+            row = [run, best_ep, best_val_score]
 
             for m in metrics:
                 val = record.get_metric_values(
