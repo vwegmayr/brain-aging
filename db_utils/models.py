@@ -187,7 +187,7 @@ class RecordGroup(object):
         print(df)
         print(df.to_latex(index=False))
 
-    def print_run_accuracies(self, metrics, validation_metric):
+    def print_run_accuracies(self, metrics, validation_metric, max_test=True):
         # Fold accuracy based on best validation epoch
         header = ["run", "bestValEpoch", "bestValScore"]
 
@@ -195,11 +195,12 @@ class RecordGroup(object):
         for m in metrics:
             header.append(toCamelCase(m))
             metric_to_values[m] = []
-    
-        metric_to_values["maxTestAcc"] = []
-        header.append("maxTestAcc")
-        metric_to_values["lastEpAcc"] = []
-        header.append("lastEpAcc")
+
+        if max_test:
+            metric_to_values["maxTestAcc"] = []
+            header.append("maxTestAcc")
+            metric_to_values["lastEpAcc"] = []
+            header.append("lastEpAcc")
 
         table = []
         for record in self.records:
@@ -227,13 +228,14 @@ class RecordGroup(object):
                 row.append(val)
                 metric_to_values[m].append(val)
 
-            test_accs = record.get_metric_values(
-                metric="test_acc"
-            )
-            row.append(np.max(test_accs))
-            metric_to_values["maxTestAcc"].append(np.max(test_accs))
-            row.append(test_accs[-1])
-            metric_to_values["lastEpAcc"].append(test_accs[-1])
+            if max_test:
+                test_accs = record.get_metric_values(
+                    metric="test_acc"
+                )
+                row.append(np.max(test_accs))
+                metric_to_values["maxTestAcc"].append(np.max(test_accs))
+                row.append(test_accs[-1])
+                metric_to_values["lastEpAcc"].append(test_accs[-1])
 
             table.append(row)
 

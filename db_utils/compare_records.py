@@ -22,6 +22,7 @@ Y_LABEL = config.Y_LABEL
 ID_TAGS = config.ID_TAGS
 REPORT_METRICS = config.REPORT_METRICS
 VALIDATION_METRIC = config.VALIDATION_METRIC
+MAX_TEST = config.MAX_TEST
 
 FILTERS = config.FILTERS
 LEGEND_LOC = config.LEGEND_LOC
@@ -112,7 +113,7 @@ def plot_groups(groups):
     )
 
     for g in groups:
-        g.print_run_accuracies(REPORT_METRICS, VALIDATION_METRIC)
+        g.print_run_accuracies(REPORT_METRICS, VALIDATION_METRIC, MAX_TEST)
 
 
 def main():
