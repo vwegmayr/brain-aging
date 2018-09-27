@@ -106,7 +106,7 @@ def threshold_log_ratio(labels, t0_probs, vagan_probs, target_metric, eps=None):
     )
 
 
-def threshold_t1_probs(labels, t1_probs, target_metric, eps=None):
+def threshold_time_probs(labels, t1_probs, target_metric, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
     else:
@@ -402,11 +402,11 @@ class TwoStepConversion(object):
         )
 
         # Threshold t1
-        best_eps, train_scores = threshold_t1_probs(
+        best_eps, train_scores = threshold_time_probs(
             train_labels, vagan_train_probs, self.target_metric
         )
 
-        _, test_scores = threshold_t1_probs(
+        _, test_scores = threshold_time_probs(
             test_labels, vagan_test_probs, self.target_metric, eps=best_eps
         )
 
@@ -421,6 +421,30 @@ class TwoStepConversion(object):
         )
         self.add_scores(
             dest=scores["thresh_t1"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        # Treshold t0
+        best_eps, train_scores = threshold_time_probs(
+            train_labels, t0_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_time_probs(
+            test_labels, t0_test_probs, self.target_metric, eps=best_eps
+        )
+
+        scores["thresh_t0"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_t0"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_t0"],
             src=test_scores,
             namespace="test"
         )
@@ -452,7 +476,7 @@ class TwoStepConversion(object):
             namespace="test"
         )
 
-        best_eps, test_scores = threshold_t1_probs(
+        best_eps, test_scores = threshold_time_probs(
             test_labels, t1_test_probs, self.target_metric
         )
 
