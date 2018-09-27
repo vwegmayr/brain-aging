@@ -319,6 +319,10 @@ class SliceClassification(EvaluateEpochsBaseTF):
                 labels=y,
                 predictions=preds
             ),
+            "specificity": tf.metrics.recall(
+                labels=1 - y,
+                predictions=1 - preds,
+            ),
             "precision": tf.metrics.precision(
                 labels=y,
                 predictions=preds

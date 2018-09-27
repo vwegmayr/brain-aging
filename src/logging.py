@@ -1,6 +1,12 @@
 import json
 
 
+def f1_score(precision, recall):
+    if precision * recall == 0:
+        return 0
+    return 2 * (precision * recall) / (precision + recall)
+
+
 class MetricLogger(object):
     def __init__(self, outdir, description="description goes here"):
         self.description = description
@@ -14,6 +20,12 @@ class MetricLogger(object):
         self.metrics[label].append(float(value))
 
     def add_evaluations(self, namespace, evaluation_dic, exclude=""):
+        # F1 score
+        if "precision" in evaluation_dic and "recall" in evaluation_dic:
+            evaluation_dic["f1_score"] = f1_score(
+                precision=evaluation_dic["precision"],
+                recall=evaluation_dic["recall"]
+            )
         for k in evaluation_dic:
             if k == exclude:
                 continue
@@ -32,7 +44,7 @@ class MetricLogger(object):
                 "x": list(range(1, n + 1)),
                 "y": self.metrics[k]
             }
-            metrics[k] = det
+            metrics[k] = det        
 
         obj = {
             "text_outcome": self.description,
