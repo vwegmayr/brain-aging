@@ -380,7 +380,6 @@ class TwoStepConversion(object):
         )
 
         # Threshold log ratio
-        scores = {}
         best_eps, train_scores = threshold_log_ratio(
             train_labels, t0_train_probs, vagan_train_probs, self.target_metric
         )
