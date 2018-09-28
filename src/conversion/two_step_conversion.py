@@ -6,6 +6,7 @@ import tensorflow as tf
 import numpy as np
 from sklearn.metrics import recall_score, precision_score, \
     accuracy_score, f1_score, roc_auc_score
+import matplotlib.pyplot as plt
 
 from src.test_retest.mri.supervised_features import SliceClassification
 from src.data.streaming.base import Group
@@ -491,3 +492,77 @@ class TwoStepConversion(object):
         )
 
         return scores
+
+
+def ProbabilityConvergence(TwoStepConversion):
+    def __init__(self, vagan_label, clf_label, split_path, time_delta,
+                 conversion_delta, vagan_rescale):
+        self.vagan_label = vagan_label
+        self.clf_label = clf_label
+        self.split_path = split_path
+        self.time_delta = time_delta
+        self.conversion_delta = conversion_delta
+        self.vagan_rescale = vagan_rescale
+
+        self.load_models()
+
+    def set_save_path(self, save_path):
+        self.save_path = save_path
+
+    def compute_probs(self, t0_ids):
+        n = len(t0_ids)
+        probs = np.zeros(n, self.time_delta + 1)
+        t0_batches = [Group([fid]) for fid in t0_ids]
+
+        for i in range(self.time_delta):
+            vagan_input_fn = self.clf_vagan_obj.streamer.get_input_fn_for_groups(
+                t0_batches,
+                vagan_steps=i + 1
+            )
+            probs_i = predict_probabilities(self.clf_vagan_est, vagan_input_fn)
+            probs[:, i + 1] = probs_i
+
+        # t0 probs
+        t0_input_fn = self.clf_only_obj.streamer.get_input_fn_for_groups(
+            t0_batches
+        )
+        t0_probs = predict_probabilities(self.clf_only_est, t0_input_fn)
+        probs[:, 0] = t0_probs
+
+        return probs
+
+    def get_hc_ids(self, fids):
+        return [fid for fid in fids
+                if self.clf_only_obj.streamer.get_diagnose(fid) == "healthy"]
+
+    def get_conv_ids(self, fids):
+        k = "mci_ad_conv_delta_{}".format(self.conversion_delta)
+        return [fid for fid in fids
+                if self.clf_only_obj.streamer.get_meta_info_by_key(fid, k) == 1]
+
+    def get_non_conv_ids(self, fids):
+        k = "mci_ad_conv_delta_{}".format(self.conversion_delta)
+        return [fid for fid in fids
+                if self.clf_only_obj.streamer.get_meta_info_by_key(fid, k) == 0]
+
+    def fit(self, X, y=None):
+        _, val_ids, test_ids = self.load_split(self.split_path)
+        t0_val_ids = self.clf_only_obj.streamer.select_file_ids(val_ids)
+        t0_test_ids = self.clf_only_obj.streamer.select_file_ids(test_ids)
+
+        hc_ids = self.get_hc_ids(t0_val_ids)
+        conv_ids = self.get_conv_ids(t0_test_ids)
+        non_conv_ids = self.get_non_conv_ids(t0_test_ids)
+
+        hc_probs = self.compute_probs(hc_ids)
+        conv_probs = self.compute_probs(conv_ids)
+        non_conv_probs = self.compute_probs(non_conv_ids)
+
+        x = list(range(self.time_delta + 1))
+        plt.plot(x, hc_probs, label="HC")
+        plt.plot(x, conv_probs, label="Converting")
+        plt.plot(x, non_conv_probs, label="Non-Converting")
+
+        plt.legend(loc=0, ncol=1)
+        plt.show()
+        plt.savefig(os.path.join(self.save_path, "population.pdf"))
