@@ -511,7 +511,7 @@ class ProbabilityConvergence(TwoStepConversion):
 
     def compute_probs(self, t0_ids):
         n = len(t0_ids)
-        probs = np.zeros(n, self.time_delta + 1)
+        probs = np.zeros((n, self.time_delta + 1))
         t0_batches = [Group([fid]) for fid in t0_ids]
 
         for i in range(self.time_delta):
@@ -530,6 +530,17 @@ class ProbabilityConvergence(TwoStepConversion):
         probs[:, 0] = t0_probs
 
         return probs
+    
+    def get_t0_ids(self, file_ids):
+        streamer = self.clf_only_obj.streamer
+        patient_groups = streamer.make_patient_groups(file_ids)
+        res = []
+        for g in patient_groups:
+            fids = g.file_ids
+            fids = sorted(fids, key=lambda x: streamer.get_exact_age(x))
+            res.append(fids[0])
+        
+        return res
 
     def get_hc_ids(self, fids):
         return [fid for fid in fids
@@ -547,10 +558,10 @@ class ProbabilityConvergence(TwoStepConversion):
 
     def fit(self, X, y=None):
         _, val_ids, test_ids = self.load_split(self.split_path)
-        t0_val_ids = self.clf_only_obj.streamer.select_file_ids(val_ids)
+        t0_val_ids = self.get_t0_ids(val_ids)
         t0_test_ids = self.clf_only_obj.streamer.select_file_ids(test_ids)
 
-        hc_ids = self.get_hc_ids(t0_val_ids)
+        hc_ids = self.get_hc_ids(val_ids)
         conv_ids = self.get_conv_ids(t0_test_ids)
         non_conv_ids = self.get_non_conv_ids(t0_test_ids)
 
@@ -559,9 +570,15 @@ class ProbabilityConvergence(TwoStepConversion):
         non_conv_probs = self.compute_probs(non_conv_ids)
 
         x = list(range(self.time_delta + 1))
-        plt.plot(x, hc_probs, label="HC")
-        plt.plot(x, conv_probs, label="Converting")
-        plt.plot(x, non_conv_probs, label="Non-Converting")
+        hc_mean = np.mean(hc_probs, axis=0)
+        hc_std = np.std(hc_probs, axis=0)
+        conv_mean = np.mean(conv_probs, axis=0)
+        conv_std = np.std(conv_probs, axis=0)
+        non_conv_mean = np.mean(non_conv_probs, axis=0)
+        non_conv_std = np.std(non_conv_probs, axis=0)
+        plt.errorbar(x, hc_mean, yerr=hc_std, marker='o', label="HC")
+        plt.errorbar(x, conv_mean, yerr=conv_std, marker='+', label="Converting")
+        plt.errorbar(x, non_conv_mean, yerr=non_conv_std, marker='s', label="Non-Converting")
 
         plt.legend(loc=0, ncol=1)
         plt.show()
