@@ -494,7 +494,7 @@ class TwoStepConversion(object):
         return scores
 
 
-def ProbabilityConvergence(TwoStepConversion):
+class ProbabilityConvergence(TwoStepConversion):
     def __init__(self, vagan_label, clf_label, split_path, time_delta,
                  conversion_delta, vagan_rescale):
         self.vagan_label = vagan_label
