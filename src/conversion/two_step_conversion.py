@@ -581,4 +581,17 @@ class ProbabilityConvergence(TwoStepConversion):
 
         plt.legend(loc=0, ncol=1)
         plt.show()
-        plt.savefig(os.path.join(self.save_path, "population.pdf"))
+        #plt.savefig(os.path.join(self.save_path, "population.pdf"))
+
+        # boxplot
+        plt.boxplot(hc_probs)
+        plt.title("HC box plot")
+        plt.show()
+        
+        plt.boxplot(conv_probs)
+        plt.title("Converting box plot")
+        plt.show()
+        
+        plt.boxplot(non_conv_probs)
+        plt.title("Non-Converting box plot")
+        plt.show()
