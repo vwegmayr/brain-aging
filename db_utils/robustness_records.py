@@ -220,15 +220,17 @@ def summary_table(records):
     # collect
     means = ["mean"]
     medians = ["median"]
+    stds = ["std"]
     for k in keys:
         vals = []
         for r in records:
             vals.append(r.value_table[k])
         means.append(np.mean(vals))
         medians.append(np.median(vals))
+        stds.append(np.std(vals))
 
     df = pd.DataFrame(
-        data=np.array([means, medians]),
+        data=np.array([means, medians, stds]),
         columns=["agg"] + list(keys)
     )
 

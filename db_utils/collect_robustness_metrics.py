@@ -1,7 +1,7 @@
 from db_utils.robustness_records import per_run_table, summary_table, Record,\
     reg_vs_not_reg, best_agreement
 
-
+"""
 RECORDS = [
     Record(0, "20180921-101852", 10),
     Record(1, "20180921-123619", 8),
@@ -14,8 +14,8 @@ RECORDS = [
     Record(8, "20180921-212036", 7),
     Record(9, "20180921-230207", 5),
 ]
-
 """
+
 RECORDS = [
     Record(0, "20180921-101902", 7),
     Record(1, "20180921-123629", 5),
@@ -28,7 +28,7 @@ RECORDS = [
     Record(8, "20180921-223453", 11),
     Record(9, "20180921-233022", 7),
 ]
-"""
+
 """
 RECORDS = [
     Record(0, "20180930-084902", 10),
