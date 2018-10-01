@@ -23,12 +23,20 @@ Here we briefly describe how to generate and train a model on synthetic data.
 ```shell
 python run.py --config toy_vagan/sample_syn_tzero_not_fixed.yaml -a transform -S data
 ```
+or (with sumatra tracking)
+```shell
+smt run --config toy_vagan/sample_syn_tzero_not_fixed.yaml -a transform -S data
+```
 This will create a new folder in the sumatra `data` folder containing the generated synthetic data. The output folder can be configured by setting `params.outdir` in `toy_vagan/sample_syn_tzero_not_fixed.yaml`.
 
 ##### Model training
 The model can be trained using
 ```shell
 python run.py --config toy_vagan/disks_synthetic.yaml -a fit -S data
+```
+or (with sumatra tracking)
+```shell
+smt run --config toy_vagan/disks_synthetic.yaml -a fit -S data
 ```
 The input folder has to be adapted by setting `params.stream_config.data_path` in `toy_vagan/disks_synthetic.yaml`, if it was changed in the previous step.
 A new folder will be created in the `data` folder and the folder's name will contain the initial timestamp corresponding to the training starting point. This folder will contain tensorboard summaries and model checkpoints. The images summaries are named as follows. The `train_a_generated_CN` images correspond to the generated training images. The `train_b_difference_CN` correspond to the generated difference maps. The `train_example_AD_delta_img` images correspond to the ground-truth difference maps. The `train_example_AD` images correspond to the inputs fed to the generator.

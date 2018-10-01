@@ -17,6 +17,7 @@ params:
   # Model settings
   critic_net: src.baum_vagan.vagan.network_zoo.nets2D.critics.C3D_fcn_16_2D
   generator_net: src.baum_vagan.vagan.network_zoo.nets2D.mask_generators.unet_16_2D_bn
+  model_id: synthetic
   #generator_kwargs:
    # max_iterations: 3
   conditioned_gan: True
