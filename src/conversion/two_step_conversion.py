@@ -450,21 +450,35 @@ class TwoStepConversion(object):
         )
 
         # GT
-        best_eps, test_scores = threshold_diff(
-            test_labels, t0_test_probs, t1_test_probs, self.target_metric
+        best_eps, train_scores = threshold_diff(
+            train_labels, t0_train_probs, t1_train_probs, self.target_metric
+        )
+
+        test_scores = threshold_diff(
+            test_labels, t0_test_probs, t1_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_diff_gt"] = {
             "best_test_eps": best_eps
         }
+
+        self.add_scores(
+            dest=scores["thresh_diff_gt"],
+            src=train_scores,
+            namespace="train"
+        )
         self.add_scores(
             dest=scores["thresh_diff_gt"],
             src=test_scores,
             namespace="test"
         )
 
-        best_eps, test_scores = threshold_log_ratio(
-            test_labels, t0_test_probs, t1_test_probs, self.target_metric
+        best_eps, train_scores = threshold_log_ratio(
+            train_labels, t0_train_probs, t1_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_log_ratio(
+            test_labels, t0_test_probs, t1_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_log_ratio_gt"] = {
@@ -472,12 +486,21 @@ class TwoStepConversion(object):
         }
         self.add_scores(
             dest=scores["thresh_log_ratio_gt"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_log_ratio_gt"],
             src=test_scores,
             namespace="test"
         )
 
+        best_eps, train_scores = threshold_time_probs(
+            train_labels, t1_train_probs, self.target_metric
+        )
+
         best_eps, test_scores = threshold_time_probs(
-            test_labels, t1_test_probs, self.target_metric
+            test_labels, t1_test_probs, self.target_metric, eps=best_eps
         )
 
         scores["thresh_t1_gt"] = {
@@ -486,6 +509,36 @@ class TwoStepConversion(object):
 
         self.add_scores(
             dest=scores["thresh_t1_gt"],
+            src=train_scores,
+            namespace="train"
+        )
+
+        self.add_scores(
+            dest=scores["thresh_t1_gt"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        best_eps, train_scores = threshold_time_probs(
+            train_labels, t0_train_probs, self.target_metric
+        )
+
+        best_eps, test_scores = threshold_time_probs(
+            test_labels, t0_test_probs, self.target_metric, eps=best_eps
+        )
+
+        scores["thresh_t0_gt"] = {
+            "best_test_eps": best_eps
+        }
+
+        self.add_scores(
+            dest=scores["thresh_t0_gt"],
+            src=train_scores,
+            namespace="train"
+        )
+
+        self.add_scores(
+            dest=scores["thresh_t0_gt"],
             src=test_scores,
             namespace="test"
         )
