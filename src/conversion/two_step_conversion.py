@@ -454,7 +454,7 @@ class TwoStepConversion(object):
             train_labels, t0_train_probs, t1_train_probs, self.target_metric
         )
 
-        test_scores = threshold_diff(
+        _, test_scores = threshold_diff(
             test_labels, t0_test_probs, t1_test_probs, self.target_metric, eps=best_eps
         )
 
@@ -499,7 +499,7 @@ class TwoStepConversion(object):
             train_labels, t1_train_probs, self.target_metric
         )
 
-        best_eps, test_scores = threshold_time_probs(
+        _, test_scores = threshold_time_probs(
             test_labels, t1_test_probs, self.target_metric, eps=best_eps
         )
 
@@ -523,7 +523,7 @@ class TwoStepConversion(object):
             train_labels, t0_train_probs, self.target_metric
         )
 
-        best_eps, test_scores = threshold_time_probs(
+        _, test_scores = threshold_time_probs(
             test_labels, t0_test_probs, self.target_metric, eps=best_eps
         )
 
