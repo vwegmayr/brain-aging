@@ -6,6 +6,7 @@ from time import process_time
 from collections import OrderedDict
 import os
 import copy
+import pandas as pd
 
 from .base import FileStream
 from .base import Group
@@ -1519,3 +1520,98 @@ class MRISplitInfoPrinter(MRISingleStream):
         )
 
         exit()
+
+
+class SplitStats(object):
+    def __init__(self, image_count, subject_count, age_mean, age_std):
+        self.image_count = image_count
+        self.subject_count = subject_count
+        self.age_mean = age_mean
+        self.age_std = age_std
+
+    def get_metrics(self):
+        names = ["image_count", "subject_count", "age_mean", "age_std"]
+        values = [self.image_count, self.subject_count, self.age_mean,
+                  self.age_std]
+
+        return names, values
+
+
+class MRICVTable(MRISingleStream):
+    def __init__(self, *args, **kwargs):
+        super(MRICVTable, self).__init__(
+            *args,
+            **kwargs
+        )
+
+        self.cv_split_folder = self.config["cv_split_folder"]
+        self.print_cv_table()
+        exit()
+
+    def print_cv_table(self):
+        # find all splits and get stats
+        all_paths = []
+        names = os.listdir(self.cv_split_folder)
+        for name in names:
+            p = os.path.join(self.cv_split_folder, name)
+            if os.path.isdir(p):
+                all_paths.append(p)
+
+        all_paths = sorted(all_paths)
+        all_stats = []
+
+        for p in all_paths:
+            stats = self.get_stats(os.path.join(p, "test.txt"))
+            all_stats.append(stats)
+
+        stat = stats[0]
+        key_to_vals = OrderedDict()
+        for stat in all_stats:
+            for d, d_stat in stat.items():
+                met_names, met_vals = d_stat.get_metrics()
+                for name, val in zip(met_names, met_vals):
+                    k = d + "_" + name
+                    if k not in key_to_vals:
+                        key_to_vals[k] = []
+
+                    key_to_vals[k].append(val)
+
+        columns = [values for values in key_to_vals.values()]
+        header = key_to_vals.keys()
+
+        df = pd.DataFrame(
+            data=np.array(columns).T,
+            columns=header
+        )
+
+        print(df.round(4))
+
+    def get_stats(self, file_path):
+        with open(file_path, 'r') as f:
+            fids = [line.strip() for line in f]
+
+        diag_file_ids = {
+            d: []
+            for d in self.config["use_diagnoses"]
+        }
+
+        for fid in fids:
+            d = self.get_diagnose(fid)
+            diag_file_ids[d].append(fid)
+
+        diag_to_stat = OrderedDict()
+        for d in self.config["use_diagnoses"]:
+            fids = diag_file_ids[d]
+            image_count = len(fids)
+            subject_count = len(self.make_patient_groups(fids))
+            ages = [self.get_exact_age(fid) for fid in fids]
+            age_mean = np.mean(ages)
+            age_std = np.std(ages)
+            diag_to_stat[d] = SplitStats(
+                image_count=image_count,
+                subject_count=subject_count,
+                age_mean=age_mean,
+                age_std=age_std
+            )
+
+        return diag_to_stat
