@@ -1564,7 +1564,6 @@ class MRICVTable(MRISingleStream):
             stats = self.get_stats(os.path.join(p, "test.txt"))
             all_stats.append(stats)
 
-        stat = stats[0]
         key_to_vals = OrderedDict()
         for stat in all_stats:
             for d, d_stat in stat.items():
