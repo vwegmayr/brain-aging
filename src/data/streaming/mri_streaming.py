@@ -1564,6 +1564,7 @@ class MRICVTable(MRISingleStream):
             stats = self.get_stats(os.path.join(p, "test.txt"))
             all_stats.append(stats)
 
+        print(all_paths)
         key_to_vals = OrderedDict()
         for stat in all_stats:
             for d, d_stat in stat.items():
@@ -1583,7 +1584,7 @@ class MRICVTable(MRISingleStream):
             columns=header
         )
 
-        print(df.round(4))
+        print(df.round(4).to_latex(index=False))
 
     def get_stats(self, file_path):
         with open(file_path, 'r') as f:
