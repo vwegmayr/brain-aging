@@ -238,6 +238,7 @@ class TwoStepConversion(object):
         for strat, agg in all_scores.items():
             print(strat)
             for k, values in agg.items():
+                print(values)
                 print("{}: mean={}, std={}, median={}".format(
                     k,
                     np.mean(values),
