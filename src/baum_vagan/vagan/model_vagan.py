@@ -775,7 +775,7 @@ class vagan:
             masks.append(np.squeeze(M))
             img += M
             img[:, :, :, 1] = delta_channel[:, :, 0]
-            images.append(np.squeeze(img[:, :, :, 0]))
+            images.append(np.copy(np.squeeze(img[:, :, :, 0])))
 
         return images, masks
 
@@ -795,7 +795,7 @@ class vagan:
                 M[M >= 0] = 0
             masks.append(np.squeeze(M))
             img += M
-            images.append(np.squeeze(img[:, :, :, 0]))
+            images.append(np.copy(np.squeeze(img[:, :, :, 0])))
             # placeholder needs a second channel not used by generator
             # img = np.concatenate((img, img), axis=-1)
 
