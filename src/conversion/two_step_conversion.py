@@ -53,7 +53,7 @@ def compute_scores(y_true, y_pred):
     for f in funcs:
         s = f(y_true, y_pred)
         fname = f.__name__.split("_")[0]
-        scores[fname] = round(s, 5)
+        scores[fname] = round(s, 6)
         names.append(fname)
 
     return names, scores
