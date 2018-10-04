@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.metrics import recall_score, precision_score, \
     accuracy_score, f1_score, roc_auc_score
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from src.test_retest.mri.supervised_features import SliceClassification
 from src.data.streaming.base import Group
@@ -237,7 +238,17 @@ class TwoStepConversion(object):
         print(self.get_config())
         for strat, agg in all_scores.items():
             print(strat)
+            header = []
+            header.append("metric")
+            header.append("mean")
+            header.append("std")
+            header.append("median")
+            for i in range(len(self.split_paths)):
+                header.append("split_{}".format(i))
+            rows = []
             for k, values in agg.items():
+                row = []
+                """
                 print(values)
                 print("{}: mean={}, std={}, median={}".format(
                     k,
@@ -255,6 +266,23 @@ class TwoStepConversion(object):
                         kk + "_median": np.median(values),
                     }
                 )
+                """
+                row.append(k)
+                row.append(np.mean(values))
+                row.append(np.std(values))
+                row.append(np.median(values))
+                for i, v in enumerate(values):
+                    row.append(v)
+
+                rows.append(row)
+
+            df = pd.DataFrame(
+                data=np.array(rows),
+                columns=header
+            )
+            df = df.round(6)
+            print(df.to_csv(index=False))
+                
         print("++++++++++++++++++++")
         logger.dump()
 
