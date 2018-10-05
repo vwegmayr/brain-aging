@@ -4,6 +4,7 @@ import pydoc
 from collections import OrderedDict
 import itertools
 import sys
+import pandas as pd
 
 from src.data.streaming.mri_streaming import MRISingleStream
 from src.baum_vagan.utils import map_image_to_intensity_range
@@ -877,10 +878,43 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
 
     def print_some_stats(self):
         def print_provider(provider):
+            header = ["delta", "diag", "n_pairs", "n_images", "n_subjects",
+                      "age_mean", 'age_std']
+            rows = []
             for delta, p in provider.delta_to_provider.items():
                 print("Delta {}, nbr samples {}".format(
                     delta, len(p.samples)
                 ))
+                diag_images = OrderedDict()
+                diag_pairs = OrderedDict()
+
+                for s in p.samples:
+                    d = s.get_diagnoses()[0]
+                    if d not in diag_images:
+                        diag_images[d] = set()
+                    if d not in diag_pairs:
+                        diag_pairs[d] = []
+                    diag_pairs[d].append(s)
+                    diag_images[d].add(s.fid1)
+                    diag_images[d].add(s.fid2)
+
+                for d in diag_pairs.keys():
+                    row = [delta]
+                    row.append(d)
+                    row.append(len(diag_pairs[d]))
+                    row.append(len(diag_images[d]))
+                    subjects = set([self.get_patient_id for fid in diag_images[d]])
+                    row.append(len(subjects))
+                    ages = [self.get_exact_age(fid) for fid in diag_images[d]]
+                    row.append(np.mean(ages))
+                    row.append(np.std(ages))
+                    rows.append(row)
+
+            df = pd.DataFrame(
+                data=np.array(rows),
+                columns=header
+            )
+            print(df.to_csv(index=False))
 
         print("Train samples")
         print_provider(self.trainAD)
