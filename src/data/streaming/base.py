@@ -504,11 +504,12 @@ class FileStream(abc.ABC):
                 
             rows.append(row)
         
-        df = pd.DataFrame(
-            data=np.array(rows),
-            columns=header
-        )
-        print(df.to_csv(index=False))
+        if len(rows) > 0:
+            df = pd.DataFrame(
+                data=np.array(rows),
+                columns=header
+            )
+            print(df.to_csv(index=False))
 
         s = gender_0 * 1.0 + gender_1
         if s == 0:
@@ -572,8 +573,8 @@ class FileStream(abc.ABC):
 
     def select_file_ids(self, file_ids):
         # Only use specified diagnoses
-        diagnoses = self.config["use_diagnoses"]
-        selected = [fid for fid in file_ids
+        diagnoses = self.config["use_diagnoa = self.get_conversion_delta()
+        selected = [fid for fid in file_idsa = self.get_conversion_delta()
                     if self.get_diagnose(fid) in diagnoses]
 
         # For debugging purposes
