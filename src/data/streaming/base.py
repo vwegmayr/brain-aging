@@ -395,9 +395,11 @@ class FileStream(abc.ABC):
         image_set = set([])
 
         extra_counts = OrderedDict()
+        extra_fids = OrderedDict()
         extra_stat_keys = self.get_stat_keys()
         for k in extra_stat_keys:
             extra_counts[k] = OrderedDict()
+            extra_fids[k] = OrderedDict()
         for group in groups:
             image_set = image_set.union(group.file_ids)
             for fid in group.file_ids:
@@ -424,10 +426,13 @@ class FileStream(abc.ABC):
                 for k in extra_stat_keys:
                     v = self.get_meta_info_by_key(fid, k)
                     dic = extra_counts[k]
+                    dic2 = extra_fids[k]
                     if v not in dic:
                         dic[v] = 1
+                        dic2[v] = set([fid])
                     else:
                         dic[v] += 1
+                        dic2[v].add(fid)
 
             if len(group.file_ids) == 1:
                 continue
@@ -520,7 +525,8 @@ class FileStream(abc.ABC):
                 if of is not None:
                     of.write("{}, val {}, count {}\n".format(k, key, val))
                 else:
-                    print("{}, val {}, count {}".format(k, key, val))
+                    conv_ages = [self.get_exact_age(fid) for fid in extra_fids[k][key]]
+                    print("{}, val {}, count {}, {}, {}".format(k, key, val, np.mean(conv_ages), np.std(conv_ages)))
 
         if of is not None:
             of.close()
