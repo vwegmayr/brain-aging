@@ -649,6 +649,10 @@ class ProbabilityConvergence(TwoStepConversion):
         hc_probs = self.compute_probs(hc_ids)
         conv_probs = self.compute_probs(conv_ids)
         non_conv_probs = self.compute_probs(non_conv_ids)
+        
+        np.save("hc_population.npy", hc_probs)
+        np.save("converting_population.npy", conv_probs)
+        np.save("non_converting_population.npy", non_conv_probs)
 
         x = list(range(self.time_delta + 1))
         hc_mean = np.mean(hc_probs, axis=0)

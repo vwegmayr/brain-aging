@@ -10,6 +10,7 @@ import os
 from functools import reduce
 import copy
 from collections import OrderedDict
+import pandas as pd
 
 from . import features as _features
 
@@ -384,6 +385,8 @@ class FileStream(abc.ABC):
 
     def print_stats(self, groups, outfile=None):
         dignosis_count = OrderedDict()
+        diag_subject_count = OrderedDict()
+        diag_images = OrderedDict()
         ages = []
         age_diffs = []
         gender_0 = 0
@@ -402,7 +405,11 @@ class FileStream(abc.ABC):
                 diag = self.get_diagnose(fid)
                 if diag not in dignosis_count:
                     dignosis_count[diag] = 0
+                    diag_subject_count[diag] = set()
+                    diag_images[diag] = set()
                 dignosis_count[diag] += 1
+                diag_subject_count[diag].add(self.get_patient_id(fid))
+                diag_images[diag].add(fid)
 
                 g = self.get_gender(fid)
                 if g == 0:
@@ -472,13 +479,31 @@ class FileStream(abc.ABC):
                          .format(np.mean(age_diffs), np.std(age_diffs)))
 
         total_diag_count = sum(dignosis_count.values())
+        header = ["diag",'image_count', 'subject_count', 'age_mean', 'age_std']
+        rows = []
         for diag, c in dignosis_count.items():
+            row = [diag]
             if of is None:
                 print(">>>> {} count: {} ({})"
                       .format(diag, c, c / total_diag_count))
+                row.append(c)
+                print(">>>> {} subject count: {}".format(diag, len(diag_subject_count[diag])))
+                dages = [self.get_exact_age(fid) for fid in diag_images[diag]]
+                row.append(len(diag_subject_count[diag]))
+                row.append(np.mean(dages))
+                row.append(np.std(dages))
+                print(">>>> {} age: {} {}".format(diag, np.mean(dages), np.std(dages)))
             else:
                 of.write("{} count: {} ({})\n"
                          .format(diag, c, c / total_diag_count))
+                
+            rows.append(row)
+        
+        df = pd.DataFrame(
+            data=np.array(rows),
+            columns=header
+        )
+        print(df.to_csv(index=False))
 
         s = gender_0 * 1.0 + gender_1
         if s == 0:

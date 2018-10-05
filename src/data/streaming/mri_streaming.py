@@ -1594,6 +1594,15 @@ class MRICVTable(MRISingleStream):
             d: []
             for d in self.config["use_diagnoses"]
         }
+        
+        if self.config["conversion"]:
+            # keep only t0 images
+            keep = []
+            patient_groups = self.make_patient_groups(fids)
+            for g in patient_groups:
+                ss = sorted(g.file_ids, key=lambda x: self.get_exact_age(x))
+                keep.append(ss[0])
+            fids = keep
 
         for fid in fids:
             d = self.get_diagnose(fid)
