@@ -499,7 +499,7 @@ class FileStream(abc.ABC):
                 
             rows.append(row)
         
-        if len(rows) > 0:
+        if len(rows) > 0 and len(rows[0]) > 1:
             df = pd.DataFrame(
                 data=np.array(rows),
                 columns=header
