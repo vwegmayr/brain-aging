@@ -903,7 +903,7 @@ class AgeVariableDeltaStream(AgeFixedDeltaStream):
                     row.append(d)
                     row.append(len(diag_pairs[d]))
                     row.append(len(diag_images[d]))
-                    subjects = set([self.get_patient_id for fid in diag_images[d]])
+                    subjects = set([self.get_patient_id(fid) for fid in diag_images[d]])
                     row.append(len(subjects))
                     ages = [self.get_exact_age(fid) for fid in diag_images[d]]
                     row.append(np.mean(ages))
