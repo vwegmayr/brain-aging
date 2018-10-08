@@ -4,6 +4,7 @@ import os
 import numpy as np
 import re
 import copy
+import shutil
 
 
 from modules.models.base import BaseTF
@@ -377,6 +378,11 @@ class EvaluateEpochsBaseTF(BaseTF):
         self.n_epochs = n_epochs
         self.input_fn_config["num_epochs"] = 1
 
+        # Compute the number of steps per epoch
+        #n_train_steps = self.streamer.get_number_train_batches()
+        #self.config["keep_checkpoint_max"] = n_epochs
+        #self.config["save_checkpoints_steps"] = n_train_steps + 1
+
         output_dir = self.config["model_dir"]
         self.metric_logger = MetricLogger(output_dir, "Evaluation metrics")
         for i in range(n_epochs):
@@ -439,6 +445,14 @@ class EvaluateEpochsBaseTF(BaseTF):
             # persist evaluations to json file
             self.metric_logger.dump()
             sys.stdout.flush()
+
+            # Copy checkpoint to new epoch folder
+            dest_path = os.path.join(self.save_path, "epoch{}".format(i))
+            os.makedirs(dest_path)
+            for fname in os.listdir(self.save_path):
+                full_path = os.path.join(self.save_path, fname)
+                if os.path.isfile(full_path):
+                    shutil.copy(full_path, dest_path)
 
         if "keep_embeddings" in self.data_params:
             self.compress_data(True)

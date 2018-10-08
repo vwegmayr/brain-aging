@@ -11,6 +11,18 @@ lambda,label,regfirst,test_test_acc,test_retest_acc
 10,20180515-215151,0,-1,-1
 10,20180515-215546,0,-1,-1
 
+\begin{tabular}{rrrrrr}
+\toprule
+ lambda &  regfirst &  test\_test\_acc &  test\_retest\_acc &  test\_total &   acc\_std \\
+\midrule
+      0 &         0 &       0.913100 &         0.913867 &    0.913483 &  0.000643 \\
+     10 &         0 &       0.920033 &         0.919833 &    0.919933 &  0.000983 \\
+     10 &         1 &       0.916867 &         0.916633 &    0.916750 &  0.001004 \\
+\bottomrule
+\end{tabular}
+
+
+
 train 10000
 lambda,label,regfirst,test_test_acc,test_retest_acc
 0,20180515-114633,0,-1,-1
@@ -22,3 +34,15 @@ lambda,label,regfirst,test_test_acc,test_retest_acc
 10,20180515-215947,0,-1,-1
 10,20180515-220505,0,-1,-1
 10,20180515-221026,0,-1,-1
+
+\begin{tabular}{rrrrrr}
+\toprule
+ lambda &  regfirst &  test\_test\_acc &  test\_retest\_acc &  test\_total &   acc\_std \\
+\midrule
+      0 &         0 &       0.951533 &         0.952600 &    0.952067 &  0.009565 \\
+     10 &         0 &       0.960800 &         0.962833 &    0.961817 &  0.000126 \\
+     10 &         1 &       0.957200 &         0.960667 &    0.958933 &  0.001200 \\
+\bottomrule
+\end{tabular}
+
+

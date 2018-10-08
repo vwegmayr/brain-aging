@@ -177,6 +177,14 @@ class FileStream(abc.ABC):
             print(">>>>>>>> Test stats")
             self.print_stats(self.test_groups)
 
+    def get_number_train_batches(self):
+        n_samples = len(self.train_groups)
+        n_batches = int(n_samples / self.batch_size)
+        if n_batches * self.batch_size < n_samples:
+            n_batches += 1
+
+        return n_batches
+
     def get_batches(self, mode):
         if mode == "train":
             groups = self.train_groups
