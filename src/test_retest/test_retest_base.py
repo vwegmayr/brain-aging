@@ -451,7 +451,7 @@ class EvaluateEpochsBaseTF(BaseTF):
             os.makedirs(dest_path)
             for fname in os.listdir(self.save_path):
                 full_path = os.path.join(self.save_path, fname)
-                if os.path.isfile(full_path):
+                if os.path.isfile(full_path) and "outcome" not in full_path:
                     shutil.copy(full_path, dest_path)
 
         if "keep_embeddings" in self.data_params:
