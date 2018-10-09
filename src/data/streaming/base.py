@@ -451,7 +451,6 @@ class FileStream(abc.ABC):
                 diff = abs(age1 - age2)
                 age_diffs.append(diff)
 
-
         age_diffs = np.array(age_diffs)
         ages = np.array(ages)
 
@@ -512,7 +511,7 @@ class FileStream(abc.ABC):
 
             rows.append(row)
 
-        if len(rows) > 0 and len(rows[0]) > 0:
+        if len(rows) > 1 and len(rows[0]) > 1:
             df = pd.DataFrame(
                 data=np.array(rows),
                 columns=header
