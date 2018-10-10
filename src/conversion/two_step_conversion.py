@@ -286,7 +286,7 @@ class TwoStepConversion(object):
             )
             df = df.round(6)
             print(df.to_csv(index=False))
-            df.to_csv(os.path.join(self.save_path, '{}_scores.csv'.format(strat)))
+            df.to_csv(os.path.join(self.save_path, '{}_scores.csv'.format(strat)), index=False)
                 
         print("++++++++++++++++++++")
         logger.dump()
