@@ -27,7 +27,8 @@ MAX_TEST = config.MAX_TEST
 FILTERS = config.FILTERS
 LEGEND_LOC = config.LEGEND_LOC
 REASON = config.REASON
-
+SORT_BY = config.SORT_BY
+NO_PLOTS = config.NO_PLOTS
 
 def filter_record_by_tag(rec, f):
     if "tags" not in f:
@@ -97,20 +98,21 @@ def plot_groups(groups):
 
     groups = [RecordGroup(g, l, DATA_PATH) for g, l in zip(groups, labels)]
 
-    for g in groups:
-        g.plot_group(
+    if not NO_PLOTS:
+        for g in groups:
+            g.plot_group(
+                metric=METRIC,
+                x_label=X_LABEL,
+                y_label=Y_LABEL,
+                legend_loc=LEGEND_LOC
+            )
+
+        RecordGroup.compare_groups(
+            groups=groups,
             metric=METRIC,
             x_label=X_LABEL,
-            y_label=Y_LABEL,
-            legend_loc=LEGEND_LOC
+            y_label=Y_LABEL
         )
-
-    RecordGroup.compare_groups(
-        groups=groups,
-        metric=METRIC,
-        x_label=X_LABEL,
-        y_label=Y_LABEL
-    )
 
     for g in groups:
         g.print_run_accuracies(REPORT_METRICS, VALIDATION_METRIC, MAX_TEST)
@@ -140,7 +142,12 @@ def main():
 
     print("{} records after tag filtering".format(len(remaining)))
     # Apply config filters
+    
+    if SORT_BY is not None:
+        remaining = sorted(remaining, key=lambda x: x.find_tag(SORT_BY))
 
+    for r in remaining:
+        print(r.label)
     # Groupy by
     groups = group_records(remaining)
 
