@@ -239,6 +239,10 @@ class TwoStepConversion(object):
         for strat, agg in all_scores.items():
             print(strat)
             header = []
+            clf_name = self.clf_label.replace("/","_")
+            header.append("method")
+            header.append("clf_name")
+            header.append("gan_name")
             header.append("metric")
             header.append("mean")
             header.append("std")
@@ -247,7 +251,7 @@ class TwoStepConversion(object):
                 header.append("split_{}".format(i))
             rows = []
             for k, values in agg.items():
-                row = []
+                row = [strat, clf_name, self.vagan_label]
                 """
                 print(values)
                 print("{}: mean={}, std={}, median={}".format(
@@ -282,6 +286,7 @@ class TwoStepConversion(object):
             )
             df = df.round(6)
             print(df.to_csv(index=False))
+            df.to_csv(os.path.join(self.save_path, '{}_scores.csv'.format(strat)))
                 
         print("++++++++++++++++++++")
         logger.dump()
