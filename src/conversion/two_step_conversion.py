@@ -12,6 +12,7 @@ import pandas as pd
 from src.test_retest.mri.supervised_features import SliceClassification
 from src.data.streaming.base import Group
 from src.logging import MetricLogger
+from src.baum_vagan.utils import ncc
 
 
 def predict_probabilities(est, input_fn):
@@ -686,3 +687,57 @@ class ProbabilityConvergence(TwoStepConversion):
         plt.boxplot(non_conv_probs)
         plt.title("Non-Converting box plot")
         plt.show()
+
+
+class NCCComputation(TwoStepConversion):
+    def __init__(self, vagan_label, clf_label, split_path, conversion_delta):
+        self.vagan_label = vagan_label
+        self.clf_label = clf_label
+        self.split_path = split_path
+        self.conversion_delta = conversion_delta
+
+        self.load_models()
+
+    def get_images(self, ids):
+        streamer = self.clf_vagan_obj.streamer
+        images = []
+        for fid in ids:
+            path = streamer.get_file_path(fid)
+            im = streamer.load_sample(path).astype(np.float32)
+            images.append(im)
+
+        return images
+
+    def get_fake_t1_images(self, t0_fids):
+        vagan = self.clf_vagan_obj.streamer.wrapper.vagan
+        t0_images = self.get_image(t0_fids)
+        gen = []
+        for t0_im in t0_images:
+            t1 = vagan.iterated_far_prediction(
+                t0_im, self.conversion_delta
+            )
+            gen.append(t1)
+
+        return gen
+
+    def fit(self, X, y=None):
+        train_ids, val_ids, test_ids = self.load_split(self.split_path)
+        all_ids = train_ids + val_ids + test_ids
+
+        # Get t0 and t1 file IDs
+        t0_ids = self.clf_only_obj.streamer.select_file_ids(all_ids)
+        t1_ids = self.clf_only_obj.streamer.t1_fids[:]
+
+        t0_images = self.get_images(t0_ids)
+        fake_t1_images = self.get_fake_t1_images(t0_ids)
+        real_t1_images = self.get_images(t1_ids)
+
+        scores = []
+        for t0, fake, real in zip(t0_images, fake_t1_images, real_t1_images):
+            gt_diff = real - t0
+            gen_diff = fake - t0
+            scores.append(ncc(gt_diff, gen_diff))
+
+        print("NCC scores mean: {}, std: {}, median: {}".format(
+            np.mean(scores), np.std(scores), np.median(scores)
+        ))
