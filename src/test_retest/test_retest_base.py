@@ -446,13 +446,15 @@ class EvaluateEpochsBaseTF(BaseTF):
             self.metric_logger.dump()
             sys.stdout.flush()
 
-            # Copy checkpoint to new epoch folder
-            dest_path = os.path.join(self.save_path, "epoch{}".format(i))
-            os.makedirs(dest_path)
-            for fname in os.listdir(self.save_path):
-                full_path = os.path.join(self.save_path, fname)
-                if os.path.isfile(full_path) and "outcome" not in full_path:
-                    shutil.copy(full_path, dest_path)
+            if "keep_epoch_checkpoints" in self.data_params and \
+                    self.data_params['keep_epoch_checkpoints']:
+                # Copy checkpoint to new epoch folder
+                dest_path = os.path.join(self.save_path, "epoch{}".format(i))
+                os.makedirs(dest_path)
+                for fname in os.listdir(self.save_path):
+                    full_path = os.path.join(self.save_path, fname)
+                    if os.path.isfile(full_path) and "outcome" not in full_path:
+                        shutil.copy(full_path, dest_path)
 
         if "keep_embeddings" in self.data_params:
             self.compress_data(True)
