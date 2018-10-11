@@ -8,6 +8,7 @@ from sklearn.metrics import recall_score, precision_score, \
     accuracy_score, f1_score, roc_auc_score
 import matplotlib.pyplot as plt
 import pandas as pd
+import itertools
 
 from src.test_retest.mri.supervised_features import SliceClassification
 from src.data.streaming.base import Group
@@ -711,15 +712,26 @@ class NCCComputation(TwoStepConversion):
 
     def get_fake_t1_images(self, t0_fids):
         vagan = self.clf_vagan_obj.streamer.wrapper.vagan
-        t0_images = self.get_image(t0_fids)
+        t0_images = self.get_images(t0_fids)
         gen = []
         for t0_im in t0_images:
-            t1 = vagan.iterated_far_prediction(
+            images, masks = vagan.iterated_far_prediction(
                 t0_im, self.conversion_delta
             )
-            gen.append(t1)
+            gen.append(images[-1])
 
         return gen
+
+    def print_scores(self, scores):
+        print("Mean {}".format(np.mean(scores)))
+        print("STD {}".format(np.std(scores)))
+        print("Median {}".format(np.median(scores)))
+        print("5-percentile {}".format(np.percentile(scores, 5)))
+        print("95-percentile {}".format(np.percentile(scores, 95)))
+        
+        return ["mean","std","median","5-perc", "95-perc", "min", "max"],\
+            [np.mean(scores), np.std(scores), np.median(scores), np.percentile(scores, 5), np.percentile(scores, 95),
+             np.min(scores), np.max(scores)]
 
     def fit(self, X, y=None):
         train_ids, val_ids, test_ids = self.load_split(self.split_path)
@@ -728,17 +740,68 @@ class NCCComputation(TwoStepConversion):
         # Get t0 and t1 file IDs
         t0_ids = self.clf_only_obj.streamer.select_file_ids(all_ids)
         t1_ids = self.clf_only_obj.streamer.t1_fids[:]
+        
+        print(">>>>>>> {} images".format(len(t0_ids)))
+        
+        for t0, t1 in zip(t0_ids, t1_ids):
+            s = self.clf_only_obj.streamer
+            assert s.get_patient_id(t0) == s.get_patient_id(t1)
+            assert s.get_exact_age(t1) - s.get_exact_age(t0) >= self.conversion_delta
 
         t0_images = self.get_images(t0_ids)
         fake_t1_images = self.get_fake_t1_images(t0_ids)
         real_t1_images = self.get_images(t1_ids)
 
+        id_to_t0 = {}
+        for fid, im in zip(t0_ids, t0_images):
+            id_to_t0[fid] = im
+        
+        id_to_t1 = {}
+        for fid, im in zip(t1_ids, real_t1_images):
+            id_to_t1[fid] = im
+
+        # NCC for difference maps
         scores = []
         for t0, fake, real in zip(t0_images, fake_t1_images, real_t1_images):
             gt_diff = real - t0
             gen_diff = fake - t0
+            assert gt_diff.shape == gen_diff.shape
             scores.append(ncc(gt_diff, gen_diff))
 
-        print("NCC scores mean: {}, std: {}, median: {}".format(
-            np.mean(scores), np.std(scores), np.median(scores)
-        ))
+        print("NCC scores t0/t1")
+        names, values = self.print_scores(scores)
+        
+        header = ["pair_type"] + names
+        rows = [["not_random"] + values]
+        
+        # random pairs
+        pairs = list(itertools.product(t0_ids, t1_ids))
+        self.clf_only_obj.streamer.np_random.shuffle(pairs)
+        scores = []
+        c = 0
+        i = 0
+        while c < len(t0_ids):
+            s = self.clf_only_obj.streamer
+            p0 = pairs[2 * i]
+            p1 = pairs[2 * i + 1]
+            
+            i += 1
+            if s.get_patient_id(p0[0]) == s.get_patient_id(p0[1]):
+                continue
+            if s.get_patient_id(p1[0]) == s.get_patient_id(p1[1]):
+                continue
+            
+            c += 1
+            diff0 = id_to_t1[p0[1]] - id_to_t0[p0[0]]
+            diff1 = id_to_t1[p1[1]] - id_to_t0[p1[0]]
+            scores.append(ncc(diff0, diff1))
+            
+        print("Random pairs")
+        names, values = self.print_scores(scores)
+        rows.append(['random'] + values)
+        
+        df = pd.DataFrame(
+            data=np.array(rows),
+            columns=header
+        )
+        print(df.to_csv(index=False))
