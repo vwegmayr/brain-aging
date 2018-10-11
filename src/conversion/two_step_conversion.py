@@ -690,11 +690,12 @@ class ProbabilityConvergence(TwoStepConversion):
 
 
 class NCCComputation(TwoStepConversion):
-    def __init__(self, vagan_label, clf_label, split_path, conversion_delta):
+    def __init__(self, vagan_label, clf_label, split_path, conversion_delta, vagan_rescale):
         self.vagan_label = vagan_label
         self.clf_label = clf_label
         self.split_path = split_path
         self.conversion_delta = conversion_delta
+        self.vagan_rescale = vagan_rescale
 
         self.load_models()
 
