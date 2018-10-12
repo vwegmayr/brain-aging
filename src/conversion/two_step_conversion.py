@@ -77,7 +77,7 @@ def threshold_probs(labels, probs, target_metric, all_eps):
 
 def threshold_harmonic_all_probs(labels, all_probs, target_metric, eps=None, weights=None):
     if eps is None:
-        all_eps = np.linspace(-1, 1, 200)
+        all_eps = np.linspace(0, 1, 100)
     else:
         all_eps = [eps]
 
@@ -639,7 +639,7 @@ class TwoStepConversion(object):
         # Threshold harmonic
         best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
             train_labels, all_vagan_train_probs, self.target_metric,
-            eps=np.linspace(0, 1, 100), weights=None
+            eps=None, weights=None
         )
         print(">>>>>> harmonic weights")
         print(best_weights)
