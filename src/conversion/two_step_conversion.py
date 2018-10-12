@@ -92,6 +92,27 @@ def threshold_diff(labels, t0_probs, vagan_probs, target_metric, eps=None):
     )
 
 
+def threshold_max_t0_t1(labels, t0_probs, t1_probs, target_metric, eps=None):
+    if eps is None:
+        all_eps = np.linspace(-1, 1, 200)
+    else:
+        all_eps = [eps]
+
+    expected = np.array(labels)
+    all_probs = np.hstack((
+        np.reshape(t0_probs, (-1, 1)),
+        np.reshape(t1_probs, (-1, 1))
+    ))
+    maxis = np.max(all_probs, axis=1)
+
+    return threshold_probs(
+        labels=expected,
+        probs=maxis,
+        target_metric=target_metric,
+        all_eps=all_eps
+    )
+
+
 def threshold_log_ratio(labels, t0_probs, vagan_probs, target_metric, eps=None):
 
     expected = np.array(labels)
@@ -461,6 +482,30 @@ class TwoStepConversion(object):
             namespace="test"
         )
 
+        # Threshold max t0, t1
+        best_eps, train_scores = threshold_max_t0_t1(
+            train_labels, t0_train_probs, vagan_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_max_t0_t1(
+            test_labels, t0_test_probs, vagan_test_probs, self.target_metric, eps=best_eps
+        )
+
+        scores["thresh_max_t0_t1"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_max_t0_t1"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_max_t0_t1"],
+            src=test_scores,
+            namespace="test"
+        )
+
         # Treshold t0
         best_eps, train_scores = threshold_time_probs(
             train_labels, t0_train_probs, self.target_metric
@@ -575,6 +620,29 @@ class TwoStepConversion(object):
 
         self.add_scores(
             dest=scores["thresh_t0_gt"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        best_eps, train_scores = threshold_max_t0_t1(
+            train_labels, t0_train_probs, t1_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_max_t0_t1(
+            test_labels, t0_test_probs, t1_test_probs, self.target_metric, eps=best_eps
+        )
+
+        scores["thresh_max_t0_t1_gt"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_max_t0_t1_gt"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_max_t0_t1_gt"],
             src=test_scores,
             namespace="test"
         )
