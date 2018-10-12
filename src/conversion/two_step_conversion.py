@@ -613,11 +613,11 @@ class TwoStepConversion(object):
         )
 
         # Threshold max all
-        best_eps, train_scores = threshold_max_t0_t1(
+        best_eps, train_scores = threshold_max_all(
             train_labels, all_vagan_train_probs, self.target_metric
         )
 
-        _, test_scores = threshold_max_t0_t1(
+        _, test_scores = threshold_max_all(
             test_labels, all_vagan_test_probs, self.target_metric, eps=best_eps
         )
 
