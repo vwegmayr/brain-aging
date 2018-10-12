@@ -756,8 +756,8 @@ class TwoStepConversion(object):
         best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
             train_labels,
             np.hstack(
-                np.reshape(t0_train_probs, (-1, 1)),
-                np.reshape(vagan_train_probs, (-1, 1))
+                (np.reshape(t0_train_probs, (-1, 1)),
+                np.reshape(vagan_train_probs, (-1, 1)))
             ),
             self.target_metric,
             eps=None, weights=None
@@ -768,8 +768,8 @@ class TwoStepConversion(object):
         _, _, test_scores = threshold_harmonic_all_probs(
             test_labels,
             np.hstack(
-                np.reshape(t0_test_probs, (-1, 1)),
-                np.reshape(vagan_test_probs, (-1, 1))
+                (np.reshape(t0_test_probs, (-1, 1)),
+                np.reshape(vagan_test_probs, (-1, 1)))
             ),
             self.target_metric,
             eps=best_eps, weights=best_weights
