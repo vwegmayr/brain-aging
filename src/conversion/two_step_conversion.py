@@ -121,6 +121,51 @@ def threshold_harmonic_all_probs(labels, all_probs, target_metric, eps=None, wei
     return best_eps, best_weights, best_all_scores
 
 
+def threshold_weighted_mean(labels, t0_probs, t1_probs, target_metric, eps=None, weights=None):
+    if eps is None:
+        all_eps = np.linspace(0, 1, 100)
+    else:
+        all_eps = [eps]
+
+    best_score = -1
+    best_all_scores = None
+    best_eps = -1
+    best_weights = []
+    expected = np.array(labels)
+
+    all_probs = np.hstack((
+        np.reshape(t0_probs, (-1, 1)),
+        np.reshape(t1_probs, (-1, 1))
+    ))
+    weight_vals = np.linspace(0.0, 1, 10)
+    n_probs = all_probs.shape[1]
+
+    if weights is None:
+        all_combos = itertools.product(weight_vals, repeat=n_probs)
+    else:
+        all_combos = [weights]
+
+    for combo in all_combos:
+        # compute harmonic mean
+        weighted = np.sum(combo * all_probs, axis=1)
+
+        new_eps, all_scores = threshold_probs(
+            labels=expected,
+            probs=weighted,
+            target_metric=target_metric,
+            all_eps=all_eps
+        )
+        score = all_scores[target_metric]
+
+        if score > best_score:
+            best_score = score
+            best_all_scores = all_scores
+            best_eps = new_eps
+            best_weights = np.copy(combo)
+
+    return best_eps, best_weights, best_all_scores
+
+
 def threshold_diff(labels, t0_probs, vagan_probs, target_metric, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
@@ -664,7 +709,7 @@ class TwoStepConversion(object):
                     eps=best_eps, weights=best_weights
                 )
 
-                scores["threshold_harmonic"] = {
+                scores["thresh_harmonic"] = {
                     "best_train_eps": best_eps,
                 }
 
@@ -678,6 +723,72 @@ class TwoStepConversion(object):
                     src=test_scores,
                     namespace="test"
                 )
+
+        # Weighted means
+        best_eps, best_weights, train_scores = threshold_weighted_mean(
+            train_labels, t0_train_probs, vagan_train_probs, self.target_metric,
+            eps=None, weights=None
+        )
+        print(">>>>>> weighted mean weights")
+        print(best_weights)
+
+        _, _, test_scores = threshold_weighted_mean(
+            test_labels, t0_test_probs, vagan_test_probs, self.target_metric,
+            eps=best_eps, weights=best_weights
+        )
+
+        scores["thresh_weighted_mean"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_weighted_mean"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_weighted_mean"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        # Harmonic t0 t1
+        best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
+            train_labels,
+            np.hstack(
+                np.reshape(t0_train_probs, (-1, 1)),
+                np.reshape(vagan_train_probs, (-1, 1))
+            ),
+            self.target_metric,
+            eps=None, weights=None
+        )
+        print(">>>>>> harmonic t0 t1 weights")
+        print(best_weights)
+
+        _, _, test_scores = threshold_harmonic_all_probs(
+            test_labels,
+            np.hstack(
+                np.reshape(t0_test_probs, (-1, 1)),
+                np.reshape(vagan_test_probs, (-1, 1))
+            ),
+            self.target_metric,
+            eps=best_eps, weights=best_weights
+        )
+
+        scores["thresh_harmonic_t0_t1"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_harmonic_t0_t1"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_harmonic_t0_t1"],
+            src=test_scores,
+            namespace="test"
+        )
 
         # Treshold t0
         best_eps, train_scores = threshold_time_probs(
