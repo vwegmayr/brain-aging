@@ -212,7 +212,8 @@ def threshold_time_probs(labels, t1_probs, target_metric, eps=None):
 
 class TwoStepConversion(object):
     def __init__(self, vagan_label, clf_label, split_paths, conversion_delta,
-                 vagan_rescale, target_metric, all_steps, n_iterations):
+                 vagan_rescale, target_metric, all_steps, n_iterations,
+                 harmonic=False):
         """
         Args:
             - vagan_label: sumatra label for VAGAN record
@@ -228,6 +229,7 @@ class TwoStepConversion(object):
         self.target_metric = target_metric
         self.all_steps = all_steps
         self.n_iterations = n_iterations
+        self.harmonic = harmonic
 
         self.load_models()
 
@@ -649,32 +651,33 @@ class TwoStepConversion(object):
             )
 
             # Threshold harmonic
-            best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
-                train_labels, all_vagan_train_probs, self.target_metric,
-                eps=None, weights=None
-            )
-            print(">>>>>> harmonic weights")
-            print(best_weights)
+            if self.harmonic:
+                best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
+                    train_labels, all_vagan_train_probs, self.target_metric,
+                    eps=None, weights=None
+                )
+                print(">>>>>> harmonic weights")
+                print(best_weights)
 
-            _, _, test_scores = threshold_harmonic_all_probs(
-                test_labels, all_vagan_test_probs, self.target_metric,
-                eps=best_eps, weights=best_weights
-            )
+                _, _, test_scores = threshold_harmonic_all_probs(
+                    test_labels, all_vagan_test_probs, self.target_metric,
+                    eps=best_eps, weights=best_weights
+                )
 
-            scores["threshold_harmonic"] = {
-                "best_train_eps": best_eps,
-            }
+                scores["threshold_harmonic"] = {
+                    "best_train_eps": best_eps,
+                }
 
-            self.add_scores(
-                dest=scores["thresh_harmonic"],
-                src=train_scores,
-                namespace="train"
-            )
-            self.add_scores(
-                dest=scores["thresh_harmonic"],
-                src=test_scores,
-                namespace="test"
-            )
+                self.add_scores(
+                    dest=scores["thresh_harmonic"],
+                    src=train_scores,
+                    namespace="train"
+                )
+                self.add_scores(
+                    dest=scores["thresh_harmonic"],
+                    src=test_scores,
+                    namespace="test"
+                )
 
         # Treshold t0
         best_eps, train_scores = threshold_time_probs(
