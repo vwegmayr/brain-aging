@@ -426,7 +426,7 @@ class TwoStepConversion(object):
         t1_input_fn = self.clf_only_obj.streamer.get_input_fn_for_groups(
             t1_batches
         )
-        vagan_input_fn = self.clf_vagan_obj.streamer.et_input_fn_for_groups(
+        vagan_input_fn = self.clf_vagan_obj.streamer.get_input_fn_for_groups(
             t0_batches,
             vagan_steps=self.n_iterations
         )
