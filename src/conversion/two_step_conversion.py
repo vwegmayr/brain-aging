@@ -455,7 +455,7 @@ class TwoStepConversion(object):
         probs = np.zeros((n, self.conversion_delta + 1))
         t0_batches = [Group([fid]) for fid in t0_ids]
 
-        for i in range(self.time_delta):
+        for i in range(self.conversion_delta):
             vagan_input_fn = self.clf_vagan_obj.streamer.get_input_fn_for_groups(
                 t0_batches,
                 vagan_steps=i + 1
