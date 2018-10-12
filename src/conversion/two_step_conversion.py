@@ -75,6 +75,52 @@ def threshold_probs(labels, probs, target_metric, all_eps):
     return all_eps[i], all_scores[i]
 
 
+def threshold_harmonic_all_probs(labels, all_probs, target_metric, eps=None, weights=None):
+    if eps is None:
+        all_eps = np.linspace(-1, 1, 200)
+    else:
+        all_eps = [eps]
+
+    best_score = -1
+    best_all_scores = None
+    best_eps = -1
+    best_weights = []
+    expected = np.array(labels)
+
+    n_probs = all_probs.shape[1]
+    weight_vals = np.linspace(0.01, 1, 10)
+
+    mci_probs = 1 - all_probs
+
+    if weights is None:
+        all_combos = itertools.product(weight_vals, repeat=n_probs)
+    else:
+        all_combos = [weights]
+
+    for combo in all_combos:
+        # compute harmonic mean
+        num = np.sum(mci_probs, axis=1)
+        denom = np.sum(combo * (1 / mci_probs), axis=1)
+        denom = denom + 0.000001
+        harmonic_means = num / denom
+
+        new_eps, all_scores = threshold_probs(
+            labels=expected,
+            probs=harmonic_means,
+            target_metric=target_metric,
+            all_eps=all_eps
+        )
+        score = all_scores[target_metric]
+
+        if score > best_score:
+            best_score = score
+            best_all_scores = all_scores
+            best_eps = new_eps
+            best_weights = np.copy(combo)
+
+    return best_eps, best_weights, best_all_scores
+
+
 def threshold_diff(labels, t0_probs, vagan_probs, target_metric, eps=None):
     if eps is None:
         all_eps = np.linspace(-1, 1, 200)
@@ -103,6 +149,23 @@ def threshold_max_t0_t1(labels, t0_probs, t1_probs, target_metric, eps=None):
         np.reshape(t0_probs, (-1, 1)),
         np.reshape(t1_probs, (-1, 1))
     ))
+    maxis = np.max(all_probs, axis=1)
+
+    return threshold_probs(
+        labels=expected,
+        probs=maxis,
+        target_metric=target_metric,
+        all_eps=all_eps
+    )
+
+
+def threshold_max_all(labels, all_probs, target_metric, eps=None):
+    if eps is None:
+        all_eps = np.linspace(-1, 1, 200)
+    else:
+        all_eps = [eps]
+
+    expected = np.array(labels)
     maxis = np.max(all_probs, axis=1)
 
     return threshold_probs(
@@ -371,6 +434,44 @@ class TwoStepConversion(object):
             predict_probabilities(self.clf_vagan_est, vagan_input_fn)
         ]
 
+    def compute_gt_probs(self, t0_ids, t1_ids):
+        t0_batches = [Group([fid]) for fid in t0_ids]
+        t1_batches = [Group([fid]) for fid in t1_ids]
+
+        t0_input_fn = self.clf_only_obj.streamer.get_input_fn_for_groups(
+            t0_batches
+        )
+        t1_input_fn = self.clf_only_obj.streamer.get_input_fn_for_groups(
+            t1_batches
+        )
+
+        return [
+            predict_probabilities(self.clf_only_est, t0_input_fn),
+            predict_probabilities(self.clf_only_est, t1_input_fn),
+        ]
+
+    def compute_all_probs(self, t0_ids):
+        n = len(t0_ids)
+        probs = np.zeros((n, self.conversion_delta + 1))
+        t0_batches = [Group([fid]) for fid in t0_ids]
+
+        for i in range(self.time_delta):
+            vagan_input_fn = self.clf_vagan_obj.streamer.get_input_fn_for_groups(
+                t0_batches,
+                vagan_steps=i + 1
+            )
+            probs_i = predict_probabilities(self.clf_vagan_est, vagan_input_fn)
+            probs[:, i + 1] = probs_i
+
+        # t0 probs
+        t0_input_fn = self.clf_only_obj.streamer.get_input_fn_for_groups(
+            t0_batches
+        )
+        t0_probs = predict_probabilities(self.clf_only_est, t0_input_fn)
+        probs[:, 0] = t0_probs
+
+        return probs
+
     def print_label_stats(self, labels):
         print("number samples: {}".format(len(labels)))
         print("class 0: {}".format(np.mean((labels == 0).astype(np.int32))))
@@ -405,12 +506,17 @@ class TwoStepConversion(object):
         self.print_label_stats(test_labels)
 
         # Compute probabilities
-        t0_train_probs, t1_train_probs, vagan_train_probs = self.compute_probs(
+        t0_train_probs, t1_train_probs = self.compute_gt_probs(
             t0_train_ids, t1_train_ids
         )
-        t0_test_probs, t1_test_probs, vagan_test_probs = self.compute_probs(
+        t0_test_probs, t1_test_probs = self.compute_gt_probs(
             t0_test_ids, t1_test_ids
         )
+
+        all_vagan_train_probs = self.compute_all_probs(t0_train_ids)
+        all_vagan_test_probs = self.compute_all_probs(t0_test_ids)
+        vagan_train_probs = all_vagan_train_probs[:, self.conversion_delta]
+        vagan_test_probs = all_vagan_test_probs[:, self.conversion_delta]
 
         # Compute scores
         # Threshold diff
@@ -502,6 +608,58 @@ class TwoStepConversion(object):
         )
         self.add_scores(
             dest=scores["thresh_max_t0_t1"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        # Threshold max all
+        best_eps, train_scores = threshold_max_t0_t1(
+            train_labels, all_vagan_train_probs, self.target_metric
+        )
+
+        _, test_scores = threshold_max_t0_t1(
+            test_labels, all_vagan_test_probs, self.target_metric, eps=best_eps
+        )
+
+        scores["thresh_max_all"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_max_all"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_max_all"],
+            src=test_scores,
+            namespace="test"
+        )
+
+        # Threshold harmonic
+        best_eps, best_weights, train_scores = threshold_harmonic_all_probs(
+            train_labels, all_vagan_train_probs, self.target_metric,
+            eps=np.linspace(0, 1, 100), weights=None
+        )
+        print(">>>>>> harmonic weights")
+        print(best_weights)
+
+        _, _, test_scores = threshold_harmonic_all_probs(
+            test_labels, all_vagan_test_probs, self.target_metric,
+            eps=best_eps, weights=best_weights
+        )
+
+        scores["threshold_harmonic"] = {
+            "best_train_eps": best_eps,
+        }
+
+        self.add_scores(
+            dest=scores["thresh_harmonic"],
+            src=train_scores,
+            namespace="train"
+        )
+        self.add_scores(
+            dest=scores["thresh_harmonic"],
             src=test_scores,
             namespace="test"
         )
