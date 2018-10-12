@@ -99,7 +99,7 @@ def threshold_harmonic_all_probs(labels, all_probs, target_metric, eps=None, wei
 
     for combo in all_combos:
         # compute harmonic mean
-        num = np.sum(mci_probs, axis=1)
+        num = np.sum(combo)
         denom = np.sum(combo * (1 / mci_probs), axis=1)
         denom = denom + 0.000001
         harmonic_means = num / denom
