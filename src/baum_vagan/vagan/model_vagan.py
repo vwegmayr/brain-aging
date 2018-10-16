@@ -1,5 +1,4 @@
-# Authors:
-# Christian F. Baumgartner (c.f.baumgartner@gmail.com)
+# Based on https://github.com/baumgach/vagan-code
 
 import logging
 import numpy as np
